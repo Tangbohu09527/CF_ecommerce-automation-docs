@@ -28,6 +28,11 @@
 | [开发规范](./03_开发规范.md) | 仓库、Git、数据与文档规则 |
 | [部署运维](./04_部署运维.md) | 测试环境基线、待部署服务与排障原则 |
 | [技术决策记录](./05_技术决策记录.md) | 当前有效决定及其原因和影响 |
+| [AI 系统总体架构](./architecture/ai-system-overview.md) | 面向企业业务的分层架构和当前实现边界 |
+| [agent-wechat 定位](./architecture/wechat-agent.md) | 微信入口层职责、非职责和接口边界 |
+| [消息与任务流程](./architecture/message-flow.md) | 普通问答、企业业务和规划中文件处理流程 |
+| [组件职责图谱](./architecture/component-map.md) | 核心组件职责、状态和系统关系 |
+| [当前开发进度](./status/current-progress.md) | 已验证事实、待完成工作和规划能力 |
 | [AI 协作入口](./AGENTS.md) | 后续 Codex 和其他代码 AI 的约束 |
 
 ## 相关仓库
@@ -40,4 +45,4 @@
 
 ## 当前状态
 
-当前处于**阶段 1 的微信接入技术验证期**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，具体基线见[部署运维](./04_部署运维.md)；生产服务、正式存储对接、接口、数据表和附件兼容性测试仍未宣称完成，下一步部署并验证 `agent-wechat`，再对接 Hermes。
+当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` 的部署、微信登录、联系人读取、聊天读取、消息读取和消息发送已完成基础验证。该进展不代表生产上线或端到端主链路完成；Gateway、Hermes、Skills、正式存储、企业系统接口、权限体系和附件兼容性仍待设计、接入或验证。详见[当前开发进度](./status/current-progress.md)和[部署运维](./04_部署运维.md)。
