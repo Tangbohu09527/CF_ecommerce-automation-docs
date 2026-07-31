@@ -6,7 +6,9 @@
 
 CF Gateway 是企业 AI 消息中枢，也是消息入口、权威控制面和 AI 执行环境之间的安全与调度边界。机器人不是公开服务：消息能够进入 Gateway 并被保存，不代表该消息有权创建 AI 任务。
 
-Gateway 管理：
+Gateway 包含 `Message Ingestion`、`Message Store`、`Access Control`、`Context Builder`、`Task Queue`、`AI Router`、`AI Provider Registry` 和由 Provider / Task 状态组成的 `Runtime / Execution Status`。
+
+这些模块共同管理：
 
 - 消息及附件历史。
 - 用户、群、Skill 和任务权限。
@@ -41,7 +43,7 @@ flowchart TB
     A["API 入口<br/>待设计"] --> AA["API Adapter / Auth<br/>待设计"]
 
     subgraph G["CF Gateway / Debian 权威控制中心"]
-        WA --> N["事件标准化"]
+        WA --> N["Message Ingestion<br/>事件标准化"]
         FA --> N
         DA --> N
         AA --> N
@@ -59,7 +61,7 @@ flowchart TB
     H --> S["授权 Skills"]
 ```
 
-图中的飞书、钉钉、API 入口及多种 AI Provider 是目标扩展位置，不表示已经选型、部署或验证。详细权限模型见[Access Control 设计](../design/access-control-design.md)，标准事件字段见[Hermes 事件协议](../design/hermes-event-schema.md)。
+图中的飞书、钉钉、API 入口及多种 AI Provider 是目标扩展位置，不表示已经选型、部署或验证。详细设计分别见[Message Store 设计](../design/message-store-design.md)、[Access Control 设计](../design/access-control-design.md)、[Task Queue 设计](../design/task-queue-design.md)和[Hermes 事件协议](../design/hermes-event-schema.md)。
 
 ## 3. Gateway 核心职责
 
@@ -147,8 +149,10 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 
 | 字段 | 说明 |
 | --- | --- |
-| `message_id` | Gateway 中稳定的消息标识；重复投递不得产生重复消息历史 |
+| `id` | Gateway 中稳定的内部消息标识；重复投递不得产生重复消息历史 |
+| `event_id` | 首次形成该消息记录的标准事件标识；同一逻辑事件重投时保持不变 |
 | `source` | 平台、接入提供方、机器人或应用账号及原始事件标识 |
+| `source_message_id` | 来源侧消息标识；与 Gateway 内部 `id` 分离，并在来源账号和会话范围内解释 |
 | `conversation_id` | 原始物理会话标识，在来源平台和账号范围内解释 |
 | `sender_id` | 平台侧稳定发信人标识 |
 | `sender_name` | 平台提供的展示名称，不作为授权依据 |
@@ -158,13 +162,13 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 | `reply_context` | 实际可得的引用消息标识、摘要和解析状态 |
 | `attachments` | 附件标识、名称、类型、大小、哈希、获取状态和受控存储引用 |
 
-`attachments` 保存结构化元数据和受控引用，不在消息记录中内嵌二进制、Base64 或任意主机路径。未授权消息的附件仍属于消息历史：能成功获取时进入受控消息附件存储，获取失败时保留元数据和失败状态；它们不得进入 AI 任务工作区或发送给 Hermes。
+`attachments` 保存结构化元数据和受控引用，不在消息记录中内嵌二进制、Base64 或任意主机路径。未授权消息的附件元数据仍属于消息历史，并保留获取或清理状态；附件二进制是否获取、长期落盘或归档由独立的存储、容量、安全和保留策略决定。未授权消息的附件不得进入 AI 任务工作区或发送给 Hermes，权限拒绝也不得被实现为删除消息或附件元数据。完整模型见[Message Store 设计](../design/message-store-design.md)。
 
 ### 5.2 持久化规则
 
 - 原始载荷与标准消息分开保存，通过受控引用关联。
 - Message Store 成功写入后才能推进入口同步检查点；保存失败时不得假装消息已接收完成。
-- 重复投递关联同一 `message_id`，记录必要接收尝试，不重复创建任务或附件副本。
+- 重复投递关联同一 `id`，记录必要接收尝试，不重复创建任务或附件副本。
 - 未授权消息和授权消息遵循明确的数据分级、访问审计和保留周期；具体周期待确认。
 - 普通运行日志不等于消息历史库，不应重复输出完整敏感正文或附件内容。
 
@@ -229,7 +233,7 @@ flowchart LR
     Q --> R["AI Router"]
 ```
 
-Task Queue 至少保存任务标识、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。具体队列产品、优先级算法和容量参数待选型。
+Task Queue 至少保存任务标识、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。Task 主状态统一为 `queued`、`running`、`succeeded`、`failed`、`cancelled`；附件的 `pending` 等获取状态不属于 Task 状态。具体字段、转换、优先级和重试边界见[Task Queue 设计](../design/task-queue-design.md)，队列产品和容量参数待选型。
 
 队列必须支持：
 
@@ -298,7 +302,13 @@ API Provider 示例：
   "provider": "openai",
   "provider_type": "api",
   "model": "GPT",
-  "status": "available"
+  "status": "idle",
+  "current_task_id": null,
+  "started_at": null,
+  "elapsed_seconds": 0,
+  "queue_length": 0,
+  "last_heartbeat": null,
+  "last_status_update": "2026-07-31T08:00:00Z"
 }
 ```
 
@@ -310,7 +320,13 @@ Local Provider 示例：
   "provider_type": "local",
   "node": "ai-node-01",
   "model": "Qwen",
-  "status": "busy"
+  "status": "busy",
+  "current_task_id": "task_example",
+  "started_at": "2026-07-31T07:58:00Z",
+  "elapsed_seconds": 120,
+  "queue_length": 2,
+  "last_heartbeat": "2026-07-31T08:00:00Z",
+  "last_status_update": "2026-07-31T08:00:00Z"
 }
 ```
 
@@ -323,12 +339,17 @@ Provider Runtime State 至少可包含：
 | `provider` | 对应 `provider_id` |
 | `provider_type` | `api`、`local` 或后续扩展类型 |
 | `model` | 当前任务目标模型或 Provider 汇报的模型 |
-| `status` | `available`、`busy`、`degraded`、`unavailable` 或 `maintenance` |
+| `status` | `idle`、`busy`、`error` 或 `maintenance` |
+| `current_task_id` | 当前执行 Task；空闲或不适用时为 `null` |
+| `started_at` | 当前 Task 或忙碌周期开始时间；不适用时为 `null` |
+| `elapsed_seconds` | 当前 Task 已执行时长快照；不适用时为 `0` 或 `null` |
+| `queue_length` | 当前可路由到该 Provider 的等待 Task 数量快照 |
+| `last_heartbeat` | Provider / Worker 最近心跳；API Provider 不适用时可为 `null` |
+| `last_status_update` | Gateway 最近确认该状态的时间 |
 | `load` | Provider 级并发、限流、排队或容量摘要；格式随 Provider 能力定义 |
 | `node` | Local Provider 可选诊断字段；Gateway 不据此维护节点注册表 |
-| `observed_at` | Gateway 接受该运行状态的时间 |
 
-API 限流、Local Provider 内部节点故障或模型服务异常都应汇总为 Provider 级状态和错误。状态过期或无法读取时，AI Router 按不可用处理，不能默认健康。
+`idle` 表示可以接受符合条件的新 Task；`busy` 表示当前达到该路由单元的执行容量；`error` 和 `maintenance` 均不接受新 Task。API 限流、Local Provider 内部节点故障或模型服务异常都应汇总为 Provider 级状态和错误。状态过期或无法读取时，AI Router 按 `error` 或不可调度处理，不能默认 `idle`。该状态用于判断是否空闲、展示当前任务和执行时长，以及决定新任务排队还是立即执行；它不是某台 AI 物理主机的状态表。
 
 ## 12. AI Router
 
@@ -355,7 +376,7 @@ flowchart TB
 
 路由分为两步：
 
-1. **资格过滤：** Provider 已启用、状态可用，并满足任务所需模态、模型、上下文、工具、数据地域、隐私和权限约束。
+1. **资格过滤：** Provider 已启用、运行状态为 `idle` 或仍有明确可用容量，并满足任务所需模态、模型、上下文、工具、数据地域、隐私和权限约束。
 2. **候选选择：** 在合格 Provider 中按策略优先级、容量、限流、成本、延迟和错误率选择；具体权重待压测和业务评审。
 
 路由要求：
@@ -426,9 +447,9 @@ Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 G
 | `agent-wechat` V1 微信入口 | **已验证**，限现有验证记录范围 |
 | `wechat-adapter` | **设计完成，代码待开发** |
 | Hermes 事件协议 | **设计基线，待实现前评审** |
-| Gateway Message Store、Context Builder | **本文形成目标设计，待实现和验证** |
+| Gateway Message Store、Context Builder | **Message Store 详细设计已形成；Context Builder 为目标设计，均待实现和验证** |
 | Access Control | **设计基线，待实现和验证** |
-| Task Queue、AI Router、AI Provider Registry | **本文形成目标设计，产品与实现待确认** |
+| Task Queue、AI Router、AI Provider Registry | **Task Queue 详细设计已形成；产品与实现待确认** |
 | Provider Runtime State | **目标设计，状态采集方式待确认** |
 | 微信群结构化 `@` 识别 | **待结合实际 API 样本验证** |
 | Hermes、Worker Bridge、Skills | **待接入 / 待开发** |

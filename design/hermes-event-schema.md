@@ -39,7 +39,7 @@
 | `conversation` | object / null | 是 | 原始物理会话；账号级错误无法定位会话时可为 `null` |
 | `sender` | object / null | 是 | 原始发起人；来源整体不可用且无法识别时可为 `null` |
 | `authorization` | object / null | 是 | Gateway 生成的不可变授权快照；来源级错误无法形成身份事实时可为 `null` |
-| `runtime` | object / null | 是 | Gateway AI Router 生成的 Provider 运行与排队快照；尚未创建任务时可为 `null` |
+| `runtime` | object / null | 是 | Gateway AI Router 生成的 Provider / Task 运行与排队快照；尚未创建任务时可为 `null` |
 | `message` | object / null | 是 | 当前消息、命令或结果摘要；不适用时为 `null` |
 | `context` | object | 是 | 追踪、因果、任务、引用、转发、权限和错误等上下文 |
 | `attachments` | array | 是 | 附件或产物引用；没有附件时使用空数组 `[]` |
@@ -57,7 +57,8 @@
     "account_id": "account_example",
     "producer": "wechat-adapter",
     "transport": "polling",
-    "native_event_id": "native_message_example"
+    "native_event_id": "native_event_example",
+    "native_message_id": "native_message_example"
   },
   "timestamp": "2026-07-31T08:00:00Z",
   "conversation": {
@@ -114,6 +115,7 @@
 | `producer` | 是 | 生成当前标准事件的组件，如 Adapter 或 Debian 控制面 |
 | `transport` | 否 | 发现或接收事件的方式，如 `polling`、`webhook`、`event`；只记录事实，不代表所有方式已验证 |
 | `native_event_id` | 否 | 上游原始事件或消息标识；不得单独假定为跨账号全局唯一 |
+| `native_message_id` | 否 | 上游原始消息标识，对应 Message Store 的 `source_message_id`；与 Gateway 内部消息 ID 分离 |
 
 `source.platform` 表示原始业务入口，不表示当前事件由该平台直接产生。例如 `command_request` 可以由 Debian 控制面生成，同时继续保留最初的 `wechat` 来源，`source.producer` 则记录实际生产组件。
 
@@ -163,7 +165,7 @@
 
 ### 3.6 `runtime`
 
-`runtime` 是 Gateway AI Router 为 Task 记录的 Provider 运行与排队快照。它描述所选 AI Provider，不表示 Gateway 管理具体 AI 主机，也不建立单一 AI 全局状态。
+`runtime` 是 Gateway AI Router 为 Task 记录的 Provider / Task 运行与排队快照。它描述所选 AI Provider 和当前 Task 的执行关系，不表示 Gateway 管理具体 AI 主机，也不建立单一 AI 全局状态。
 
 API Provider 示例：
 
@@ -172,8 +174,15 @@ API Provider 示例：
   "provider": "openai",
   "provider_type": "api",
   "model": "GPT",
-  "status": "available",
-  "queue_position": 0
+  "status": "busy",
+  "task_status": "running",
+  "current_task_id": "task_example",
+  "started_at": "2026-07-31T07:58:00Z",
+  "elapsed_seconds": 120,
+  "queue_length": 1,
+  "queue_position": null,
+  "last_heartbeat": null,
+  "last_status_update": "2026-07-31T08:00:00Z"
 }
 ```
 
@@ -186,7 +195,14 @@ Local Provider 示例：
   "node": "ai-node-01",
   "model": "Qwen",
   "status": "busy",
-  "queue_position": 0
+  "task_status": "running",
+  "current_task_id": "task_example",
+  "started_at": "2026-07-31T07:58:00Z",
+  "elapsed_seconds": 120,
+  "queue_length": 2,
+  "queue_position": null,
+  "last_heartbeat": "2026-07-31T08:00:00Z",
+  "last_status_update": "2026-07-31T08:00:00Z"
 }
 ```
 
@@ -197,20 +213,26 @@ Local Provider 示例：
 | `provider` | 是 | AI Provider Registry 中的稳定 `provider_id` |
 | `provider_type` | 是 | `api`、`local` 或后续扩展类型 |
 | `model` | 是 | AI Router 为当前 Task 选择的模型标识 |
-| `status` | 是 | `available`、`busy`、`degraded`、`unavailable` 或 `maintenance` |
-| `queue_position` | 否 | 当前 Task 的零基队列位置；`0` 表示下一待调度任务，不适用时为 `null` |
+| `status` | 是 | Provider 状态：`idle`、`busy`、`error` 或 `maintenance` |
+| `task_status` | 是 | Task 状态快照：`queued`、`running`、`succeeded`、`failed` 或 `cancelled` |
+| `current_task_id` | 是 | 当前执行 Task；空闲或不适用时为 `null` |
+| `started_at` | 是 | 当前 Task 或忙碌周期开始时间；不适用时为 `null` |
+| `elapsed_seconds` | 是 | 当前 Task 已执行时长快照；不适用时为 `0` 或 `null` |
+| `queue_length` | 是 | 当前可路由到该 Provider 的等待 Task 数量快照 |
+| `queue_position` | 否 | 当前 Task 的零基队列位置；已经运行或不适用时为 `null` |
+| `last_heartbeat` | 是 | Provider / Worker 最近心跳；API Provider 不适用时为 `null` |
+| `last_status_update` | 是 | Gateway 最近确认该状态的 UTC RFC 3339 时间 |
 | `node` | 否 | Local Provider 可选诊断字段；API Provider 或不暴露节点时为 `null` |
-| `observed_at` | 是 | Gateway 接受该 Provider 状态快照的 UTC RFC 3339 时间 |
 
-Provider 状态过期或无法读取时按不可用处理。Gateway AI Router 可以重新选择符合策略的 Provider，但不得绕过数据边界、权限、模型批准或幂等规则。
+`idle` 表示 Provider 可以接受符合条件的新 Task；`busy` 表示当前达到该路由单元的执行容量；`error` 和 `maintenance` 均不接受新 Task。状态过期或无法读取时按 `error` 或不可调度处理，不能默认 `idle`。Gateway AI Router 可以重新选择符合策略的 Provider，但不得绕过数据边界、权限、模型批准或幂等规则。
 
-`runtime` 是事件发生时的快照，不替代 Gateway 中的 Task Queue 和 Provider Runtime State 权威记录。Hermes 可以回报执行结果，但不能自行更换未获批准的 Provider 或改写路由事实。
+`runtime` 是事件发生时的快照，不替代 Gateway 中的 Task Queue 和 Provider Runtime State 权威记录。Hermes 可以回报执行结果，但不能自行更换未获批准的 Provider、修改 Task 状态或改写路由事实。
 
 ### 3.7 `message`
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `id` | 是 | 当前平台消息标识或控制面生成的命令/结果消息标识 |
+| `id` | 是 | Gateway 内部消息 ID 或控制面生成的命令 / 结果消息 ID；平台侧消息 ID 位于 `source.native_message_id` |
 | `type` | 是 | 统一消息类型：`text`、`file`、`image`、`voice`、`reply`、`forward` |
 | `content` | 否 | 当前消息正文、外层标题、命令摘要或结果摘要；二进制内容不得放入此字段 |
 | `raw_type` | 否 | 上游原始消息类型，供映射升级和排障使用；Hermes 不应依赖它执行业务逻辑 |
@@ -249,7 +271,7 @@ Provider 状态过期或无法读取时按不可用处理。Gateway AI Router �
 | `storage_ref` | 否 | Debian 受控临时存储或 File Service 的不透明引用；不是主机路径 |
 | `purpose` | 否 | `input`、`reference` 或 `output`；由任务上下文确定 |
 
-`status=available` 时才允许提供可用的 `storage_ref`。`status=failed` 时不得用空文件或失效引用继续执行依赖该附件的任务。
+`status=available` 时才允许提供可用的 `storage_ref`。`status=failed` 时不得用空文件或失效引用继续执行依赖该附件的任务。这里的 `pending`、`available`、`failed` 是附件获取状态；Task 主状态独立使用 `queued`、`running`、`succeeded`、`failed`、`cancelled`。
 
 ## 4. 核心事件类型
 
@@ -353,7 +375,7 @@ flowchart TB
 目标生命周期为：
 
 1. `agent-wechat` 提供文件消息和当前可获取的来源元数据。
-2. Adapter 把消息写入 Gateway Message Store，登记 `pending` 附件并尝试获取文件。
+2. Adapter 提交标准化消息和附件元数据，Gateway Message Store 完成持久化并登记 `pending` 附件；Adapter 再按受控策略尝试获取文件。
 3. 文件写入 Debian 受控消息附件存储，完成大小、类型、哈希和安全边界检查后标为 `available`，发布 `file_received`。
 4. Access Control 形成授权快照；拒绝消息及附件保留历史，但不创建 Task。
 5. 允许消息由 Context Builder 生成快照、创建 Task 并进入 Task Queue，AI Router 再选择 AI Provider。
@@ -434,4 +456,4 @@ message_received（全部消息先持久化）
 | Hermes、Worker Bridge、Skills 接入 | **待接入 / 待开发** |
 | `feishu`、`dingtalk` 入口 | **协议预留，未接入、未验证** |
 
-现有验证事实以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准，Gateway、权限和 Provider 边界以[企业 AI Gateway 架构](../architecture/gateway-architecture.md)与[Access Control 设计](./access-control-design.md)为准，组件权威边界以[系统设计](../02_系统设计.md)为准。
+现有验证事实以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准，消息、任务、Gateway、权限和 Provider 边界分别见[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)与[Access Control 设计](./access-control-design.md)，组件权威边界以[系统设计](../02_系统设计.md)为准。

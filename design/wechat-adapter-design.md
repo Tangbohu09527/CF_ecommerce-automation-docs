@@ -4,14 +4,14 @@
 
 ## 设计定位
 
-`wechat-adapter` 是 CF Gateway 逻辑边界中的微信入口适配组件。它封装 `agent-wechat` API，把微信原始消息转换为版本化标准事件，登记附件并通过 Debian 权威控制面与 Hermes 通信。总体关系见[微信入口与 Hermes 集成架构](../architecture/wechat-hermes-integration.md)。
+`wechat-adapter` 是 CF Gateway 逻辑边界中的微信入口适配组件。它封装 `agent-wechat` API，把微信原始消息和附件元数据转换为版本化标准事件并提交 Gateway。Message Store 持久化、Access Control、Context Builder、Task Queue 和 AI Router 均由 Gateway 负责；Adapter 不直接与 Hermes 通信。总体关系见[微信入口与 Hermes 集成架构](../architecture/wechat-hermes-integration.md)。
 
-V1 使用 Polling，不依赖尚未确认的 WebSocket 微信消息事件。Adapter 不承担意图理解、任务规划、Skill 选择或 ERP 业务逻辑。
+V1 使用 Polling，不依赖尚未确认的 WebSocket 微信消息事件。Adapter 不承担权威消息存储、入口授权、上下文构建、Task 创建、意图理解、任务规划、Skill 选择或 ERP 业务逻辑。
 
 ## 设计原则
 
-- 原始消息与标准事件分开保存，转换失败时仍可追踪原始输入。
-- 先持久化、后派发；消息进入 Hermes 前必须经过来源、权限、任务和上下文控制。
+- Adapter 分开提交受控原始载荷引用和标准化内容，Gateway Message Store 负责权威保存；转换失败时仍可追踪原始输入。
+- Gateway 先持久化、后做权限判断和派发；消息进入 Hermes 前必须经过 Access Control、Context Builder、Task Queue 和 AI Router。
 - 事件协议版本化，新增字段优先保持向后兼容。
 - 同步去重、任务幂等、业务操作幂等和结果回传幂等分别处理。
 - 只使用上游实际提供的信息，不根据 `senderName`、文件名或消息正文猜测身份和权限。
@@ -37,42 +37,67 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
 
 ### 事件封装
 
-统一入站事件名为 `message_received`。目标事件至少包含 `source`、`conversation`、`sender`、`message`、`attachments` 和 `context`，并携带协议版本、事件标识及采集时间。
+统一入站事件名为 `message_received`。目标事件遵循[Hermes 事件协议](./hermes-event-schema.md)的 `snake_case` 字段和小写枚举。Adapter 提供来源事实、标准化消息、附件元数据和原始载荷引用；Gateway 持久化后追加 `authorization`，只有创建 Task 后才会出现 `runtime`。
 
-以下 JSON 仅表示目标结构，不是已经运行的接口响应：
+以下 JSON 表示 Gateway 完成持久化和授权后的目标结构，不是已经运行的接口响应。示例中的 `authorization` 由 Gateway 生成，不由 Adapter 填写：
 
 ```json
 {
-  "schemaVersion": "1.0",
-  "eventId": "wechat:<source-account>:<chat-id>:<local-id>",
-  "eventType": "message_received",
-  "receivedAt": "<adapter-received-at>",
+  "schema_version": "1.0",
+  "event_id": "evt_example",
+  "event_type": "message_received",
   "source": {
     "platform": "wechat",
     "provider": "agent-wechat",
-    "accountId": "<source-account>",
-    "transport": "polling"
+    "account_id": "account_example",
+    "producer": "wechat-adapter",
+    "transport": "polling",
+    "native_event_id": "native_event_example",
+    "native_message_id": "native_message_example"
   },
+  "timestamp": "2026-07-31T08:00:00Z",
   "conversation": {
-    "id": "<chat-id>",
-    "kind": "<PRIVATE_OR_GROUP_IF_CONFIRMED>"
+    "id": "conversation_example",
+    "type": "private",
+    "thread_id": null
   },
   "sender": {
-    "id": "<sender>",
-    "displayName": "<sender-name>",
-    "enterpriseIdentityId": null
+    "id": "sender_example",
+    "display_name": "示例用户",
+    "enterprise_identity_id": null,
+    "type": "human"
   },
+  "authorization": {
+    "user_allowed": true,
+    "group_allowed": null,
+    "is_mentioned": null,
+    "permission_scope": ["scope_example"],
+    "decision": "allowed",
+    "reason_code": "allowed",
+    "policy_version": "policy_example",
+    "checked_at": "2026-07-31T08:00:00Z"
+  },
+  "runtime": null,
   "message": {
-    "id": "<local-id>",
-    "type": "TEXT",
-    "rawType": "<agent-wechat-type>",
-    "content": "<message-content>"
+    "id": "message_example",
+    "type": "text",
+    "raw_type": "source_specific_type",
+    "content": "示例消息"
   },
-  "attachments": [],
   "context": {
-    "reply": null,
-    "forward": null
-  }
+    "trace_id": "trace_example",
+    "correlation_id": null,
+    "causation_event_id": null,
+    "source_timestamp": null,
+    "batch_id": null,
+    "task_id": null,
+    "context_snapshot_ref": null,
+    "reply_to": null,
+    "forward": null,
+    "raw_payload_ref": "raw_payload_example",
+    "error": null
+  },
+  "attachments": []
 }
 ```
 
@@ -80,46 +105,50 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
 
 | 对象 | 必要内容 | 边界 |
 | --- | --- | --- |
-| `source` | 平台、上游组件、来源账号、采集方式 | 来源账号来自受控配置；不能只用 `chatId` 区分多个微信账号 |
+| `source` | 平台、上游组件、来源账号、采集方式和来源消息 ID | 来源账号来自受控配置；不能只用 `chatId` 区分多个微信账号 |
 | `conversation` | `chatId` 和已确认的私聊/群聊类型 | 会话类型无法可靠确定时不得猜测；应进入待补全或错误状态 |
 | `sender` | `sender`、`senderName`、可选企业身份映射 | 企业身份由权限系统解析，Adapter 不自行授予权限 |
-| `message` | `localId`、统一类型、原始类型、正文或外层标题 | 原始类型必须保留，便于升级映射和排障 |
+| `message` | Gateway 内部消息 ID、统一类型、原始类型、正文或外层标题 | `localId` 映射到 `source.native_message_id`；原始类型必须保留 |
 | `attachments` | 文件引用、名称、类型、大小、哈希和获取状态中实际可得的字段 | 未获取成功时不得生成可用文件引用；未知元数据保持为空 |
 | `context` | 可获得的引用关系、合并转发外层信息 | 不包含未被 `agent-wechat` 展开的合并转发内部记录 |
 
-`eventId` 的建议组成是 `sourceAccount + chatId + localId`。该规则须在确认 `localId` 的稳定性和作用域后定稿；未经验证时不能仅用 `localId` 作为全局唯一键。
+`event_id` 和 Gateway 内部 `message.id` 使用稳定生成值，来源侧 `localId` 保存在 `source.native_message_id`。建议以 `source.account_id + conversation.id + source.native_message_id` 作为来源幂等键；该规则须在确认 `localId` 的稳定性和作用域后定稿，未经验证时不能仅用 `localId` 作为全局唯一键。
 
 ### 引用上下文
 
-当 `reply` 中确实存在可读取信息时，`context.reply` 可记录被引用消息标识、类型、文本摘要或附件引用。缺少稳定被引用消息标识时，应保留“引用存在”和实际可得内容，同时标记关联未解析，不把相似文本自动关联为原消息。
+当 `reply` 中确实存在可读取信息时，`context.reply_to` 可记录被引用消息标识、类型、文本摘要或附件引用。缺少稳定被引用消息标识时，应保留“引用存在”和实际可得内容，同时标记关联未解析，不把相似文本自动关联为原消息。
 
 合并转发消息只在 `context.forward` 记录当前已验证可获得的外层标题、发送人和原始类型。内部消息列表和内部文件保持未解析状态。
 
 ## 3. 消息类型
 
-统一类型使用以下枚举：
+统一消息类型使用小写枚举：
 
 | 类型 | 含义 | 当前状态 |
 | --- | --- | --- |
-| `TEXT` | 普通文本消息 | **已验证：** 私聊文本收发、群聊文本读取 |
-| `IMAGE` | 图片消息 | **待技术验证** |
-| `FILE` | 普通文件或群文件消息 | **已验证：** 文件消息读取，以及 TXT、ZIP、群文件和引用文件获取；其他格式与边界仍待验证 |
-| `VIDEO` | 视频消息 | **待技术验证** |
-| `VOICE` | 语音消息 | **待技术验证** |
-| `REPLY` | 带引用关系的消息包装 | **已验证：** 引用消息和引用文件；具体字段完整性仍需按样本固化 |
-| `FORWARD` | 合并转发消息包装 | **外层已验证：** 可识别类型、发送人和标题；内部聊天记录及文件未支持 |
-| `SYSTEM` | 微信系统通知或会话状态消息 | **待技术验证** |
+| `text` | 普通文本消息 | **已验证：** 私聊文本收发、群聊文本读取 |
+| `image` | 图片消息 | **待技术验证** |
+| `file` | 普通文件或群文件消息 | **已验证：** 文件消息读取，以及 TXT、ZIP、群文件和引用文件获取；其他格式与边界仍待验证 |
+| `voice` | 语音消息 | **待技术验证** |
+| `reply` | 带引用关系的消息包装 | **已验证：** 引用消息和引用文件；具体字段完整性仍需按样本固化 |
+| `forward` | 合并转发消息包装 | **外层已验证：** 可识别类型、发送人和标题；内部聊天记录及文件未支持 |
 
-`REPLY` 和 `FORWARD` 表示消息结构，不应丢失其正文或附件。引用正文、引用文件和合并转发外层信息分别放入 `message`、`attachments` 和 `context`。无法映射的上游 `type` 应记录为不支持的原始消息并进入待分析状态，不能为了通过校验而误标为 `SYSTEM`。
+`reply` 和 `forward` 表示消息结构，不应丢失其正文或附件。引用正文、引用文件和合并转发外层信息分别放入 `message`、`attachments` 和 `context`。尚未纳入协议的 `video`、`system` 或其他上游类型保留原始类型并产生 `invalid_message`，不得强制伪装为已知类型。
 
 ## 4. 文件流程
 
 ```mermaid
-flowchart LR
+flowchart TB
     F["微信文件"] --> A["agent-wechat"]
     A --> W["wechat-adapter"]
-    W --> T["Debian 受控临时存储"]
-    T --> H["Hermes<br/>文件引用和元数据"]
+    W --> M["Gateway Message Store<br/>消息与附件元数据"]
+    M --> AC["Access Control"]
+    AC -->|"拒绝"| R["只保留消息、附件元数据和权限决策"]
+    AC -->|"允许"| C["Context Builder"]
+    C --> Q["Task Queue"]
+    Q --> AR["AI Router"]
+    AR --> P["AI Provider"]
+    P --> H["Hermes<br/>获准文件引用和元数据"]
     H --> S["授权 Skill"]
 ```
 
@@ -127,12 +156,13 @@ flowchart LR
 
 目标处理步骤：
 
-1. Adapter 先持久化原始文件消息及来源账号、`chatId`、`sender` 和 `localId`。
-2. Adapter 调用 `agent-wechat` 获取文件，使用受控生成的内部名称写入 Debian 临时区。
-3. File Service 或规划中的受控文件处理环节登记原文件名、大小、媒体类型、哈希、获取状态和来源关联。
+1. Adapter 标准化原始文件消息，提交来源账号、`chatId`、`sender`、`localId`、原始载荷引用和附件元数据。
+2. Gateway Message Store 先持久化消息和附件元数据，再允许后续 Access Control；保存失败时不得推进同步检查点。
+3. Adapter 调用 `agent-wechat` 获取文件，按独立存储与安全策略写入 Debian 受控存储并更新同一附件记录。
 4. 标准事件的 `attachments` 只携带不透明文件引用和已确认元数据，不携带文件二进制内容或任意主机路径。
-5. 控制面在权限检查和任务批次收口后，将文件引用放入 Hermes 的上下文快照。
-6. Hermes 只能把获授权的文件引用交给相应 Skill；Skill 输出重新登记后才能回传或归档。
+5. Access Control 只决定是否创建 Task，不决定是否保留消息或附件元数据；附件二进制长期保留由独立策略决定。
+6. 获准消息经 Context Builder 选择必要附件、创建 Task 并进入 Task Queue，AI Router 再选择 Provider。
+7. Hermes 只能取得上下文快照中的获准文件引用并交给相应 Skill；Skill 输出重新登记后才能回传或归档。
 
 文件获取失败时，消息事件仍应保留，附件状态标记为失败。依赖该文件的任务不得在缺失输入的情况下继续执行或伪造成功。ZIP 文件入口已验证不等于自动解压、安全检查或内部内容处理已经完成。
 
@@ -146,8 +176,9 @@ flowchart TB
     H --> Q["查询受控范围内的 chat"]
     Q --> M["读取最近消息或分页消息"]
     M --> D["按 lastMsgLocalId 和幂等键去重"]
-    D --> N["保存原始消息并转换标准事件"]
-    N --> C["提交控制面并更新会话检查点"]
+    D --> N["标准化消息并提交 Gateway"]
+    N --> G["Gateway Message Store 持久化"]
+    G --> C["确认成功后更新会话检查点"]
 ```
 
 V1 计划按以下规则实现：
@@ -155,9 +186,9 @@ V1 计划按以下规则实现：
 1. 定时查询配置允许或控制面授权的会话，不默认扫描并处理全部联系人和群。
 2. 每个 `sourceAccount + chatId` 独立维护 `lastMsgLocalId`，不得使用跨会话的全局游标。
 3. 获取检查点之后的新增消息；如果 API 只能返回最近窗口，则保留重叠读取窗口并依靠幂等键过滤重复消息。
-4. 先保存原始消息，再转换并持久化 `message_received` 事件。
-5. 原始消息和标准事件持久化成功后更新同步检查点；Hermes 是否执行成功由任务状态负责，不阻塞消息游标。
-6. 将标准事件交给上下文和任务控制面，不从轮询循环直接执行 Skill。
+4. Adapter 提交受控原始载荷引用和标准化消息，由 Gateway Message Store 先持久化消息，再形成授权快照。
+5. Gateway 确认消息与必要来源引用已持久化后，Adapter 才更新同步检查点；Hermes 是否执行成功由 Task 状态负责，不阻塞消息游标。
+6. Adapter 不执行 Access Control、Context Builder、Task 创建、AI Router、Hermes 或 Skill。
 
 轮询间隔、API 分页参数、消息排序规则、历史保留窗口和 `localId` 是否单调递增尚需结合 `agent-wechat` API 实测确定。若 `localId` 是不透明标识，Adapter 只能按 API 返回顺序维护检查点，不得进行字符串或数值大小猜测。
 
@@ -185,15 +216,15 @@ V2 即使采用 Event 模式，也只替换“发现新消息”的触发方式�
 
 ## 7. Hermes 通信边界
 
-Adapter 不把原始微信响应直接拼接成 Hermes Prompt。目标通信顺序是：
+Adapter 不把原始微信响应直接拼接成 Hermes Prompt，也不直接调用 Hermes。目标通信顺序是：
 
 1. Adapter 提交版本化 `message_received` 事件和附件引用。
-2. Debian 控制面完成身份映射、权限校验、任务批次收口和上下文快照。
-3. Worker Bridge 向 Hermes 提供 `traceId`、`taskId`、当前指令、上下文引用、附件引用、允许的 Skills 和权限约束。
+2. Gateway Message Store 先持久化全部消息，再由 Access Control、Context Builder、Task Queue 和 AI Router 完成准入、上下文、任务和 Provider 路由。
+3. Worker Bridge 向 Hermes 提供 `trace_id`、`task_id`、当前指令、`context_snapshot_ref`、附件引用、允许的 Skills、权限约束和 Provider / Task 运行快照。
 4. Hermes 返回结构化任务结果，不直接调用微信 API。
 5. 控制面生成回传指令，Adapter 再通过 `agent-wechat` 向原 `chatId` 发送结果。
 
-任务协议、鉴权、超时、回传命令结构和 Worker Bridge 接口仍待后续详细设计与实现。
+任务协议、鉴权、超时、回传命令结构和 Worker Bridge 接口仍待后续详细设计与实现。消息和任务边界分别见[Message Store 设计](./message-store-design.md)与[Task Queue 设计](./task-queue-design.md)。
 
 ## 8. 错误处理
 
