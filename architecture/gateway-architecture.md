@@ -1,0 +1,438 @@
+# 企业 AI Gateway 架构
+
+> 状态日期：2026-07-31。本文定义企业 AI Gateway 的目标架构，不是实现说明。当前已完成 `agent-wechat` V1 微信入口验证、`wechat-adapter` 设计和 Hermes 事件协议设计；Gateway、Access Control、Message Store、Context Builder、Task Queue、AI Router、AI Provider 接入和端到端链路均待实现或接入。
+
+## 1. Gateway 定位
+
+CF Gateway 是企业 AI 消息中枢，也是消息入口、权威控制面和 AI 执行环境之间的安全与调度边界。机器人不是公开服务：消息能够进入 Gateway 并被保存，不代表该消息有权创建 AI 任务。
+
+Gateway 管理：
+
+- 消息及附件历史。
+- 用户、群、Skill 和任务权限。
+- 面向 Hermes 的受控上下文。
+- 任务、队列、租约和结果状态。
+- AI Provider 注册、运行状态和路由决策。
+
+Gateway 不管理具体 AI 主机，不维护 AI 主机清单、GPU 节点心跳或主机级进程状态。本地 AI 主机、私有模型服务和云端模型 API 均通过 `AI Provider` 抽象接入；具体主机、容器、GPU 和服务实例由 Provider 自身的执行或运维层管理。
+
+Gateway 计划位于 Debian 权威控制中心。它是逻辑架构边界，不预先限定为一个进程、一个容器或一种网关产品；内部模块后续可以拆分部署，但消息、权限、上下文、任务、队列和 Provider 路由的权威记录仍在 Debian。
+
+## 2. 总体架构
+
+面向入口和 Hermes 的简化关系如下：
+
+```mermaid
+flowchart TB
+    W["微信"] --> G["CF Gateway"]
+    F["飞书"] --> G
+    D["钉钉"] --> G
+    A["API 入口"] --> G
+    G --> H["Hermes"]
+```
+
+Gateway 内部控制链路如下：
+
+```mermaid
+flowchart TB
+    W["agent-wechat<br/>当前已验证入口"] --> WA["wechat-adapter"]
+    F["飞书<br/>后续规划"] --> FA["Feishu Adapter<br/>待设计"]
+    D["钉钉<br/>后续规划"] --> DA["DingTalk Adapter<br/>待设计"]
+    A["API 入口<br/>待设计"] --> AA["API Adapter / Auth<br/>待设计"]
+
+    subgraph G["CF Gateway / Debian 权威控制中心"]
+        WA --> N["事件标准化"]
+        FA --> N
+        DA --> N
+        AA --> N
+        N --> M["Message Store<br/>全部消息持久化"]
+        M --> AC["Access Control"]
+        AC -->|"允许"| C["Context Builder"]
+        AC -->|"拒绝"| R["只保存消息和权限决策<br/>不创建 AI 任务"]
+        C --> T["Task Queue"]
+        T --> AR["AI Router"]
+        PR["AI Provider Registry"] --> AR
+    end
+
+    AR --> P["AI Provider"]
+    P --> H["Hermes"]
+    H --> S["授权 Skills"]
+```
+
+图中的飞书、钉钉、API 入口及多种 AI Provider 是目标扩展位置，不表示已经选型、部署或验证。详细权限模型见[Access Control 设计](../design/access-control-design.md)，标准事件字段见[Hermes 事件协议](../design/hermes-event-schema.md)。
+
+## 3. Gateway 核心职责
+
+Gateway 负责：
+
+- 校验入口账号、来源平台和 Adapter 身份，隔离不同机器人账号和入口范围。
+- 接收 Adapter 生成的标准消息，执行来源映射、基础结构校验和幂等去重。
+- 在推进同步检查点前保存全部消息，形成企业统一消息历史。
+- 在消息持久化后执行 Access Control，决定是否创建 AI 任务。
+- 只为获准消息筛选必要上下文、创建任务并进入 Task Queue。
+- 根据任务所需模态、模型、数据边界和能力，通过 AI Router 选择 AI Provider。
+- 保存任务、队列、租约、Provider 运行快照、文件、权限决策和结果回传的权威状态。
+- 在 Skill 执行前再次校验权限、高风险确认和任务状态。
+- 将结果路由回原平台、原账号和原会话，并区分任务完成与回传成功。
+
+Gateway 不负责：
+
+- 代替 Hermes 理解自然语言、规划业务步骤或生成业务答案。
+- 执行模型推理、管理模型进程或运维具体 AI 主机。
+- 代替 Skill 执行 ERP、S6、平台后台、文件处理或 Windows 自动化。
+- 根据昵称、群名、正文或文件名猜测企业身份和权限。
+- 绕过 File Service、人工确认或业务幂等规则直接访问正式文件和企业系统。
+
+## 4. 消息接入
+
+### 4.1 当前与未来来源
+
+| 来源 | 接入组件 | 当前状态 |
+| --- | --- | --- |
+| 微信 | `agent-wechat` + `wechat-adapter` | `agent-wechat` V1 入口已验证；Adapter 待开发 |
+| 飞书 | 平台 Adapter | 后续规划，未选型、未验证 |
+| 钉钉 | 平台 Adapter | 后续规划，未选型、未验证 |
+| API | API Adapter / 服务身份鉴权 | 后续规划，协议、鉴权和调用方范围待设计 |
+
+所有入口都必须经过标准化、Message Store 和 Gateway 权限控制。API 入口是业务消息来源，与向外调用模型的 API Provider 不是同一概念；它也不是绕过用户、Skill、文件和审计权限的内部后门。
+
+### 4.2 `agent-wechat` 职责
+
+`agent-wechat` 是微信协议入口，不是 Gateway、Access Control 或 Hermes。
+
+**负责：**
+
+- 维持微信登录态并提供当前已验证的消息读取、发送和文件获取能力。
+- 提供微信侧实际可获得的会话、发信人、消息类型、内容、引用和附件元数据。
+- 按 Adapter 指定的目标会话发送结果。
+
+**不负责：**
+
+- 决定用户是否在企业白名单。
+- 决定群是否启用 AI，或某条消息是否有权创建任务。
+- 构建 Hermes 上下文、维护任务队列或选择 AI Provider。
+- 分配 Skill、文件或企业系统权限。
+- 保存权威任务状态，或直接调用 Hermes 和 Skills。
+
+当前已验证范围以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准。群聊消息已验证可读取，但能否从实际 API 载荷稳定识别针对当前机器人账号的结构化 `@` 仍须结合样本验证。
+
+### 4.3 Adapter 职责
+
+每个入口平台使用独立 Adapter 隔离平台差异。Adapter 负责：
+
+- 读取或接收平台原始消息，保存受控原始载荷引用并维护同步检查点。
+- 把平台私有字段映射为统一的 `source`、`conversation`、`sender`、`message` 和 `attachments`。
+- 提取平台明确提供的会话类型、发信人标识和结构化 mention 事实。
+- 生成标准事件并提交 Gateway Message Store。
+- 获取并登记平台附件，使用受控文件引用关联消息历史。
+- 接收 Gateway 结果回传指令并调用平台发送接口。
+
+Adapter 不自行授予权限，也不直接创建 AI 任务。`user_allowed`、`group_allowed`、`is_mentioned` 和 `permission_scope` 均由 Gateway Access Control 根据权威配置形成。
+
+## 5. Message Store
+
+Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须先保存，再进行权限判断，包括：
+
+- 白名单用户的私聊和群聊消息。
+- 非白名单用户的消息。
+- 未启用 AI 群中的消息。
+- 群内未 `@` 当前机器人的消息。
+- 当前不支持建立任务的消息类型。
+
+权限拒绝只阻止 AI 任务创建，不删除、不跳过消息历史。
+
+### 5.1 消息记录
+
+标准消息记录至少保存：
+
+| 字段 | 说明 |
+| --- | --- |
+| `message_id` | Gateway 中稳定的消息标识；重复投递不得产生重复消息历史 |
+| `source` | 平台、接入提供方、机器人或应用账号及原始事件标识 |
+| `conversation_id` | 原始物理会话标识，在来源平台和账号范围内解释 |
+| `sender_id` | 平台侧稳定发信人标识 |
+| `sender_name` | 平台提供的展示名称，不作为授权依据 |
+| `message_type` | 标准消息类型，如 `text`、`file`、`reply`、`forward` |
+| `content` | 标准化正文或外层标题；按数据分级和保留策略受控访问 |
+| `timestamp` | 平台消息时间及 Gateway 接收时间，二者不得混为同一语义 |
+| `reply_context` | 实际可得的引用消息标识、摘要和解析状态 |
+| `attachments` | 附件标识、名称、类型、大小、哈希、获取状态和受控存储引用 |
+
+`attachments` 保存结构化元数据和受控引用，不在消息记录中内嵌二进制、Base64 或任意主机路径。未授权消息的附件仍属于消息历史：能成功获取时进入受控消息附件存储，获取失败时保留元数据和失败状态；它们不得进入 AI 任务工作区或发送给 Hermes。
+
+### 5.2 持久化规则
+
+- 原始载荷与标准消息分开保存，通过受控引用关联。
+- Message Store 成功写入后才能推进入口同步检查点；保存失败时不得假装消息已接收完成。
+- 重复投递关联同一 `message_id`，记录必要接收尝试，不重复创建任务或附件副本。
+- 未授权消息和授权消息遵循明确的数据分级、访问审计和保留周期；具体周期待确认。
+- 普通运行日志不等于消息历史库，不应重复输出完整敏感正文或附件内容。
+
+## 6. Access Control
+
+Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。它位于 Message Store 之后、Context Builder 和任务创建之前。权限决定由 Gateway 作出并强制执行，不由 Hermes 判断。
+
+### 6.1 准入规则
+
+| 会话类型 | 创建 AI 任务的条件 | 其他情况 |
+| --- | --- | --- |
+| 私聊 | 发信人存在于有效白名单，即 `user_allowed=true` | 只保存消息，不创建任务 |
+| 群聊 | `group_allowed=true` 且 `user_allowed=true` 且 `is_mentioned=true` | 只保存消息，不创建任务 |
+
+其中 `group_allowed` 对应群策略中的 `group_enabled=true`，`user_allowed` 对应发信人白名单中的 `sender_allowed=true`。群聊任一条件为 `false` 或无法确认都拒绝创建任务。
+
+结构化 `@` 必须明确指向当前机器人账号。仅在正文出现机器人昵称、`@` 字符、引用或历史上曾与机器人交互，均不能替代 `is_mentioned=true`。
+
+### 6.2 拒绝处理
+
+未通过准入检查的消息：
+
+- 已经保存在 Message Store，并关联授权决策和策略版本。
+- 不构建 Hermes 上下文，不创建任务，不进入 Task Queue。
+- 不调用 AI Provider、Hermes、Skill、企业系统或任务级文件工作区。
+- 是否发送固定拒绝提示及提示频率待运营规则确认；即使需要提示，也由 Gateway 使用固定受控文案处理，不调用 Hermes 生成拒绝内容。
+
+访问拒绝是权限决策，不应伪装为消息格式错误。详细白名单、群、Skill 和 RBAC 设计见[Access Control 设计](../design/access-control-design.md)。
+
+## 7. Context Builder
+
+Gateway 的 Context Builder 只为通过准入检查并准备创建任务的消息构建 Hermes 输入。候选信息按以下优先级选择：
+
+1. 当前消息。
+2. 当前消息明确关联的 `reply_context`。
+3. 当前任务批次的文件附件及其元数据。
+4. 同一 AI 线程中与当前用户有关的最近必要历史消息。
+5. 少量与当前意图直接相关的群聊上下文。
+6. 未完成关联任务的必要状态。
+
+构建规则：
+
+- 不把完整私聊或群聊记录发送给 Hermes。
+- 未授权消息虽然保存在 Message Store，但默认不进入 Hermes 上下文。
+- 群聊按机器人账号、群会话和发信人隔离 AI 线程，避免不同员工串线。
+- 只纳入当前任务权限允许读取的正文、附件和任务状态。
+- 进入队列前生成不可变 `context_snapshot_ref`，记录选入项、选择原因和版本。
+- 后续补充消息形成新快照或新批次，不悄悄改写正在执行的输入。
+
+窗口长度、摘要、跨消息附件归属和授权批次规则仍待确认。
+
+## 8. Task Queue
+
+Gateway 维护持久化 Task Queue。消息历史与任务是不同对象：所有消息都保存，只有通过权限和任务收口条件的消息才创建 Task。
+
+```mermaid
+flowchart LR
+    M["Message Store"] --> P["Access Control"]
+    P -->|"允许"| T["Create Task"]
+    P -->|"拒绝"| H["仅保留消息历史"]
+    T --> Q["Task Queue"]
+    Q --> R["AI Router"]
+```
+
+Task Queue 至少保存任务标识、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。具体队列产品、优先级算法和容量参数待选型。
+
+队列必须支持：
+
+- 多任务排队和幂等入队。
+- Provider 繁忙、限流、维护或不可用时继续持久化任务。
+- 有期限领取租约，避免执行端失联后任务永久占用。
+- 可判定安全的重试、延迟重试和人工接管。
+- 结果未知或部分成功时停止自动重复业务写操作。
+
+## 9. AI Provider 抽象
+
+`AI Provider` 是 Gateway 面向 AI 执行环境的统一抽象。Provider 描述“可通过什么受控路径使用哪些模型和能力”，而不是一台具体主机。
+
+### 9.1 API Provider
+
+API Provider 表示通过外部或内部 API 提供模型能力，例如：
+
+- OpenAI API。
+- Anthropic API。
+- DeepSeek API。
+
+这些名称是架构兼容示例，不表示已经选型、接入或批准使用。当前生产模型计划仍以[技术决策记录](../05_技术决策记录.md)中的 GPT-5.6 API 基线为准；变更正式模型路线必须先更新技术决策。
+
+### 9.2 Local Provider
+
+Local Provider 表示企业本地或私有环境提供的模型能力，例如：
+
+- 本地 AI 主机。
+- 私有模型服务。
+- 由内部平台管理的多个推理实例。
+
+Gateway 不注册或调度 Local Provider 内部的具体主机。若 Local Provider 由多台主机组成，其节点发现、GPU 分配、进程健康和内部负载均衡由 Provider 自身负责，只向 Gateway 暴露统一能力和 Provider Runtime State。
+
+### 9.3 后续 Provider
+
+未来可以增加其他 Provider 类型，但必须保持统一注册、能力声明、鉴权引用、健康状态、路由约束、错误分类和审计边界。Provider 不得借扩展接口绕过 Access Control、Task Queue、Hermes、Skill 权限或 File Service。
+
+## 10. AI Provider Registry
+
+Gateway 维护 AI Provider Registry，用于发现可路由的 Provider，而不是管理 AI 主机。
+
+每个 Provider 注册项至少包含：
+
+| 字段 | 说明 |
+| --- | --- |
+| `provider_id` | Provider 稳定唯一标识 |
+| `provider_name` | 运维展示名称，不作为凭证 |
+| `provider_type` | `api`、`local` 或后续扩展类型 |
+| `models` | Provider 声明可用的模型集合及版本 |
+| `capabilities` | `text`、`vision`、工具调用、上下文上限等已确认能力 |
+| `routing_tags` | 数据地域、隐私级别、环境或业务用途等路由标签 |
+| `credential_ref` | 受控密钥引用，不包含实际 API Key 或密码 |
+| `enabled` | 是否允许新任务路由到该 Provider |
+| `policy_version` | 当前注册和路由策略版本 |
+
+模型名称和能力必须来自实际配置与验证，不因 Provider 宣称支持就自动进入生产路由。Provider 注册变更必须可审计。
+
+## 11. Provider Runtime State
+
+Gateway 不维护单一 AI 状态，也不维护主机级节点注册表。它只保存 AI Router 所需的 Provider 级运行状态快照。
+
+API Provider 示例：
+
+```json
+{
+  "provider": "openai",
+  "provider_type": "api",
+  "model": "GPT",
+  "status": "available"
+}
+```
+
+Local Provider 示例：
+
+```json
+{
+  "provider": "local",
+  "provider_type": "local",
+  "node": "ai-node-01",
+  "model": "Qwen",
+  "status": "busy"
+}
+```
+
+示例仅说明结构。`node` 是 Local Provider 可选提供的诊断信息，不建立 Gateway 对该主机的管理关系。
+
+Provider Runtime State 至少可包含：
+
+| 字段 | 说明 |
+| --- | --- |
+| `provider` | 对应 `provider_id` |
+| `provider_type` | `api`、`local` 或后续扩展类型 |
+| `model` | 当前任务目标模型或 Provider 汇报的模型 |
+| `status` | `available`、`busy`、`degraded`、`unavailable` 或 `maintenance` |
+| `load` | Provider 级并发、限流、排队或容量摘要；格式随 Provider 能力定义 |
+| `node` | Local Provider 可选诊断字段；Gateway 不据此维护节点注册表 |
+| `observed_at` | Gateway 接受该运行状态的时间 |
+
+API 限流、Local Provider 内部节点故障或模型服务异常都应汇总为 Provider 级状态和错误。状态过期或无法读取时，AI Router 按不可用处理，不能默认健康。
+
+## 12. AI Router
+
+AI Router 位于 Task Queue 与 AI Provider 之间，根据任务要求、权限和 Provider 状态选择执行路径。
+
+```mermaid
+flowchart TB
+    M["Message Gateway"] --> Q["Task Queue"]
+    Q --> R["AI Router"]
+    R --> P1["API Provider<br/>文本 / 视觉等"]
+    R --> P2["Local Provider<br/>本地 / 私有模型"]
+    P1 --> H["Hermes"]
+    P2 --> H
+    H --> S["Skills"]
+```
+
+逻辑路由示例：
+
+| 任务需求 | 可选路由方向 | 说明 |
+| --- | --- | --- |
+| 文本理解与规划 | GPT API 等已批准的文本 Provider | 实际默认模型以技术决策和配置为准 |
+| 图片理解 | 已验证的 Vision Provider | 当前图片入口和视觉处理仍未验证，不表示已可用 |
+| 本地或私有处理 | Local Provider | 需满足数据边界、模型能力和运行状态要求 |
+
+路由分为两步：
+
+1. **资格过滤：** Provider 已启用、状态可用，并满足任务所需模态、模型、上下文、工具、数据地域、隐私和权限约束。
+2. **候选选择：** 在合格 Provider 中按策略优先级、容量、限流、成本、延迟和错误率选择；具体权重待压测和业务评审。
+
+路由要求：
+
+- 无合格 Provider 时任务留在队列，不自动降级到未批准的模型或外部服务。
+- Provider 繁忙、限流或维护时支持排队和受控重试。
+- Provider 故障时可在策略允许、输入兼容且业务动作安全的前提下重新路由。
+- 写操作结果未知、部分成功或不具备幂等性时，不因 Provider 故障盲目重复执行。
+- 新 Provider 完成身份、能力、安全、合规和健康验证后才可进入候选集合。
+- Router 只处理已通过 Gateway 权限检查的任务，不改变 `permission_scope`、`allowed_skills` 或人工确认要求。
+
+## 13. Hermes 与 Skills
+
+Gateway 不执行 AI 任务。目标流程为：
+
+```text
+Message Gateway
+  -> Task Queue
+  -> AI Router
+  -> AI Provider
+  -> Hermes
+  -> Skills
+```
+
+Provider 是模型或 AI 执行能力的抽象，Hermes 仍是唯一生产 Agent。具体 Provider Adapter 和 Worker Bridge 如何把所选模型、凭证引用和任务交给 Hermes，仍待接口设计；该抽象不允许以 Provider 替代 Hermes 的 Agent 职责。
+
+Hermes 负责：
+
+- 在 Gateway 提供的不可变上下文快照内理解请求和规划步骤。
+- 使用 AI Router 选定且当前任务获准的 Provider / 模型。
+- 从 Gateway 提供的 `allowed_skills` 中选择适用 Skill。
+- 遵守 `authorization.permission_scope`、文件引用、确认状态和任务级限制。
+- 向 Gateway 回报结构化完成、澄清、等待确认或失败结果。
+
+Hermes 不负责：
+
+- 判断用户是否在白名单、群是否启用 AI、消息是否真正 `@` 机器人。
+- 决定消息是否保存或从企业消息历史中删除。
+- 维护权威 Task Queue、Provider Registry 或 Provider Runtime State。
+- 自行更换未获批准的 Provider、增加权限范围或扩大 `allowed_skills`。
+- 直接访问生产权限配置、完整聊天历史或正式存储任意路径。
+
+Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 Gateway / 控制面的权限、确认、文件和审计约束。
+
+## 14. 多入口与 Provider 扩展
+
+微信、飞书、钉钉和 API 入口共享 Message Store、Access Control、Context Builder、Task Queue 和 AI Router，但各入口 Adapter 独立处理平台差异。
+
+新增消息入口至少需要验证稳定账号、会话、发信人、mention、消息唯一标识、附件和回传语义。新增 AI Provider 至少需要验证身份、模型能力、数据边界、凭证注入、限流、错误、状态和审计语义。
+
+入口扩展与 Provider 扩展相互独立：增加飞书不要求更换 Provider，增加 Local Provider 也不改变微信权限规则。任何新入口或 Provider 在关键事实无法确认时都拒绝默认。
+
+## 15. 安全与可靠性边界
+
+- **消息先保存：** 授权与未授权消息都进入企业消息历史；持久化失败时不推进任务链路。
+- **权限后分流：** Access Control 只决定是否创建任务，不决定是否保留消息。
+- **上下文最小化：** Gateway 从消息历史中筛选必要且获准的内容，不把完整聊天记录发送给 Hermes。
+- **队列权威：** Task Queue、租约和重试状态保存在 Debian，Provider 本地状态不能覆盖。
+- **Provider 抽象：** Gateway 管理 Provider 路由，不管理具体 AI 主机或 GPU 节点。
+- **故障可恢复：** Provider 故障不丢失 Debian 已保存的消息和队列任务，结果未知时避免盲目重放。
+- **最小授权：** Provider 和 Hermes 只获得当前任务所需模型、文件、Skill 和数据权限。
+- **全链路审计：** 消息、授权、上下文快照、入队、路由、Provider、Hermes、Skill 和结果回传使用关联标识记录。
+
+## 16. 当前状态
+
+| 项目 | 状态 |
+| --- | --- |
+| `agent-wechat` V1 微信入口 | **已验证**，限现有验证记录范围 |
+| `wechat-adapter` | **设计完成，代码待开发** |
+| Hermes 事件协议 | **设计基线，待实现前评审** |
+| Gateway Message Store、Context Builder | **本文形成目标设计，待实现和验证** |
+| Access Control | **设计基线，待实现和验证** |
+| Task Queue、AI Router、AI Provider Registry | **本文形成目标设计，产品与实现待确认** |
+| Provider Runtime State | **目标设计，状态采集方式待确认** |
+| 微信群结构化 `@` 识别 | **待结合实际 API 样本验证** |
+| Hermes、Worker Bridge、Skills | **待接入 / 待开发** |
+| 飞书、钉钉、API 入口 | **后续规划，未接入、未验证** |
+| API Provider、Local Provider 扩展 | **架构兼容目标，尚未接入或验证** |
+
+本文不改变 Debian 权威控制中心、Hermes 生产 Agent、GPT-5.6 API 计划和 File Service 受控文件访问等既有技术决定。完整系统边界以[系统设计](../02_系统设计.md)和[技术决策记录](../05_技术决策记录.md)为准。
