@@ -16,8 +16,8 @@
 - **已确定：** 新 Windows AI 电脑运行 Hermes、Worker Bridge、Skills 及文档、浏览器和 Windows 自动化工具。
 - **已确定：** 正式文件操作经 Debian File Service 完成权限检查和审计，Hermes 不直接拥有正式存储的任意读写权。
 - **已确定：** 第一阶段不建设独立 OCR；自动化主线与 FileBrowser Enterprise 二次开发并行推进。
-- **已验证：** `agent-wechat` V1 入口已完成微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别和 `chatId` 识别验证。
-- **待技术验证：** 图片、Office、PDF、中文文件名、连续多附件、失败重试和长期运行稳定性等未覆盖场景。
+- **已验证：** `agent-wechat` V1 入口已完成微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取验证；合并转发消息已验证类型识别、发送人获取和外层标题获取。
+- **待技术验证 / 待开发：** 图片、Office、PDF、中文文件名、连续多附件、失败重试和长期运行稳定性等未覆盖场景，以及合并转发内部聊天记录展开和内部文件自动提取。
 
 ## 文档入口
 
@@ -47,4 +47,4 @@
 
 ## 当前状态
 
-当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 入口验证已经完成：微信登录、私聊/群聊文本、文件消息、ZIP 文件、引用消息以及 `sender`、`chatId` 识别均已验证。微信消息入口层技术可行，但该结论不代表生产上线或端到端主链路完成；Gateway、Hermes Agent、Skills、ERP/S6 接口、正式文件处理、权限体系和 WebSocket 实时事件仍待设计、开发、接入或研究。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口验证已经完成；合并转发消息的类型、发送人和外层标题识别也已补充验证，但内部聊天记录展开与内部文件自动提取尚未支持。微信消息入口层技术可行，但该结论不代表生产上线或端到端主链路完成；Gateway、Hermes Adapter、Hermes Agent、Skills、ERP/S6 接口、正式文件处理、权限体系、实时事件机制和合并转发解析增强仍待设计、开发、接入或研究。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
