@@ -26,6 +26,7 @@
 | [项目总纲](./00_项目总纲.md) | 范围、总体模块、设备分工、建设阶段 |
 | [功能需求](./01_功能需求.md) | 系统要做什么及验收边界 |
 | [系统设计](./02_系统设计.md) | 架构、职责、数据流、状态与安全边界 |
+| [员工工作区与 AI 会话线程设计](./design/employee-workspace-design.md) | 企业身份、员工工作区、AI 线程隔离与 Hermes 运行时绑定 |
 | [开发规范](./03_开发规范.md) | 仓库、Git、数据与文档规则 |
 | [部署运维](./04_部署运维.md) | 测试环境基线、待部署服务与排障原则 |
 | [技术决策记录](./05_技术决策记录.md) | 当前有效决定及其原因和影响 |
@@ -47,4 +48,4 @@
 
 ## 当前状态
 
-当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口验证已经完成；合并转发消息的类型、发送人和外层标题识别也已补充验证，但内部聊天记录展开与内部文件自动提取尚未支持。微信消息入口层技术可行，但该结论不代表生产上线或端到端主链路完成；Gateway、Hermes Adapter、Hermes Agent、Skills、ERP/S6 接口、正式文件处理、权限体系、实时事件机制和合并转发解析增强仍待设计、开发、接入或研究。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口验证已经完成；合并转发消息的类型、发送人和外层标题识别也已补充验证，但内部聊天记录展开与内部文件自动提取尚未支持。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议以及员工工作区与 AI Thread 已形成设计基线，但 Identity Mapping、Conversation Manager、Gateway 代码、Hermes Adapter、Hermes 员工工作台、Skills、ERP/S6 接口、正式文件处理、实时事件机制和端到端主链路仍待开发、接入或验证。设计完成不代表生产上线。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。

@@ -1,10 +1,10 @@
 # Access Control 设计
 
-> 状态日期：2026-07-31。本文定义 Gateway 内部的企业访问控制模块，不是已部署配置或实现说明。当前企业身份映射、用户白名单、群权限、Skill 权限、策略存储和审计闭环均待实现与验证。
+> 状态日期：2026-08-01。本文定义 Gateway 内部的企业访问控制模块，不是已部署配置或实现说明。当前 Identity Mapping、用户白名单、群权限、Skill 权限、工作区查看权限、策略存储和审计闭环均待实现与验证。
 
 ## 1. 模块定位
 
-Access Control 是 CF Gateway 的内部模块，不是独立消息入口，也不是 Gateway 的全部职责。Gateway 先通过 Message Store 保存所有进入系统的消息，再调用 Access Control 判断是否创建 AI 任务。
+Access Control 是 CF Gateway 的内部模块，不是独立消息入口，也不是 Gateway 的全部职责。Gateway 先通过 Message Store 保存所有进入系统的消息，由 Identity Mapping 确认来源账号对应的 Enterprise Identity / 企业身份，再调用 Access Control 判断是否创建 AI 任务。
 
 Access Control 只决定：
 
@@ -15,6 +15,8 @@ Access Control 只决定：
 Access Control 不决定：
 
 - 消息是否保存。白名单、非白名单、未启用群和未 `@` 机器人的消息都必须持久化。
+- 来源账号对应哪个企业员工。该事实由 Gateway Identity Mapping 依据权威映射提供。
+- Employee Workspace / 员工工作区和 AI Thread / AI 会话线程如何建立或绑定。该职责属于 Employee Conversation Manager。
 - 如何选择 AI Provider。Provider 路由由 Gateway AI Router 根据获准任务和路由约束执行。
 - 如何理解消息、规划任务或生成回答。这些是 Hermes 的职责。
 
@@ -27,6 +29,7 @@ Access Control 不决定：
 - **稳定标识：** 权限绑定平台、机器人账号、会话和发信人的稳定 ID，不使用昵称、群名或正文匹配授权。
 - **权限前置：** 准入检查早于 Context Builder、Task 创建、Task Queue 和 AI Router。
 - **最小权限：** 允许创建 Task 不等于允许所有 Skill、数据、文件或写操作。
+- **工作区不提权：** Employee Workspace / 员工工作区只表达归属与隔离，存在、启用或可见都不能扩大 `permission_scope`。
 - **拒绝优先：** 显式禁用、过期、身份冲突或高风险条件未满足时，不能被其他允许规则覆盖。
 - **可追踪：** 每次允许和拒绝都关联消息、策略版本、决策原因、来源和时间。
 - **权威集中：** Debian 保存权限配置和决策记录，Hermes、AI Provider 和 Skill 不维护或修改权限真相。
@@ -35,7 +38,7 @@ Access Control 不决定：
 
 ### 3.1 私聊
 
-私聊消息创建 AI 任务的充要条件为：
+私聊消息创建 AI 任务的前提是 Enterprise Identity / 企业身份映射有效，准入条件为：
 
 ```text
 sender whitelist = true
@@ -45,7 +48,7 @@ sender whitelist = true
 
 ### 3.2 群聊
 
-群聊消息创建 AI 任务的充要条件为：
+群聊消息创建 AI 任务同样要求 Enterprise Identity / 企业身份映射有效，并同时满足：
 
 ```text
 group_enabled = true
@@ -81,7 +84,9 @@ AND is_mentioned = true
 - `account_id`
 - `sender_id`
 
-该组合映射到可选的 `enterprise_identity_id`。企业身份尚未解析时，不得只凭 `sender_name`、手机号片段、群名片或相似昵称自动合并为已授权用户。
+该组合必须先由 Identity Mapping 显式映射到 `enterprise_identity_id`，白名单才能产生 `user_allowed=true`。企业身份尚未解析时，不得只凭 `sender_name`、手机号片段、群名片或相似昵称自动合并为已授权用户；微信 `wxid` 等平台稳定标识是来源映射键，不是 `employee_id`。
+
+白名单最终授权 Enterprise Identity / 企业身份，而不是孤立的平台昵称。一个员工可以绑定多个来源平台账号，但每个来源账号都必须有独立、可审计的映射；同一来源账号存在多个有效企业身份映射时拒绝创建 Task。
 
 ### 4.2 白名单条目
 
@@ -92,7 +97,7 @@ AND is_mentioned = true
 | `platform` | 来源平台，如 `wechat`、`feishu`、`dingtalk` |
 | `account_id` | 当前机器人或应用账号，避免多账号权限串用 |
 | `sender_id` | 平台侧稳定发信人标识 |
-| `enterprise_identity_id` | 可选的企业身份映射；未完成映射时为 `null` |
+| `enterprise_identity_id` | 白名单授权的企业身份；有效启用条目必须完成映射，未解析时为 `null` 且不得放行 |
 | `enabled` | 是否启用；只有明确为 `true` 才可得到 `user_allowed=true` |
 | `permission_scope` | 该用户可获得的权限范围上限 |
 | `valid_from` / `valid_until` | 可选有效期；过期条目拒绝创建任务 |
@@ -104,6 +109,7 @@ AND is_mentioned = true
 ### 4.3 判定规则
 
 - 条目不存在、被停用、过期、账号不匹配或身份冲突时，`user_allowed=false`。
+- `enterprise_identity_id=null` 或映射无法唯一确定时，`user_allowed=false`。
 - 同一人员在不同平台或不同机器人账号中的身份必须显式绑定，不自动跨平台放行。
 - 白名单不决定消息是否保存，不授予群启用状态，也不替代群聊 mention 条件。
 - 白名单不自动授予高风险 Skill、正式文件路径或企业系统写权限。
@@ -174,6 +180,14 @@ Gateway 根据有效范围生成 `allowed_skills` 和 `authorization.permission_
 
 高风险确认是附加条件，不会把原本无权的动作变为有权。AI Provider 和 Hermes 都不得跳过第二次检查。
 
+### 6.3 工作区与管理员查看权限
+
+Employee Workspace / 员工工作区存在、状态为 `active` 或出现在 Hermes 工作台中，都不代表拥有全部 Skill、文件、消息或企业系统权限。工作区只能承接 Access Control 已经允许的范围，不能扩大 `permission_scope`、`allowed_skills` 或数据访问范围。
+
+员工默认只能查看和操作自己的工作区及获准内容。管理员查看其他员工工作区必须具有单独权限，并区分工作区列表、任务元数据、Context Snapshot / 上下文快照、消息正文、附件和接管操作等范围；具有系统运维权限不自动获得完整敏感对话查看权。
+
+跨员工查看、拒绝、导出、接管和权限变更必须记录操作者、目标员工、工作区、范围、原因、时间和结果。未来跨员工协作也不得以管理员界面可见为由自动合并 AI Thread / AI 会话线程。
+
 ## 7. 权限模型
 
 当前设计采用“显式白名单 + 属性条件 + 明确权限范围”的最小模型，可视为面向 V1 的受限 ABAC，不预设完整 RBAC 已经存在。
@@ -191,12 +205,12 @@ Gateway 根据有效范围生成 `allowed_skills` 和 `authorization.permission_
 
 1. Adapter 标准化消息，Gateway Message Store 完成持久化。
 2. 校验平台、机器人账号、Adapter 身份和消息基础结构。
-3. 解析会话类型、发信人稳定标识和企业身份映射。
+3. Identity Mapping 使用会话类型和发信人稳定标识解析 Enterprise Identity / 企业身份；无法唯一解析时拒绝默认。
 4. 查询有效用户白名单，计算 `user_allowed`。
 5. 群聊查询群策略并验证结构化 mention；私聊跳过群条件。
 6. 按拒绝默认规则形成 `allowed` 或 `denied` 决策并关联原消息。
 7. 对允许消息计算 `permission_scope`，生成带策略版本的不可变授权快照。
-8. 仅为允许消息构建上下文、创建 Task 并进入 Task Queue。
+8. 仅为允许消息由 Employee Conversation Manager 定位 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程，再构建上下文、创建 Task 并进入 Task Queue。
 9. 在 Skill 调用和高风险动作前重新校验有效权限及确认状态。
 
 ### 7.2 决策原因
@@ -225,7 +239,7 @@ Gateway 根据有效范围生成 `allowed_skills` 和 `authorization.permission_
 | 配置对象 | 核心键 | 主要内容 |
 | --- | --- | --- |
 | `gateway_account` | `platform + account_id` | 入口账号状态、所属组织、允许的 Adapter 和全局策略引用 |
-| `user_allowlist_entry` | `platform + account_id + sender_id` | 企业身份映射、启用状态、有效期、用户权限上限 |
+| `user_allowlist_entry` | `platform + account_id + sender_id` | 企业身份引用、启用状态、有效期、用户权限上限；有效条目必须能唯一映射企业身份 |
 | `group_policy` | `platform + account_id + conversation_id` | `group_enabled`、有效期、群权限上限和群级 Skill 限制 |
 | `skill_grant` | 主体或未来角色 + `skill_id` | 允许动作、数据域、文件范围、风险和确认要求 |
 | `policy_bundle` | `policy_version` | 一组原子生效的账号、用户、群和 Skill 策略版本 |
@@ -261,6 +275,7 @@ Message Store 与权限审计是不同记录：
 ## 10. Hermes 与 AI Provider 边界
 
 - Gateway Access Control 形成授权决定和有效权限范围。
+- Employee Workspace / 员工工作区和 AI Thread / AI 会话线程只承载该决定，不得扩大权限。
 - AI Router 只能在 Task 的权限与数据约束内选择已批准 Provider。
 - Hermes 只消费 Gateway 已允许的 Task、上下文快照、`permission_scope` 和 `allowed_skills`。
 - AI Provider 只提供模型或执行能力，不授予用户、群或 Skill 权限。
@@ -289,8 +304,9 @@ RBAC 扩展后，有效权限仍须由 Gateway 计算并写入授权快照。Her
 | Message Store 与权限决策关联 | **目标设计，待实现** |
 | 权限配置存储、版本发布和审计 | **待设计实现** |
 | 企业身份映射 | **待实现和验证** |
+| 工作区权限边界与管理员跨员工查看 | **设计基线，权限项、审批和审计待实现** |
 | 微信群结构化 mention 识别 | **待基于 `agent-wechat` 实际样本验证** |
 | 飞书、钉钉身份与 mention 映射 | **后续规划，未验证** |
 | 完整 RBAC | **后续规划** |
 
-当前只确认了企业级准入规则和职责边界，不代表权限系统、配置中心、审批流或 RBAC 已经上线。
+当前只确认了企业级准入规则、工作区权限边界和职责划分，不代表 Identity Mapping、权限系统、Hermes 员工工作台、配置中心、审批流或 RBAC 已经上线。员工归属与线程设计见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。

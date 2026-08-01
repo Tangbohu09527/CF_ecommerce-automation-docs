@@ -1,16 +1,17 @@
 # Message Store 设计
 
-> 状态日期：2026-07-31。本文定义 CF Gateway 的 Message Store 设计基线，不代表数据库、对象存储或保留策略已经选型、部署或验证。
+> 状态日期：2026-08-01。本文定义 CF Gateway 的 Message Store 设计基线，不代表数据库、对象存储或保留策略已经选型、部署或验证。
 
 ## 1. 定位
 
-Message Store 是企业 AI 的长期消息历史中心，也是上下文检索、权限追踪和审计的基础。它位于消息标准化之后、Access Control 之前，权威记录保存在 Debian。
+Message Store 是企业 AI 的长期 Physical Conversation / 物理会话消息历史中心，也是上下文检索、权限追踪和审计的基础。它位于消息标准化之后、Identity Mapping 和 Access Control 之前，权威记录保存在 Debian。
 
 固定处理顺序为：
 
 ```text
 消息进入 Gateway
   -> 标准化并持久化
+  -> Identity Mapping
   -> Access Control
   -> 决定是否创建 Task
   -> 只有获准 Task 才进入 Hermes
@@ -19,6 +20,8 @@ Message Store 是企业 AI 的长期消息历史中心，也是上下文检索�
 所有成功进入 Gateway 的消息都必须保存，包括白名单与非白名单用户消息、私聊与群聊消息、群内未 `@` 当前机器人的消息，以及最终不会进入 Hermes 的消息。权限只决定后续是否创建 Task，不决定是否保留聊天记录。
 
 Message Store 与 Task Store 是两个独立的权威数据域：Message Store 保存全部消息；Task Queue / Task Store 只保存通过准入检查后创建的 AI 任务。一条消息可以没有对应 Task，一条 Task 也可以引用同一获准批次中的多条消息。详细任务边界见[Task Queue 设计](./task-queue-design.md)。
+
+Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用独立实体，不通过复制每名员工的整份消息历史实现隔离。Message Store 保存来源事实，工作区、线程、Context Snapshot / 上下文快照和权限记录决定某次 Task 可以引用哪些消息。
 
 ## 2. 消息模型
 
@@ -66,6 +69,19 @@ Message Store 与 Task Store 是两个独立的权威数据域：Message Store �
 - `conversation_name`、`sender_name` 只保存接收时的展示快照；后续改名不改写历史身份事实。
 - 微信、飞书、钉钉及未来 API 入口由各自 Adapter 解释原始字段，再映射到统一模型；平台私有字段保存在受控原始载荷中，不扩散为核心字段。
 - 无法可靠确认会话类型、发送人或消息类型时，仍保留可得的原始载荷引用和错误记录，但拒绝创建 Task。
+
+### 2.4 员工工作区与消息引用边界
+
+Message Store、Employee Workspace / 员工工作区和 AI Thread / AI 会话线程保持不同的数据职责：
+
+- `messages` 记录 Physical Conversation / 物理会话中的来源事实。
+- `source_identity_mapping` 记录来源账号与 Enterprise Identity / 企业身份的显式映射。
+- `employee_workspace`、`ai_thread` 和 `thread_source_binding` 记录员工归属、逻辑线程与来源绑定。
+- `context_snapshot` 记录某个 Task 实际选择的消息、附件、权限和任务状态引用。
+
+同一条物理消息可以被多个受控 Context Snapshot / 上下文快照引用，例如当前群消息同时是两项获准任务的必要公共背景；系统不得因此复制或改写原始消息。每次引用必须记录 `workspace_id`、`ai_thread_id`、Task、选择原因和当时权限，且不得跨员工使用未授权的私聊、任务或附件。
+
+Identity Mapping 失败或 Access Control 拒绝只阻止创建员工 Task，不删除 Message Store 记录。完整归属与隔离规则见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
 
 ## 3. 附件模型
 
@@ -132,7 +148,7 @@ Message Store 需要支持未来以下访问路径：
 
 建议索引至少覆盖来源幂等键、`conversation_id + timestamp`、`sender_id + timestamp`、`event_id`、`authorization_result` 和附件 `message_id` / `hash`。搜索索引和知识库不是权威消息副本；索引可重建，删除、归档和权限变更必须同步处理。
 
-查询 Message Store 不等于向 Hermes 提供全部历史。Context Builder 只选择当前触发消息、被引用消息、与任务相关的附件，以及最近有限条且相关并获准的历史消息，并生成不可变 `context_snapshot_ref`。完整群聊历史不得无边界发送给 Hermes。
+查询 Message Store 不等于向 Hermes 提供全部历史。Context Builder 只在当前 `workspace_id`、`ai_thread_id` 和权限边界内选择当前触发消息、被引用消息、与任务相关的附件，以及最近有限条且相关并获准的历史消息，并生成不可变 `context_snapshot_ref`。完整群聊历史不得无边界发送给 Hermes，其他员工的个人历史和未授权 Task 内容不得进入当前快照。
 
 ## 7. 保留与安全
 
@@ -144,4 +160,4 @@ Message Store 需要支持未来以下访问路径：
 - 附件设置单文件大小、会话 / 用户配额、总容量水位、危险类型、压缩包展开和恶意内容限制；超过限制时保留消息和附件元数据并记录安全状态。
 - 在线消息库、归档库、附件存储和备份的删除边界必须分别定义。归档不是删除，删除数据库行也不能替代附件对象、索引和备份的生命周期处理。
 
-相关权限规则见[Access Control 设计](./access-control-design.md)，Gateway 总体位置见[企业 AI Gateway 架构](../architecture/gateway-architecture.md)，标准事件字段见[Hermes 事件协议](./hermes-event-schema.md)。
+相关权限规则见[Access Control 设计](./access-control-design.md)，员工归属见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)，Gateway 总体位置见[企业 AI Gateway 架构](../architecture/gateway-architecture.md)，标准事件字段见[Hermes 事件协议](./hermes-event-schema.md)。

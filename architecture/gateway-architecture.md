@@ -1,18 +1,19 @@
 # 企业 AI Gateway 架构
 
-> 状态日期：2026-07-31。本文定义企业 AI Gateway 的目标架构，不是实现说明。当前已完成 `agent-wechat` V1 微信入口验证、`wechat-adapter` 设计和 Hermes 事件协议设计；Gateway、Access Control、Message Store、Context Builder、Task Queue、AI Router、AI Provider 接入和端到端链路均待实现或接入。
+> 状态日期：2026-08-01。本文定义企业 AI Gateway 的目标架构，不是实现说明。当前已完成 `agent-wechat` V1 微信入口验证；Gateway 架构、`wechat-adapter`、Message Store、Access Control、Task Queue、Hermes 事件协议及员工工作区已经形成设计基线，Identity Mapping、Employee Conversation Manager、Context Builder、AI Router、AI Provider 接入和端到端链路仍待实现或接入。
 
 ## 1. Gateway 定位
 
 CF Gateway 是企业 AI 消息中枢，也是消息入口、权威控制面和 AI 执行环境之间的安全与调度边界。机器人不是公开服务：消息能够进入 Gateway 并被保存，不代表该消息有权创建 AI 任务。
 
-Gateway 包含 `Message Ingestion`、`Message Store`、`Access Control`、`Context Builder`、`Task Queue`、`AI Router`、`AI Provider Registry` 和由 Provider / Task 状态组成的 `Runtime / Execution Status`。
+Gateway 包含 `Message Ingestion`、`Message Store`、`Identity Mapping`、`Access Control`、`Employee Conversation Manager`、`Context Builder`、`Task Queue`、`AI Router`、`AI Provider Registry` 和由 Provider / Task 状态组成的 `Runtime / Execution Status`。
 
 这些模块共同管理：
 
 - 消息及附件历史。
+- Enterprise Identity / 企业身份、Employee Workspace / 员工工作区和 AI Thread / AI 会话线程。
 - 用户、群、Skill 和任务权限。
-- 面向 Hermes 的受控上下文。
+- 按员工和 AI Thread / AI 会话线程隔离的 Hermes 受控上下文。
 - 任务、队列、租约和结果状态。
 - AI Provider 注册、运行状态和路由决策。
 
@@ -48,9 +49,11 @@ flowchart TB
         DA --> N
         AA --> N
         N --> M["Message Store<br/>全部消息持久化"]
-        M --> AC["Access Control"]
-        AC -->|"允许"| C["Context Builder"]
+        M --> IM["Identity Mapping<br/>来源账号到企业身份"]
+        IM --> AC["Access Control"]
+        AC -->|"允许"| ECM["Employee Conversation Manager<br/>工作区与 AI Thread"]
         AC -->|"拒绝"| R["只保存消息和权限决策<br/>不创建 AI 任务"]
+        ECM --> C["Context Builder"]
         C --> T["Task Queue"]
         T --> AR["AI Router"]
         PR["AI Provider Registry"] --> AR
@@ -61,7 +64,7 @@ flowchart TB
     H --> S["授权 Skills"]
 ```
 
-图中的飞书、钉钉、API 入口及多种 AI Provider 是目标扩展位置，不表示已经选型、部署或验证。详细设计分别见[Message Store 设计](../design/message-store-design.md)、[Access Control 设计](../design/access-control-design.md)、[Task Queue 设计](../design/task-queue-design.md)和[Hermes 事件协议](../design/hermes-event-schema.md)。
+图中的飞书、钉钉、API 入口及多种 AI Provider 是目标扩展位置，不表示已经选型、部署或验证。详细设计分别见[Message Store 设计](../design/message-store-design.md)、[Access Control 设计](../design/access-control-design.md)、[Task Queue 设计](../design/task-queue-design.md)、[Hermes 事件协议](../design/hermes-event-schema.md)和[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
 
 ## 3. Gateway 核心职责
 
@@ -70,8 +73,9 @@ Gateway 负责：
 - 校验入口账号、来源平台和 Adapter 身份，隔离不同机器人账号和入口范围。
 - 接收 Adapter 生成的标准消息，执行来源映射、基础结构校验和幂等去重。
 - 在推进同步检查点前保存全部消息，形成企业统一消息历史。
+- 把来源平台稳定账号映射到 Enterprise Identity / 企业身份；映射失败时保留消息但不创建员工 Task。
 - 在消息持久化后执行 Access Control，决定是否创建 AI 任务。
-- 只为获准消息筛选必要上下文、创建任务并进入 Task Queue。
+- 为获准消息确定 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程，再筛选必要上下文、创建任务并进入 Task Queue。
 - 根据任务所需模态、模型、数据边界和能力，通过 AI Router 选择 AI Provider。
 - 保存任务、队列、租约、Provider 运行快照、文件、权限决策和结果回传的权威状态。
 - 在 Skill 执行前再次校验权限、高风险确认和任务状态。
@@ -83,6 +87,7 @@ Gateway 不负责：
 - 执行模型推理、管理模型进程或运维具体 AI 主机。
 - 代替 Skill 执行 ERP、S6、平台后台、文件处理或 Windows 自动化。
 - 根据昵称、群名、正文或文件名猜测企业身份和权限。
+- 根据 Hermes Runtime Thread / Hermes 运行时线程反推或覆盖企业身份、工作区和 AI Thread / AI 会话线程归属。
 - 绕过 File Service、人工确认或业务幂等规则直接访问正式文件和企业系统。
 
 ## 4. 消息接入
@@ -172,15 +177,41 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 - 未授权消息和授权消息遵循明确的数据分级、访问审计和保留周期；具体周期待确认。
 - 普通运行日志不等于消息历史库，不应重复输出完整敏感正文或附件内容。
 
-## 6. Access Control
+## 6. Identity Mapping 与 Employee Conversation Manager
 
-Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。它位于 Message Store 之后、Context Builder 和任务创建之前。权限决定由 Gateway 作出并强制执行，不由 Hermes 判断。
+Identity Mapping 与 Employee Conversation Manager 是两个独立 Gateway 模块，分别位于 Access Control 前后。
+
+### 6.1 Identity Mapping
+
+Identity Mapping 使用 `source.platform + source.account_id + sender.id` 查询权威来源身份映射，输出 `enterprise_identity_id`、`employee_id` 和 `workspace_id`。它回答“这个来源账号对应哪个企业员工？”。
+
+展示名称、群名片、微信 `wxid` 的显示形式或消息正文不能直接作为 `employee_id`，也不能用于自动合并两个来源账号。映射失败、冲突或已失效时，消息仍在 Message Store 中保存，但 Access Control 按拒绝默认形成 `identity_unresolved` 等结果，不创建 Employee Workspace / 员工工作区 Task。
+
+一个 Enterprise Identity / 企业身份可以显式绑定多个来源平台账号；一个来源账号在同一有效期内默认只能映射一个企业身份。映射变更必须记录操作者、原因、前后值、时间和有效期。
+
+### 6.2 Employee Conversation Manager
+
+Employee Conversation Manager 只处理已经完成 Identity Mapping 且通过 Access Control 的消息，负责：
+
+- 定位或按受控规则建立 Employee Workspace / 员工工作区。
+- 在工作区内定位稳定的 AI Thread / AI 会话线程。
+- 保存 AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。
+- 向 Context Builder 和 Task Queue 提供 `employee_id`、`workspace_id`、`ai_thread_id` 与原始路由信息。
+- 记录可选 `hermes_thread_id` 的创建、失效和重绑定，但不把它作为权威主键。
+
+微信私聊线程键仍为 `bot_account_id + private_chat_id`；群聊线程键仍为 `bot_account_id + group_chat_id + sender_id`。同群不同员工默认进入不同工作区和 AI Thread / AI 会话线程。一个 Hermes 服务可以承载多个员工工作区，每个工作区可以包含多个 AI Thread / AI 会话线程，不为每名员工部署独立 Hermes 进程。
+
+Employee Workspace / 员工工作区是归属与隔离容器，不产生权限。工作区存在或为 `active` 不能扩大 Access Control 生成的 `permission_scope` 或 `allowed_skills`。完整模型见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
+
+## 7. Access Control
+
+Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。它位于 Message Store 和 Identity Mapping 之后、Employee Conversation Manager、Context Builder 和任务创建之前。Identity Mapping 回答“这个来源账号对应哪个企业员工？”，Access Control 回答“这个员工的这条消息能否创建任务？”。权限决定由 Gateway 作出并强制执行，不由 Hermes 判断。
 
 ### 6.1 准入规则
 
 | 会话类型 | 创建 AI 任务的条件 | 其他情况 |
 | --- | --- | --- |
-| 私聊 | 发信人存在于有效白名单，即 `user_allowed=true` | 只保存消息，不创建任务 |
+| 私聊 | 企业身份映射有效且发信人存在于有效白名单，即 `user_allowed=true` | 只保存消息，不创建任务 |
 | 群聊 | `group_allowed=true` 且 `user_allowed=true` 且 `is_mentioned=true` | 只保存消息，不创建任务 |
 
 其中 `group_allowed` 对应群策略中的 `group_enabled=true`，`user_allowed` 对应发信人白名单中的 `sender_allowed=true`。群聊任一条件为 `false` 或无法确认都拒绝创建任务。
@@ -198,7 +229,7 @@ Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。�
 
 访问拒绝是权限决策，不应伪装为消息格式错误。详细白名单、群、Skill 和 RBAC 设计见[Access Control 设计](../design/access-control-design.md)。
 
-## 7. Context Builder
+## 8. Context Builder
 
 Gateway 的 Context Builder 只为通过准入检查并准备创建任务的消息构建 Hermes 输入。候选信息按以下优先级选择：
 
@@ -213,27 +244,31 @@ Gateway 的 Context Builder 只为通过准入检查并准备创建任务的消�
 
 - 不把完整私聊或群聊记录发送给 Hermes。
 - 未授权消息虽然保存在 Message Store，但默认不进入 Hermes 上下文。
-- 群聊按机器人账号、群会话和发信人隔离 AI 线程，避免不同员工串线。
+- 群聊按机器人账号、群会话和发信人隔离 AI Thread / AI 会话线程，避免不同员工串线。
+- 员工 A 的私聊、群聊任务和未授权数据不得进入员工 B 的上下文。
 - 只纳入当前任务权限允许读取的正文、附件和任务状态。
 - 进入队列前生成不可变 `context_snapshot_ref`，记录选入项、选择原因和版本。
 - 后续补充消息形成新快照或新批次，不悄悄改写正在执行的输入。
 
 窗口长度、摘要、跨消息附件归属和授权批次规则仍待确认。
 
-## 8. Task Queue
+## 9. Task Queue
 
 Gateway 维护持久化 Task Queue。消息历史与任务是不同对象：所有消息都保存，只有通过权限和任务收口条件的消息才创建 Task。
 
 ```mermaid
 flowchart LR
-    M["Message Store"] --> P["Access Control"]
-    P -->|"允许"| T["Create Task"]
+    M["Message Store"] --> I["Identity Mapping"]
+    I --> P["Access Control"]
+    P -->|"允许"| E["Employee Conversation Manager"]
     P -->|"拒绝"| H["仅保留消息历史"]
+    E --> C["Context Builder"]
+    C --> T["Create Task"]
     T --> Q["Task Queue"]
     Q --> R["AI Router"]
 ```
 
-Task Queue 至少保存任务标识、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。Task 主状态统一为 `queued`、`running`、`succeeded`、`failed`、`cancelled`；附件的 `pending` 等获取状态不属于 Task 状态。具体字段、转换、优先级和重试边界见[Task Queue 设计](../design/task-queue-design.md)，队列产品和容量参数待选型。
+Task Queue 至少保存任务标识、`employee_id`、`workspace_id`、`ai_thread_id`、可选 `hermes_thread_id`、来源账号与 Physical Conversation / 物理会话、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。同一 AI Thread / AI 会话线程默认有序执行，不同线程可在 Provider 容量和任务风险允许时并行。Task 主状态统一为 `queued`、`running`、`succeeded`、`failed`、`cancelled`；附件的 `pending` 等获取状态不属于 Task 状态。具体字段、转换、优先级和重试边界见[Task Queue 设计](../design/task-queue-design.md)，队列产品和容量参数待选型。
 
 队列必须支持：
 
@@ -243,7 +278,7 @@ Task Queue 至少保存任务标识、上下文快照引用、所需模态或模
 - 可判定安全的重试、延迟重试和人工接管。
 - 结果未知或部分成功时停止自动重复业务写操作。
 
-## 9. AI Provider 抽象
+## 10. AI Provider 抽象
 
 `AI Provider` 是 Gateway 面向 AI 执行环境的统一抽象。Provider 描述“可通过什么受控路径使用哪些模型和能力”，而不是一台具体主机。
 
@@ -271,7 +306,7 @@ Gateway 不注册或调度 Local Provider 内部的具体主机。若 Local Prov
 
 未来可以增加其他 Provider 类型，但必须保持统一注册、能力声明、鉴权引用、健康状态、路由约束、错误分类和审计边界。Provider 不得借扩展接口绕过 Access Control、Task Queue、Hermes、Skill 权限或 File Service。
 
-## 10. AI Provider Registry
+## 11. AI Provider Registry
 
 Gateway 维护 AI Provider Registry，用于发现可路由的 Provider，而不是管理 AI 主机。
 
@@ -291,7 +326,7 @@ Gateway 维护 AI Provider Registry，用于发现可路由的 Provider，而不
 
 模型名称和能力必须来自实际配置与验证，不因 Provider 宣称支持就自动进入生产路由。Provider 注册变更必须可审计。
 
-## 11. Provider Runtime State
+## 12. Provider Runtime State
 
 Gateway 不维护单一 AI 状态，也不维护主机级节点注册表。它只保存 AI Router 所需的 Provider 级运行状态快照。
 
@@ -351,7 +386,7 @@ Provider Runtime State 至少可包含：
 
 `idle` 表示可以接受符合条件的新 Task；`busy` 表示当前达到该路由单元的执行容量；`error` 和 `maintenance` 均不接受新 Task。API 限流、Local Provider 内部节点故障或模型服务异常都应汇总为 Provider 级状态和错误。状态过期或无法读取时，AI Router 按 `error` 或不可调度处理，不能默认 `idle`。该状态用于判断是否空闲、展示当前任务和执行时长，以及决定新任务排队还是立即执行；它不是某台 AI 物理主机的状态表。
 
-## 12. AI Router
+## 13. AI Router
 
 AI Router 位于 Task Queue 与 AI Provider 之间，根据任务要求、权限和 Provider 状态选择执行路径。
 
@@ -388,7 +423,7 @@ flowchart TB
 - 新 Provider 完成身份、能力、安全、合规和健康验证后才可进入候选集合。
 - Router 只处理已通过 Gateway 权限检查的任务，不改变 `permission_scope`、`allowed_skills` 或人工确认要求。
 
-## 13. Hermes 与 Skills
+## 14. Hermes 与 Skills
 
 Gateway 不执行 AI 任务。目标流程为：
 
@@ -403,6 +438,8 @@ Message Gateway
 
 Provider 是模型或 AI 执行能力的抽象，Hermes 仍是唯一生产 Agent。具体 Provider Adapter 和 Worker Bridge 如何把所选模型、凭证引用和任务交给 Hermes，仍待接口设计；该抽象不允许以 Provider 替代 Hermes 的 Agent 职责。
 
+企业内目标是运行一套或少量统一 Hermes 服务，由 Gateway 下发不同 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程的任务与上下文。Hermes Runtime Thread / Hermes 运行时线程可以按需创建或重建，但不能成为跨员工混合上下文或替代 Gateway 权威记录的依据。
+
 Hermes 负责：
 
 - 在 Gateway 提供的不可变上下文快照内理解请求和规划步骤。
@@ -416,23 +453,28 @@ Hermes 不负责：
 - 判断用户是否在白名单、群是否启用 AI、消息是否真正 `@` 机器人。
 - 决定消息是否保存或从企业消息历史中删除。
 - 维护权威 Task Queue、Provider Registry 或 Provider Runtime State。
+- 自行创建、合并或改变 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程归属。
 - 自行更换未获批准的 Provider、增加权限范围或扩大 `allowed_skills`。
 - 直接访问生产权限配置、完整聊天历史或正式存储任意路径。
 
 Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 Gateway / 控制面的权限、确认、文件和审计约束。
 
-## 14. 多入口与 Provider 扩展
+## 15. 多入口与 Provider 扩展
 
-微信、飞书、钉钉和 API 入口共享 Message Store、Access Control、Context Builder、Task Queue 和 AI Router，但各入口 Adapter 独立处理平台差异。
+微信、飞书、钉钉和 API 入口共享 Message Store、Identity Mapping、Access Control、Employee Conversation Manager、Context Builder、Task Queue 和 AI Router，但各入口 Adapter 独立处理平台差异。
 
 新增消息入口至少需要验证稳定账号、会话、发信人、mention、消息唯一标识、附件和回传语义。新增 AI Provider 至少需要验证身份、模型能力、数据边界、凭证注入、限流、错误、状态和审计语义。
 
 入口扩展与 Provider 扩展相互独立：增加飞书不要求更换 Provider，增加 Local Provider 也不改变微信权限规则。任何新入口或 Provider 在关键事实无法确认时都拒绝默认。
 
-## 15. 安全与可靠性边界
+多入口线程绑定必须包含 `source.platform`、`source.account_id`、Physical Conversation / 物理会话和企业身份或稳定来源身份，避免跨平台 ID 冲突。不同来源账号只有经过显式身份映射才能归入同一 Enterprise Identity / 企业身份，默认不合并 AI Thread / AI 会话线程。
+
+## 16. 安全与可靠性边界
 
 - **消息先保存：** 授权与未授权消息都进入企业消息历史；持久化失败时不推进任务链路。
 - **权限后分流：** Access Control 只决定是否创建任务，不决定是否保留消息。
+- **身份与权限分离：** Identity Mapping 解析员工，Access Control 决定消息能否创建 Task；映射成功不代表获准执行。
+- **工作区隔离：** 个人消息、任务和上下文默认按 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程隔离。
 - **上下文最小化：** Gateway 从消息历史中筛选必要且获准的内容，不把完整聊天记录发送给 Hermes。
 - **队列权威：** Task Queue、租约和重试状态保存在 Debian，Provider 本地状态不能覆盖。
 - **Provider 抽象：** Gateway 管理 Provider 路由，不管理具体 AI 主机或 GPU 节点。
@@ -440,15 +482,18 @@ Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 G
 - **最小授权：** Provider 和 Hermes 只获得当前任务所需模型、文件、Skill 和数据权限。
 - **全链路审计：** 消息、授权、上下文快照、入队、路由、Provider、Hermes、Skill 和结果回传使用关联标识记录。
 
-## 16. 当前状态
+## 17. 当前状态
 
 | 项目 | 状态 |
 | --- | --- |
 | `agent-wechat` V1 微信入口 | **已验证**，限现有验证记录范围 |
 | `wechat-adapter` | **设计完成，代码待开发** |
 | Hermes 事件协议 | **设计基线，待实现前评审** |
-| Gateway Message Store、Context Builder | **Message Store 详细设计已形成；Context Builder 为目标设计，均待实现和验证** |
+| Gateway 架构 | **设计基线已形成，代码与部署待实现** |
+| Message Store、Context Builder | **Message Store 详细设计已形成；Context Builder 为目标设计，均待实现和验证** |
 | Access Control | **设计基线，待实现和验证** |
+| Identity Mapping、Employee Conversation Manager | **设计基线，待实现和验证** |
+| Employee Workspace / 员工工作区与 AI Thread / AI 会话线程 | **设计基线，实体、恢复和 Hermes 员工工作台待实现** |
 | Task Queue、AI Router、AI Provider Registry | **Task Queue 详细设计已形成；产品与实现待确认** |
 | Provider Runtime State | **目标设计，状态采集方式待确认** |
 | 微信群结构化 `@` 识别 | **待结合实际 API 样本验证** |

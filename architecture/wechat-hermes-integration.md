@@ -1,12 +1,12 @@
 # 微信入口与 Hermes 集成架构
 
-> 状态日期：2026-07-31。本文描述目标架构，不代表生产系统已经完成。当前仅完成 `agent-wechat` V1 微信入口验证；`wechat-adapter`、Hermes 接入、Skills 和企业系统接口仍处于规划、设计或待开发状态。
+> 状态日期：2026-08-01。本文描述目标架构，不代表生产系统已经完成。当前仅完成 `agent-wechat` V1 微信入口验证；`wechat-adapter`、Identity Mapping、Employee Conversation Manager、Hermes 接入、Skills 和企业系统接口仍处于设计或待开发状态。
 
 ## 目标与范围
 
 本方案用于把员工微信中的文本、文件和可获得的引用上下文，转换为企业 AI 自动化系统可追踪、可去重、可授权的任务输入，再由 Hermes 选择获授权的 Skill 处理，并将结果返回原微信会话。
 
-本文只定义微信入口到 Hermes 的组件关系和职责边界。消息事件字段、Polling 和文件处理细节见 [wechat-adapter 设计](../design/wechat-adapter-design.md)；Debian 权威控制面、任务中心、File Service 和 Worker Bridge 的完整边界以[系统设计](../02_系统设计.md)为准。
+本文只定义微信入口到 Hermes 的组件关系和职责边界。消息事件字段、Polling 和文件处理细节见 [wechat-adapter 设计](../design/wechat-adapter-design.md)；员工工作区与线程隔离见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)；Debian 权威控制面、任务中心、File Service 和 Worker Bridge 的完整边界以[系统设计](../02_系统设计.md)为准。
 
 ## 当前验证结论
 
@@ -45,7 +45,11 @@ flowchart LR
 
     subgraph D["Debian 权威控制中心"]
         A --> W["wechat-adapter"]
-        W --> C["上下文 / 任务 / 权限 / 审计"]
+        W --> M["Message Store"]
+        M --> I["Identity Mapping"]
+        I --> AC["Access Control"]
+        AC -->|"允许"| C["Employee Conversation Manager<br/>上下文 / 任务 / 审计"]
+        AC -->|"拒绝"| R["仅保存消息与权限决策"]
         W --> T["受控临时文件 / File Service"]
         T --> C
     end
@@ -62,6 +66,17 @@ flowchart LR
 ```
 
 生产部署位置仍以现有技术决定为准：`agent-wechat` 计划运行在 Debian；Debian 保存消息、上下文、任务、文件、权限、日志和审计的权威状态；Windows AI 节点计划运行 Hermes、Worker Bridge 和 Skills。
+
+## 统一 Hermes 与员工逻辑隔离
+
+企业内目标是运行一套或少量统一 Hermes 服务，不为每个员工部署独立 Hermes 进程。Gateway 为每个 Enterprise Identity / 企业身份维护独立 Employee Workspace / 员工工作区，每个工作区可以包含多个 AI Thread / AI 会话线程：
+
+- 微信私聊线程键保持为 `bot_account_id + private_chat_id`。
+- 微信群聊线程键保持为 `bot_account_id + group_chat_id + sender_id`。
+- 同一群内不同员工发起的任务进入不同员工工作区和不同 AI Thread / AI 会话线程，不共享个人上下文。
+- 企业知识、授权 Skills、文件资料和企业系统能力可以按权限共享，但其他员工的个人消息和任务历史不得混入当前上下文。
+
+Gateway 生成稳定的 `workspace_id` 和 `ai_thread_id`。Hermes Runtime Thread / Hermes 运行时线程的 `hermes_thread_id` 可以为空或重新绑定，不是系统权威主键。Windows AI 节点未来可以按员工显示独立工作区与任务状态，但这属于目标界面，尚未实现；Gateway / Debian 控制面仍是权威状态源。
 
 ## 组件职责
 
@@ -104,6 +119,7 @@ flowchart LR
 
 **负责：**
 
+- 在 Gateway 下发的 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程范围内处理任务。
 - 在控制面提供的受控上下文内理解用户意图。
 - 将请求规划为可执行步骤。
 - 从当前任务允许的 Skills 中选择合适能力。
@@ -111,6 +127,7 @@ flowchart LR
 
 **不负责：**
 
+- 根据微信昵称、来源账号或 Hermes Runtime Thread / Hermes 运行时线程自行创建、合并或改变员工工作区归属。
 - 维护微信登录和消息同步检查点。
 - 直接解析 `agent-wechat` 私有响应结构。
 - 绕过 Skill、权限、高风险确认或 File Service 直接操作企业系统和正式文件。
@@ -130,21 +147,26 @@ Skills 封装确定性的企业能力，例如库存查询、订单处理、文�
 
 1. 员工在私聊或允许的群聊中发送文本、文件或引用消息。
 2. `agent-wechat` 读取微信侧消息和当前可获得的元数据。
-3. `wechat-adapter` 轮询新增消息，保存原始记录，按 `chatId` 和 `localId` 去重并生成 `message_received` 标准事件。
-4. Debian 控制面校验来源和权限，关联上下文与附件，形成任务批次和不可变上下文快照。
-5. Worker Bridge 把受控任务、文件引用和允许的 Skills 交给 Hermes。
-6. Hermes 理解意图、规划步骤并调用获授权的 Skill。
-7. Skill 通过明确接口访问企业系统，并返回结构化结果或错误。
+3. `wechat-adapter` 轮询新增消息，按 `chatId` 和 `localId` 去重、生成 `message_received` 标准事件，并由 Message Store 保存 Physical Conversation / 物理会话消息。
+4. Identity Mapping 把稳定来源账号映射到 Enterprise Identity / 企业身份；映射失败时保留消息但不创建 Task。
+5. Access Control 检查准入与权限；群聊必须同时满足 `group_allowed AND user_allowed AND is_mentioned`。
+6. Employee Conversation Manager 为获准消息定位 Employee Workspace / 员工工作区及私聊或“群 + 员工”AI Thread / AI 会话线程。
+7. Context Builder 关联有限上下文与附件，形成任务批次和不可变上下文快照，再由 Task Queue 持久化排队。
+8. Worker Bridge 把受控任务、工作区、线程、文件引用和允许的 Skills 交给统一 Hermes 服务。
+9. Hermes 理解意图、规划步骤并调用获授权的 Skill。
+10. Skill 通过明确接口访问企业系统，并返回结构化结果或错误。
 
-Adapter 不把全部群聊历史直接提交给 Hermes。上下文必须按会话、发信人、任务和权限筛选，群内不同员工的任务不得串线。
+Adapter 不把全部群聊历史直接提交给 Hermes。上下文必须按 Employee Workspace / 员工工作区、AI Thread / AI 会话线程、Task 和权限筛选，群内不同员工的任务不得串线。
 
 ### 结果回传
 
 1. Hermes 返回完成、需要澄清、等待确认、可重试失败或最终失败等结构化结果。
 2. Debian 控制面先更新权威任务状态和审计记录。
-3. 控制面生成包含目标会话、关联任务和待发送内容的回传指令。
+3. 控制面根据 Task 中保留的原平台、原账号、原 Physical Conversation / 物理会话、Employee Workspace / 员工工作区和 AI Thread / AI 会话线程生成回传指令。
 4. `wechat-adapter` 调用 `agent-wechat` 发送接口，将结果返回原 `chatId`。
 5. 发送结果和失败原因写回权威状态；发送失败不得被记录为任务回传成功。
+
+结果显示在 Hermes 员工工作区中不能替代原微信路由。Task 完成与微信发送成功必须分别记录；前者表示结果已经由 Debian 持久化，后者才表示结果到达原微信窗口。
 
 ## 文件边界
 
@@ -180,4 +202,5 @@ flowchart LR
 | Polling 消息同步 | **规划开发** | V1 目标方案，轮询周期、分页和保留窗口需结合 API 实测确认 |
 | WebSocket Event 模式 | **后续研究** | `/api/ws/events` 可连接，但微信消息事件推送尚未确认 |
 | Hermes 接入 | **规划接入** | Hermes、Worker Bridge、任务协议和结果回传尚未端到端实现 |
+| 员工工作区与 AI Thread | **设计完成，待开发** | Identity Mapping、Employee Conversation Manager、Hermes 员工工作台、运行时线程绑定和恢复尚未实现 |
 | Skills 与企业系统 | **规划建设 / 待验证** | 具体 Skill 和企业接口待逐项设计、实现和验收 |

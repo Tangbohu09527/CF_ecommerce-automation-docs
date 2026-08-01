@@ -1,6 +1,6 @@
 # Task Queue 设计
 
-> 状态日期：2026-07-31。本文定义 CF Gateway 的 Task Queue / Task Store 设计基线，不代表队列产品、数据库、调度参数或 AI Provider 已经选型、部署或验证。
+> 状态日期：2026-08-01。本文定义 CF Gateway 的 Task Queue / Task Store 设计基线，不代表队列产品、数据库、调度参数、员工工作区或 AI Provider 已经选型、部署或验证。
 
 ## 1. 定位
 
@@ -10,7 +10,9 @@ Task Queue 是 Gateway 中已授权 AI 任务的持久化排队、调度和生�
 
 ```text
 Message Store
+  -> Identity Mapping
   -> Access Control
+  -> Employee Conversation Manager
   -> Context Builder
   -> Task Queue
   -> AI Router
@@ -21,7 +23,7 @@ Message Store
 
 Message Store 与 Task Store 必须分离：Message Store 保存所有消息，Task Store 只保存准入结果为 `allowed` 且满足任务收口条件的 AI 任务。未获准消息、群内未 `@` 当前机器人的消息以及只需留存但不执行的消息均没有 Task；不得用“创建一个拒绝 Task”代替权限审计。
 
-Task Queue 在逻辑上包含持久化 Task Store、优先级调度、领取租约、延迟重试、取消和执行审计。具体可由一个或多个组件实现，但 Debian 保存权威任务状态；Provider、Hermes 或 Windows Worker 的本地状态不得覆盖它。
+Task Queue 在逻辑上包含持久化 Task Store、优先级调度、线程顺序控制、领取租约、延迟重试、取消和执行审计。具体可由一个或多个组件实现，但 Debian 保存权威任务状态及 Employee Workspace / 员工工作区、AI Thread / AI 会话线程归属；Provider、Hermes 或 Windows Worker 的本地状态不得覆盖它。
 
 ## 2. 任务生命周期
 
@@ -70,9 +72,15 @@ stateDiagram-v2
 | 字段 | 语义 |
 | --- | --- |
 | `task_id` | Debian Task Store 生成的稳定任务 ID |
+| `employee_id` | Task 所属企业员工引用，不使用微信 `wxid` 等来源标识代替 |
+| `workspace_id` | Gateway 生成的 Employee Workspace / 员工工作区稳定 ID |
+| `ai_thread_id` | Gateway 生成的 AI Thread / AI 会话线程稳定 ID，是任务顺序与上下文隔离依据 |
+| `hermes_thread_id` | 可选的 Hermes Runtime Thread / Hermes 运行时线程绑定；可为 `null`、可重建，不是权威主键 |
 | `source_message_id` | 触发本 Task 的 Message Store `messages.id`；这里表示“Task 的来源消息”，不是平台侧 `messages.source_message_id` |
-| `conversation_id` | 来源物理会话 ID，用于追踪和结果路由；不替代 AI 线程 ID |
+| `source_conversation_id` | 来源 Physical Conversation / 物理会话 ID，用于追踪和结果路由；不替代 `ai_thread_id` |
+| `source_account_id` | 来源机器人或应用账号 ID，与平台和物理会话共同确定回传作用域 |
 | `requester_id` | 发起人的稳定入口身份或已解析企业身份引用 |
+| `context_snapshot_id` | 本 Task 实际使用的不可变 Context Snapshot / 上下文快照 ID |
 | `task_type` | 任务类别，如受控问答、文档处理或业务查询；具体枚举待业务设计 |
 | `priority` | `low`、`normal`、`high` 或 `urgent` |
 | `status` | `queued`、`running`、`succeeded`、`failed` 或 `cancelled` |
@@ -93,18 +101,28 @@ stateDiagram-v2
 
 还应保存：
 
-- `trace_id`、`batch_id`、`ai_thread_id` 和 `idempotency_key`。
-- `authorization_decision_ref`、`policy_version`、`context_snapshot_ref`、`allowed_skills` 和有效权限范围引用。
+- `trace_id`、`batch_id`、`source_platform` 和 `idempotency_key`。
+- `authorization_decision_ref`、`policy_version`、`context_snapshot_ref`、`allowed_skills` 和有效权限范围引用；`context_snapshot_ref` 是传输或读取引用，不替代稳定的 `context_snapshot_id`。
 - `task_timeout`、`blocked_reason`、`cancellation_requested_at` 和当前租约信息。
 - 创建者、最后状态版本和乐观并发版本，防止并发调度覆盖较新状态。
 
-`source_message_id + task_type + context_snapshot_ref` 可参与生成任务幂等键，但最终组成需结合任务批次规则确认。同一 Message Store 消息可以没有 Task；多消息批次创建 Task 时，`source_message_id` 指向触发收口的主消息，其他消息通过批次项和上下文快照关联。
+`source_message_id + task_type + context_snapshot_id` 可参与生成任务幂等键，但最终组成需结合任务批次规则确认。同一 Message Store 消息可以没有 Task；多消息批次创建 Task 时，`source_message_id` 指向触发收口的主消息，其他消息通过批次项和上下文快照关联。
 
 ### 3.2 执行尝试
 
-每次领取和执行应追加独立 attempt 记录，至少包含 `attempt_id`、`task_id`、attempt 序号、Provider、模型、租约、开始 / 结束时间、耗时、结果、错误、重试决定和重新路由原因。更新 `tasks.selected_provider` 不得覆盖历史路由事实。
+每次领取和执行应追加独立 attempt 记录，至少包含 `attempt_id`、`task_id`、attempt 序号、Provider、模型、当次 `hermes_thread_id`、租约、开始 / 结束时间、耗时、结果、错误、重试决定和重新路由原因。更新 `tasks.selected_provider` 或当前 `hermes_thread_id` 不得覆盖历史路由与运行时线程绑定事实。
 
 结果回传使用独立 `result_delivery` 记录。Task `succeeded` 表示执行结果已在 Debian 持久化，不表示微信或其他入口已经发送成功。
+
+`result_delivery` 必须保留 `employee_id`、`workspace_id`、`ai_thread_id`、`task_id`、`source_message_id`、`source_platform`、`source_account_id` 和 `source_conversation_id`，确保结果从 Hermes 员工工作区仍能回到原 Physical Conversation / 物理会话。
+
+### 3.3 线程顺序与并行
+
+同一 AI Thread / AI 会话线程内的 Task 默认按 Gateway 确认的入队顺序执行。前一 Task 仍为 `running`，或其结果尚未完成权威上下文提交时，后一 Task 不得并发修改同一线程上下文。实现可以使用线程序号、线程级租约或等效的持久化顺序机制，具体方案待选型。
+
+不同 Employee Workspace / 员工工作区或不同 AI Thread / AI 会话线程的 Task 可以并行，但必须同时满足 Provider 容量、任务风险、文件与企业系统并发限制。Hermes Runtime Thread / Hermes 运行时线程的本地并发能力不得绕过 Gateway 的线程顺序。
+
+跨员工共享线程、共同 Task 或管理者接管属于后续规划；没有明确授权、参与者、共享范围和审计记录时不得自动合并顺序域。
 
 ## 4. 优先级
 
@@ -174,6 +192,8 @@ Provider Runtime State 至少包含：
 
 `queue_length` 和 `elapsed_seconds` 是可重算快照，Task Store、attempt 和租约才是权威执行记录。状态过期时按 `error` 或不可调度处理，不能默认 `idle`。即使当前主要使用 GPT API，也必须记录任务执行状态，以判断是否空闲、展示正在处理的 Task、统计执行时长并决定新 Task 排队或立即执行。
 
+未来 Hermes 员工工作台按 `workspace_id` 和 `ai_thread_id` 查询 Task，并至少展示 `queue_position`、`started_at`、`elapsed_seconds`、当前状态、选定 Provider 和模型。该工作台是受控视图，不是已实现功能；显示快照不得覆盖 Task Store、attempt 或租约中的权威事实。
+
 该状态描述 Provider / Task 执行关系，不表示 Gateway 管理某台 AI 物理主机。Local Provider 可以提供节点诊断信息，但它是可选运维元数据，不形成 Gateway 节点注册表。
 
 ## 7. 重试、超时和取消
@@ -219,4 +239,4 @@ Task 审计必须能够回答：
 
 状态变更、优先级调整、重新路由、取消和人工接管均追加不可变审计事件，并携带 `trace_id`、`task_id`、操作者 / 组件身份和时间。普通运行日志不得包含 API Token、密码、Cookie、微信登录数据、完整敏感上下文或真实业务附件。
 
-Gateway 总体位置见[企业 AI Gateway 架构](../architecture/gateway-architecture.md)，消息边界见[Message Store 设计](./message-store-design.md)，准入规则见[Access Control 设计](./access-control-design.md)，事件字段见[Hermes 事件协议](./hermes-event-schema.md)。
+Gateway 总体位置见[企业 AI Gateway 架构](../architecture/gateway-architecture.md)，消息边界见[Message Store 设计](./message-store-design.md)，员工归属见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)，准入规则见[Access Control 设计](./access-control-design.md)，事件字段见[Hermes 事件协议](./hermes-event-schema.md)。

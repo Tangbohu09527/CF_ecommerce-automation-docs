@@ -1,10 +1,10 @@
 # 当前开发进度
 
-> 状态日期：2026-07-31。本文记录已经验证的事实和仍待完成的工作；“已完成”仅限所列技术验证范围，不等同于生产上线或端到端业务验收。
+> 状态日期：2026-08-01。本文记录已经验证的事实、已经形成的设计基线和仍待完成的工作；“已完成”仅限所列验证或文档设计范围，不等同于生产上线或端到端业务验收。
 
 ## 已完成
 
-| 项目 | 已验证范围 | 不代表 |
+| 项目 | 已完成 / 已验证范围 | 不代表 |
 | --- | --- | --- |
 | `agent-wechat` 部署验证 | 已完成测试环境部署验证 | 已形成生产高可用部署 |
 | 微信登录验证 | 已完成微信登录验证 | 登录态备份、自动恢复和长期稳定性已经验收 |
@@ -17,19 +17,22 @@
 | 合并转发消息 | 已验证类型识别、发送人获取和外层标题获取 | 已支持展开内部聊天记录或自动提取内部文件 |
 | 消息读取方式 | API 读取方式已验证 | WebSocket 实时事件已经研究或实现 |
 | 消息发送 | 已验证可发送微信消息 | Gateway、Hermes 处理结果已经能够端到端回传 |
+| 员工工作区与 AI Thread 设计 | 已完成 Enterprise Identity / 企业身份、Employee Workspace / 员工工作区、AI Thread / AI 会话线程及 Hermes Runtime Thread / Hermes 运行时线程的设计基线 | Identity Mapping、Conversation Manager、Hermes 员工工作台、工作区恢复或端到端接入已经实现 |
 
 ## 待完成
 
 | 项目 | 当前边界 |
 | --- | --- |
 | Hermes 接入 | 生产 Agent 路线已确定，Hermes Adapter、Worker Bridge、GPT-5.6 API 调用和任务链路尚待实施 |
-| Gateway 设计 | CF Gateway 当前是规划中的逻辑边界；消息路由、安全隔离、事件协议及与权威控制面的衔接待设计 |
+| Gateway 实现 | Gateway 架构、Message Store、Access Control、Task Queue 和 Hermes 事件协议已形成设计基线；代码、部署和联调待实施 |
+| Identity Mapping 与 Conversation Manager | 来源账号到 Enterprise Identity / 企业身份的映射、Employee Workspace / 员工工作区实体、AI Thread / AI 会话线程绑定和恢复待开发 |
+| Hermes 员工工作台 | 按员工显示独立工作区、线程、任务历史、队列状态、Provider、模型、耗时、上下文快照和原会话来源的界面待开发 |
 | Skill 体系 | 运行边界已确定，库存、订单、文件等具体 Skill 尚待定义、实现和验收 |
 | ERP/S6 接口 | 旺店通 ERP、旺店通 WMS、S6 的接口、字段、数据口径、权限和数据时效待逐项验证与对接 |
 | 文件自动处理 | 文件消息和 ZIP 入口已验证；临时文件管理、自动解压、OCR/视觉、Skill 处理、File Service 对接、产物回写和归档均待完成 |
 | 实时事件机制 | 当前 API 读取方式已验证；WebSocket 接口、事件范围、重连、去重和补偿机制待研究和开发 |
 | 合并转发解析增强 | 内部聊天记录展开、内部文件自动提取和 `forward parser` 尚待开发 |
-| 企业权限体系 | 用户、群、岗位、Skill、系统接口和文件路径权限矩阵及高风险确认机制待设计和实施 |
+| 企业权限体系 | Access Control 已形成设计基线；用户、群、岗位、Skill、系统接口、文件路径、管理员跨员工查看权限矩阵及高风险确认机制待业务确认和实施 |
 | 端到端主链路 | 微信事件到 Gateway、Hermes、Skill、企业系统再返回原会话的完整链路尚未完成 |
 
 ## 规划能力说明
@@ -42,4 +45,4 @@
 
 ## 当前阶段结论
 
-项目仍处于阶段 1。`agent-wechat` V1 微信入口层已经验证，说明微信消息入口层技术可行；合并转发当前只完成外层识别。下一步工作集中在 Gateway 设计、Hermes Adapter 与 Hermes Agent 接入、Skills 系统建设、ERP/S6 接口对接和端到端主链路建设；实时事件机制与合并转发解析增强仍待开发。在这些环节完成并通过验收前，不对外宣称企业业务自动化已经可用。验证范围详见[agent-wechat V1 入口验证记录](./agent-wechat-validation.md)。
+项目仍处于阶段 1。`agent-wechat` V1 微信入口层已经验证，说明微信消息入口层技术可行；合并转发当前只完成外层识别。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议和员工工作区与 AI Thread 已形成设计基线。下一步工作集中在 Gateway 代码、Identity Mapping、Conversation Manager、Hermes Adapter 与 Hermes Agent、Hermes 员工工作台、Skills、ERP/S6 接口和端到端主链路建设；实时事件机制与合并转发解析增强仍待开发。在这些环节完成并通过验收前，不对外宣称企业业务自动化已经可用。验证范围详见[agent-wechat V1 入口验证记录](./agent-wechat-validation.md)，员工隔离边界见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
