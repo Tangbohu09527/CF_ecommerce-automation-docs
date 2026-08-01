@@ -17,15 +17,19 @@
 | 合并转发消息 | 已验证类型识别、发送人获取和外层标题获取 | 已支持展开内部聊天记录或自动提取内部文件 |
 | 消息读取方式 | API 读取方式已验证 | WebSocket 实时事件已经研究或实现 |
 | 消息发送 | 已验证可发送微信消息 | Gateway、Hermes 处理结果已经能够端到端回传 |
-| 员工工作区与 AI Thread 设计 | 已完成 Enterprise Identity / 企业身份、Employee Workspace / 员工工作区、AI Thread / AI 会话线程及 Hermes Runtime Thread / Hermes 运行时线程的设计基线 | Identity Mapping、Conversation Manager、Hermes 员工工作台、工作区恢复或端到端接入已经实现 |
+| `CF_agent-gateway` 工程基础 | 已完成 Python 3.12 + FastAPI、YAML 配置、JSON 结构化日志、SQLAlchemy engine / session、SQLite 自动建表和 PostgreSQL 配置兼容 | 已完成生产部署、生产数据库选型或完整 Gateway |
+| Message Store Foundation | commit `d32b65aa389626f820349367d2132b7d53d0ed4f` 已实现 Conversation / Message / Attachment、`POST /internal/messages`、`GET /messages/{id}`、`GET /conversations/{conversation_id}/messages` 和 `event_id` 幂等；9 项测试通过 | Identity Mapping、权限、上下文、Task 或 Adapter / Hermes 链路已经实现 |
+| Gateway Docker 配置 | 已提供 Dockerfile 和 Compose 配置 | 已完成 Docker 镜像构建、容器运行或部署验证 |
+| 员工工作区与 AI Thread 设计 | 已完成 Enterprise Identity / 企业身份、Employee Workspace / 员工工作区、AI Thread / AI 会话线程及 Hermes Runtime Thread / Hermes 运行时线程的设计基线 | Identity Mapping、Employee Conversation Manager、Hermes 员工工作台、工作区恢复或端到端接入已经实现 |
 
 ## 待完成
 
 | 项目 | 当前边界 |
 | --- | --- |
 | Hermes 接入 | 生产 Agent 路线已确定，Hermes Adapter、Worker Bridge、GPT-5.6 API 调用和任务链路尚待实施 |
-| Gateway 实现 | Gateway 架构、Message Store、Access Control、Task Queue 和 Hermes 事件协议已形成设计基线；代码、部署和联调待实施 |
-| Identity Mapping 与 Conversation Manager | 来源账号到 Enterprise Identity / 企业身份的映射、Employee Workspace / 员工工作区实体、AI Thread / AI 会话线程绑定和恢复待开发 |
+| Gateway 剩余实现 | Gateway 架构、Message Store、Access Control、Task Queue 和 Hermes 事件协议已形成设计基线；工程基础和 Message Store Foundation 已实现，Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter、Hermes 与 AI Provider 链路仍待实施 |
+| Gateway Docker 验证 | Dockerfile 和 Compose 配置已提供；镜像实际构建、容器运行和部署验证尚未完成 |
+| Identity Mapping 与 Employee Conversation Manager | 来源账号到 Enterprise Identity / 企业身份的映射、Employee Workspace / 员工工作区实体、AI Thread / AI 会话线程绑定和恢复待开发 |
 | Hermes 员工工作台 | 按员工显示独立工作区、线程、任务历史、队列状态、Provider、模型、耗时、上下文快照和原会话来源的界面待开发 |
 | Skill 体系 | 运行边界已确定，库存、订单、文件等具体 Skill 尚待定义、实现和验收 |
 | ERP/S6 接口 | 旺店通 ERP、旺店通 WMS、S6 的接口、字段、数据口径、权限和数据时效待逐项验证与对接 |
@@ -45,4 +49,4 @@
 
 ## 当前阶段结论
 
-项目仍处于阶段 1。`agent-wechat` V1 微信入口层已经验证，说明微信消息入口层技术可行；合并转发当前只完成外层识别。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议和员工工作区与 AI Thread 已形成设计基线。下一步工作集中在 Gateway 代码、Identity Mapping、Conversation Manager、Hermes Adapter 与 Hermes Agent、Hermes 员工工作台、Skills、ERP/S6 接口和端到端主链路建设；实时事件机制与合并转发解析增强仍待开发。在这些环节完成并通过验收前，不对外宣称企业业务自动化已经可用。验证范围详见[agent-wechat V1 入口验证记录](./agent-wechat-validation.md)，员工隔离边界见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
+项目仍处于阶段 1。`agent-wechat` V1 微信入口层已经验证，说明微信消息入口层技术可行；合并转发当前只完成外层识别。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议和员工工作区与 AI Thread 已形成设计基线，`CF_agent-gateway` 工程基础和 Message Store Foundation 已完成代码实现。下一步工作集中在 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 与 Hermes / AI Provider 链路、Hermes 员工工作台、Skills、ERP/S6 接口和端到端主链路建设；Docker 实际构建部署、实时事件机制与合并转发解析增强仍待验证或开发。在这些环节完成并通过验收前，不对外宣称企业业务自动化已经可用。验证范围详见[agent-wechat V1 入口验证记录](./agent-wechat-validation.md)，员工隔离边界见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。

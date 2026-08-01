@@ -1,6 +1,6 @@
 # Message Store 设计
 
-> 状态日期：2026-08-01。本文定义 CF Gateway 的 Message Store 设计基线，不代表数据库、对象存储或保留策略已经选型、部署或验证。
+> 状态日期：2026-08-01。本文定义 CF Gateway 的 Message Store 设计基线。`CF_agent-gateway` 已实现 Conversation / Message / Attachment 基础模型、消息写入与查询和 `event_id` 幂等；身份解析、权限关联、完整附件存储策略、生产数据库和部署仍待实现或验证。
 
 ## 1. 定位
 
@@ -22,6 +22,8 @@ Message Store 是企业 AI 的长期 Physical Conversation / 物理会话消息�
 Message Store 与 Task Store 是两个独立的权威数据域：Message Store 保存全部消息；Task Queue / Task Store 只保存通过准入检查后创建的 AI 任务。一条消息可以没有对应 Task，一条 Task 也可以引用同一获准批次中的多条消息。详细任务边界见[Task Queue 设计](./task-queue-design.md)。
 
 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用独立实体，不通过复制每名员工的整份消息历史实现隔离。Message Store 保存来源事实，工作区、线程、Context Snapshot / 上下文快照和权限记录决定某次 Task 可以引用哪些消息。
+
+当前代码实现对应 commit `d32b65aa389626f820349367d2132b7d53d0ed4f`，包含 `POST /internal/messages`、`GET /messages/{id}` 和 `GET /conversations/{conversation_id}/messages`，9 项测试通过。该实现不包含 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 或 Hermes 链路。
 
 ## 2. 消息模型
 
@@ -48,7 +50,7 @@ Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用�
 | `created_at` | Gateway 首次持久化记录的时间 |
 | `updated_at` | Gateway 最后更新标准化补充字段、附件状态或授权关联的时间 |
 
-建议同时保存 `source_timestamp_raw`、`received_at`、`raw_payload_ref`、`normalization_version`、`authorization_decision_ref` 和 `trace_id`，用于解释来源时间、映射版本和处理链路。受控原始载荷与标准消息分开保存，通过不透明引用关联；普通日志不得代替 Message Store。
+建议同时保存 `source_timestamp_raw`、`received_at`、`raw_payload_ref`、`normalization_version`、`identity_resolution_ref`、`authorization_decision_ref` 和 `trace_id`，用于解释来源时间、身份解析、映射版本和处理链路。受控原始载荷与标准消息分开保存，通过不透明引用关联；普通日志不得代替 Message Store。这些建议字段不表示当前代码已经实现。
 
 ### 2.2 标识与幂等
 
@@ -74,14 +76,17 @@ Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用�
 
 Message Store、Employee Workspace / 员工工作区和 AI Thread / AI 会话线程保持不同的数据职责：
 
+`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、工作区和权限关联的权威主键。`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信 `wxid` 代替。
+
 - `messages` 记录 Physical Conversation / 物理会话中的来源事实。
-- `source_identity_mapping` 记录来源账号与 Enterprise Identity / 企业身份的显式映射。
+- `source_identity_mapping` 记录 `source.platform + source.account_id + sender.id` 到 `enterprise_identity_id` 及可选 `employee_id` 的显式映射；不创建或返回 `workspace_id`。
+- `identity_resolution` 记录每条消息的解析状态、`enterprise_identity_id`、可选 `employee_id`、映射版本和原因。
 - `employee_workspace`、`ai_thread` 和 `thread_source_binding` 记录员工归属、逻辑线程与来源绑定。
 - `context_snapshot` 记录某个 Task 实际选择的消息、附件、权限和任务状态引用。
 
-同一条物理消息可以被多个受控 Context Snapshot / 上下文快照引用，例如当前群消息同时是两项获准任务的必要公共背景；系统不得因此复制或改写原始消息。每次引用必须记录 `workspace_id`、`ai_thread_id`、Task、选择原因和当时权限，且不得跨员工使用未授权的私聊、任务或附件。
+同一条物理消息可以被多个受控 Context Snapshot / 上下文快照引用，例如当前群消息同时是两项获准任务的必要公共背景；系统不得因此复制或改写原始消息。每次引用必须记录 `enterprise_identity_id`、`workspace_id`、`ai_thread_id`、Task、选择原因和当时权限，且不得跨员工使用未授权的私聊、任务或附件。
 
-Identity Mapping 失败或 Access Control 拒绝只阻止创建员工 Task，不删除 Message Store 记录。完整归属与隔离规则见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
+Identity Mapping 失败或 Access Control 拒绝只阻止创建员工 Task，不删除 Message Store 记录或身份解析结果，也不创建执行上下文或自动建立新的 AI Thread / AI 会话线程执行关系。只有身份映射成功且 Access Control 允许创建 Task 后，Employee Conversation Manager 才解析或创建 `workspace_id` 和 `ai_thread_id`。完整归属与隔离规则见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
 
 ## 3. 附件模型
 

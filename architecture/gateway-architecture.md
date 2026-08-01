@@ -1,6 +1,6 @@
 # 企业 AI Gateway 架构
 
-> 状态日期：2026-08-01。本文定义企业 AI Gateway 的目标架构，不是实现说明。当前已完成 `agent-wechat` V1 微信入口验证；Gateway 架构、`wechat-adapter`、Message Store、Access Control、Task Queue、Hermes 事件协议及员工工作区已经形成设计基线，Identity Mapping、Employee Conversation Manager、Context Builder、AI Router、AI Provider 接入和端到端链路仍待实现或接入。
+> 状态日期：2026-08-01。本文定义企业 AI Gateway 的目标架构，并单独标记实际实现边界。Gateway 各模块已形成设计基线；`CF_agent-gateway` 已完成工程基础和 Message Store Foundation。Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter、AI Router、AI Provider、Hermes 接入和端到端链路仍待实现或接入。
 
 ## 1. Gateway 定位
 
@@ -148,6 +148,8 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 
 权限拒绝只阻止 AI 任务创建，不删除、不跳过消息历史。
 
+当前代码实现边界为：commit `d32b65aa389626f820349367d2132b7d53d0ed4f` 已实现 Conversation / Message / Attachment 模型、`POST /internal/messages`、`GET /messages/{id}`、`GET /conversations/{conversation_id}/messages` 和 `event_id` 幂等，9 项测试通过。该基础不包含 Identity Mapping、Employee Workspace、AI Thread、Access Control、Context Builder、Task Queue、Adapter 或 Hermes 链路。
+
 ### 5.1 消息记录
 
 标准消息记录至少保存：
@@ -183,21 +185,25 @@ Identity Mapping 与 Employee Conversation Manager 是两个独立 Gateway 模�
 
 ### 6.1 Identity Mapping
 
-Identity Mapping 使用 `source.platform + source.account_id + sender.id` 查询权威来源身份映射，输出 `enterprise_identity_id`、`employee_id` 和 `workspace_id`。它回答“这个来源账号对应哪个企业员工？”。
+Identity Mapping 的固定输入为 `source.platform`、`source.account_id` 和 `sender.id`，输出 `enterprise_identity_id` 和可选 `employee_id`。它不创建或返回 `workspace_id`。
 
-展示名称、群名片、微信 `wxid` 的显示形式或消息正文不能直接作为 `employee_id`，也不能用于自动合并两个来源账号。映射失败、冲突或已失效时，消息仍在 Message Store 中保存，但 Access Control 按拒绝默认形成 `identity_unresolved` 等结果，不创建 Employee Workspace / 员工工作区 Task。
+`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、Employee Workspace / 员工工作区和权限关联的权威主键。`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键；展示名称、群名片、消息正文和微信 `wxid` 均不得代替它或用于自动合并来源账号。
+
+无论映射成功、失败、冲突或已失效，身份解析结果都必须关联原消息记录。映射失败时消息继续保存在 Message Store，Access Control 按拒绝默认形成 `identity_unresolved` 等结果，不创建 Task、执行上下文或新的 AI Thread / AI 会话线程执行关系。
 
 一个 Enterprise Identity / 企业身份可以显式绑定多个来源平台账号；一个来源账号在同一有效期内默认只能映射一个企业身份。映射变更必须记录操作者、原因、前后值、时间和有效期。
 
 ### 6.2 Employee Conversation Manager
 
-Employee Conversation Manager 只处理已经完成 Identity Mapping 且通过 Access Control 的消息，负责：
+Employee Conversation Manager 只处理 Identity Mapping 成功且 Access Control 明确允许创建 Task 的消息，负责：
 
-- 定位或按受控规则建立 Employee Workspace / 员工工作区。
-- 在工作区内定位稳定的 AI Thread / AI 会话线程。
+- 以 `enterprise_identity_id` 定位或按受控规则创建 Employee Workspace / 员工工作区，解析 `workspace_id`。
+- 在该工作区内定位或按受控规则创建稳定的 AI Thread / AI 会话线程，解析 `ai_thread_id`。
 - 保存 AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。
-- 向 Context Builder 和 Task Queue 提供 `employee_id`、`workspace_id`、`ai_thread_id` 与原始路由信息。
+- 向 Context Builder 和 Task Queue 提供 `enterprise_identity_id`、可选 `employee_id`、`workspace_id`、`ai_thread_id` 与原始路由信息。
 - 记录可选 `hermes_thread_id` 的创建、失效和重绑定，但不把它作为权威主键。
+
+身份映射失败或 Access Control 拒绝时不调用 Employee Conversation Manager 自动创建新的工作区、AI Thread / AI 会话线程或执行绑定；既有历史关系只按审计和保留规则继续存在。
 
 微信私聊线程键仍为 `bot_account_id + private_chat_id`；群聊线程键仍为 `bot_account_id + group_chat_id + sender_id`。同群不同员工默认进入不同工作区和 AI Thread / AI 会话线程。一个 Hermes 服务可以承载多个员工工作区，每个工作区可以包含多个 AI Thread / AI 会话线程，不为每名员工部署独立 Hermes 进程。
 
@@ -223,7 +229,9 @@ Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。�
 未通过准入检查的消息：
 
 - 已经保存在 Message Store，并关联授权决策和策略版本。
+- 已知的身份解析结果继续记录并关联原消息。
 - 不构建 Hermes 上下文，不创建任务，不进入 Task Queue。
+- 不自动创建新的 Employee Workspace / 员工工作区、AI Thread / AI 会话线程或执行关系。
 - 不调用 AI Provider、Hermes、Skill、企业系统或任务级文件工作区。
 - 是否发送固定拒绝提示及提示频率待运营规则确认；即使需要提示，也由 Gateway 使用固定受控文案处理，不调用 Hermes 生成拒绝内容。
 
@@ -268,7 +276,7 @@ flowchart LR
     Q --> R["AI Router"]
 ```
 
-Task Queue 至少保存任务标识、`employee_id`、`workspace_id`、`ai_thread_id`、可选 `hermes_thread_id`、来源账号与 Physical Conversation / 物理会话、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。同一 AI Thread / AI 会话线程默认有序执行，不同线程可在 Provider 容量和任务风险允许时并行。Task 主状态统一为 `queued`、`running`、`succeeded`、`failed`、`cancelled`；附件的 `pending` 等获取状态不属于 Task 状态。具体字段、转换、优先级和重试边界见[Task Queue 设计](../design/task-queue-design.md)，队列产品和容量参数待选型。
+Task Queue 至少保存任务标识、`enterprise_identity_id`、可选 `employee_id`、`workspace_id`、`ai_thread_id`、可选 `hermes_thread_id`、来源账号与 Physical Conversation / 物理会话、上下文快照引用、所需模态或模型能力、允许的 Skills、Provider 路由约束、优先级、队列状态、尝试次数、租约和关联 `trace_id`。同一 AI Thread / AI 会话线程默认有序执行，不同线程可在 Provider 容量和任务风险允许时并行。Task 主状态统一为 `queued`、`running`、`succeeded`、`failed`、`cancelled`；附件的 `pending` 等获取状态不属于 Task 状态。具体字段、转换、优先级和重试边界见[Task Queue 设计](../design/task-queue-design.md)，队列产品和容量参数待选型。
 
 队列必须支持：
 
@@ -489,12 +497,15 @@ Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 G
 | `agent-wechat` V1 微信入口 | **已验证**，限现有验证记录范围 |
 | `wechat-adapter` | **设计完成，代码待开发** |
 | Hermes 事件协议 | **设计基线，待实现前评审** |
-| Gateway 架构 | **设计基线已形成，代码与部署待实现** |
-| Message Store、Context Builder | **Message Store 详细设计已形成；Context Builder 为目标设计，均待实现和验证** |
+| Gateway 架构 | **设计基线已形成** |
+| `CF_agent-gateway` 工程基础 | **已实现** Python 3.12 + FastAPI、YAML 配置、JSON 结构化日志、SQLAlchemy engine / session、SQLite 自动建表和 PostgreSQL 配置兼容 |
+| Message Store | **Foundation 已实现** Conversation / Message / Attachment、消息写入与查询、`event_id` 幂等；9 项测试通过 |
+| Context Builder | **目标设计，待实现和验证** |
 | Access Control | **设计基线，待实现和验证** |
 | Identity Mapping、Employee Conversation Manager | **设计基线，待实现和验证** |
 | Employee Workspace / 员工工作区与 AI Thread / AI 会话线程 | **设计基线，实体、恢复和 Hermes 员工工作台待实现** |
-| Task Queue、AI Router、AI Provider Registry | **Task Queue 详细设计已形成；产品与实现待确认** |
+| Task Queue、AI Router、AI Provider Registry | **Task Queue 详细设计已形成；产品与实现待确认，代码未实现** |
+| Gateway Docker | **已提供 Dockerfile 和 Compose 配置；尚未完成镜像构建和部署验证** |
 | Provider Runtime State | **目标设计，状态采集方式待确认** |
 | 微信群结构化 `@` 识别 | **待结合实际 API 样本验证** |
 | Hermes、Worker Bridge、Skills | **待接入 / 待开发** |

@@ -1,6 +1,6 @@
 # 消息与任务流程
 
-> 状态日期：2026-07-31。本文描述目标流程，不代表所有组件已经实现。`agent-wechat` V1 微信入口层已经验证；CF Gateway、Hermes Adapter、Hermes、Skills、企业系统接口、实时事件机制、合并转发解析增强和文件自动处理仍处于待设计、待开发、待接入或后续规划状态。
+> 状态日期：2026-08-01。本文描述目标流程，不代表所有组件已经实现。`agent-wechat` V1 微信入口层已经验证；CF Gateway 已形成设计基线，工程基础和 Message Store Foundation 已实现。Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Hermes Adapter、Hermes、Skills、企业系统接口、实时事件机制、合并转发解析增强和文件自动处理仍待开发、接入或验证。
 
 ## 普通问答
 

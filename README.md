@@ -43,9 +43,10 @@
 | 仓库 | 状态 |
 | --- | --- |
 | `CF_ecommerce-automation-docs` | **已确定：** 当前文档仓库 |
+| `CF_agent-gateway` | **已实现基础：** Python 3.12 + FastAPI 工程和 Message Store Foundation 已完成；其余 Gateway 模块与部署验证仍待完成 |
 | `filebrowser-enterprise` | **已确定：** 当前继续并行二次开发，暂不重命名；本仓库任务不得修改它 |
-| 其他 `CF_` 前缀代码仓库 | **后续规划：** 尚未创建，名称与边界须另行确认 |
+| 其他 `CF_` 前缀代码仓库 | **后续规划：** 名称与边界须另行确认 |
 
 ## 当前状态
 
-当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口验证已经完成；合并转发消息的类型、发送人和外层标题识别也已补充验证，但内部聊天记录展开与内部文件自动提取尚未支持。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议以及员工工作区与 AI Thread 已形成设计基线，但 Identity Mapping、Conversation Manager、Gateway 代码、Hermes Adapter、Hermes 员工工作台、Skills、ERP/S6 接口、正式文件处理、实时事件机制和端到端主链路仍待开发、接入或验证。设计完成不代表生产上线。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口验证已经完成；合并转发消息的类型、发送人和外层标题识别也已补充验证，但内部聊天记录展开与内部文件自动提取尚未支持。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议以及员工工作区与 AI Thread 已形成设计基线。`CF_agent-gateway` 已完成 Python 3.12 + FastAPI 工程基础和 Message Store Foundation，包括 Conversation / Message / Attachment、消息写入与查询及 `event_id` 幂等；Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 与 Hermes 链路仍待实现。Gateway 已提供 Dockerfile 和 Compose 配置，但尚未完成 Docker 镜像构建和部署验证。设计完成或代码基础完成均不代表生产上线。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。

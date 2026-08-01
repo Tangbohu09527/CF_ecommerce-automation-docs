@@ -1,6 +1,6 @@
 # Hermes 事件协议
 
-> 状态日期：2026-08-01。本文是未来入口 Adapter、Gateway、AI Provider、Hermes Worker Bridge 与 Hermes Agent 之间的事件协议设计基线，不是实现说明。当前仅完成 `agent-wechat` V1 微信入口验证；Gateway、Adapter、Identity Mapping、员工工作区、Provider 路由、Hermes 接入、事件投递和端到端链路均尚未实现。
+> 状态日期：2026-08-01。本文是未来入口 Adapter、Gateway、AI Provider、Hermes Worker Bridge 与 Hermes Agent 之间的事件协议设计基线，不是协议实现说明。`CF_agent-gateway` 工程基础和 Message Store Foundation 已实现；本协议、Adapter、Identity Mapping、员工工作区、Provider 路由、Hermes 接入、事件投递和端到端链路仍待实现。
 
 ## 1. 目标与边界
 
@@ -19,7 +19,7 @@
 - **版本化：** 每个事件携带 `schema_version`；新增字段优先保持向后兼容。
 - **不可变与幂等：** 已发布事件不原地修改；同一逻辑事件重投时保持相同 `event_id`。
 - **因果可追踪：** 后续事件通过 `trace_id`、`causation_event_id`、`task_id` 等标识关联，不依赖到达顺序猜测关系。
-- **权威标识分层：** Gateway 生成 `workspace_id` 和 `ai_thread_id`；`hermes_thread_id` 只是可空、可替换的运行时绑定。
+- **权威标识分层：** `enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键；准入允许后由 Employee Conversation Manager 解析或创建 `workspace_id` 和 `ai_thread_id`；`hermes_thread_id` 只是可空、可替换的运行时绑定。
 - **文件只传引用：** 事件不携带文件二进制、Base64 内容、任意主机绝对路径或正式存储凭证。
 - **未知即未知：** 缺失或未验证的信息使用 `null`、空数组或明确错误，不根据显示名、文件名或消息正文补造。
 - **验证状态隔离：** 消息入口已验证不等于 Adapter、Hermes、Skill 或端到端业务能力已实现。
@@ -71,6 +71,7 @@
     "id": "sender_example",
     "display_name": "示例用户",
     "enterprise_identity_id": "enterprise_identity_example",
+    "employee_id": null,
     "type": "human"
   },
   "authorization": {
@@ -138,10 +139,11 @@
 | --- | --- | --- |
 | `id` | 是 | 平台侧发信人标识，在来源账号范围内解释 |
 | `display_name` | 否 | 展示名称，只用于显示和辅助审计，不作为授权依据 |
-| `enterprise_identity_id` | 否 | 权限系统完成映射后的企业身份；映射前为 `null` |
+| `enterprise_identity_id` | 否 | Gateway 内部不可变企业身份主键；映射前为 `null` |
+| `employee_id` | 否 | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键 |
 | `type` | 是 | `human` 或 `system` |
 
-`sender.id` 只是入口身份，不自动获得企业权限。`sender.enterprise_identity_id` 只能由 Gateway Identity Mapping 根据权威映射填充；Adapter 不得依据显示名或消息正文填充该字段。微信 `wxid` 等平台标识保留在 `sender.id` 的来源作用域内，不得当作 `employee_id`。
+`sender.id` 只是入口身份，不自动获得企业权限。Gateway Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，只输出 `enterprise_identity_id` 和可选 `employee_id`；Adapter 不得依据显示名或消息正文填充这些字段，Identity Mapping 也不创建或返回 `workspace_id`。微信 `wxid` 等平台标识保留在 `sender.id` 的来源作用域内，不得当作 `employee_id`。
 
 ### 3.5 `authorization`
 
@@ -162,7 +164,7 @@
 
 - 私聊只有 `user_allowed=true` 才能创建 Task。
 - 群聊只有 `user_allowed=true`、`group_allowed=true`、`is_mentioned=true` 同时成立才能创建 Task。
-- 未通过准入的消息仍保存在 Gateway Message Store，但不进入 Context Builder、Task Queue、AI Provider 或 Hermes。
+- 未通过准入的消息仍保存在 Gateway Message Store，已知身份解析结果继续记录；不进入 Context Builder、Task Queue、AI Provider 或 Hermes，也不自动创建新的工作区或 AI Thread 执行关系。
 
 `permission_scope` 由用户、群、Skill 和风险策略共同约束。`context.allowed_skills` 是 Gateway 为具体 `command_request` 派生的 Skill 集合；Hermes 不得修改授权快照或扩大权限。详细规则见[Access Control 设计](./access-control-design.md)。
 
@@ -249,7 +251,7 @@ Local Provider 示例：
 | `causation_event_id` | 后续事件 | 直接导致当前事件的前一事件 `event_id` |
 | `source_timestamp` | 入站事件 | 平台提供的原始消息时间；不可用时为 `null` |
 | `batch_id` | 命令及任务事件 | 多消息、多附件聚合批次标识 |
-| `workspace_id` | 获准任务事件 | Gateway 生成的 Employee Workspace / 员工工作区稳定标识；身份未解析或未创建 Task 时为 `null` |
+| `workspace_id` | 获准任务事件 | 身份映射成功且 Access Control 允许创建 Task 后，由 Employee Conversation Manager 解析或创建的 Employee Workspace / 员工工作区稳定标识；其他情况为 `null` |
 | `task_id` | 命令及任务事件 | Debian 任务中心生成的稳定任务标识 |
 | `context_snapshot_ref` | `command_request` | Hermes 实际使用的不可变上下文快照引用 |
 | `hermes_thread_id` | Hermes 执行相关事件 | Hermes Runtime Thread / Hermes 运行时线程绑定；尚未创建、已失效或待重绑时为 `null` |
@@ -263,13 +265,14 @@ Local Provider 示例：
 事件顶层结构保持不变，工作区与线程标识复用现有对象：
 
 - `sender.enterprise_identity_id`：Gateway 映射后的 Enterprise Identity / 企业身份。
+- `sender.employee_id`：可选公司员工编号、HR 编号或业务人员编号，不作为 Gateway 内部关联主键。
 - `context.workspace_id`：Gateway 生成的 Employee Workspace / 员工工作区 ID。
 - `conversation.thread_id`：Gateway 生成的 `ai_thread_id`，不另设重复的顶层线程字段。
 - `context.task_id`：Debian Task Store 生成的稳定 Task ID。
 - `context.context_snapshot_ref`：当前 Task 实际使用的不可变上下文快照引用。
 - `context.hermes_thread_id`：可选运行时绑定，允许为 `null`，不得作为企业权威主键。
 
-`workspace_id`、`ai_thread_id` 和 Task 归属由 Gateway / Debian 控制面决定。Hermes、Worker Bridge 或 AI Provider 不得自行生成企业侧工作区与线程 ID，也不得用 `hermes_thread_id` 覆盖 `conversation.thread_id`。
+`enterprise_identity_id` 是身份、工作区和权限关联的权威主键。`workspace_id`、`ai_thread_id` 和 Task 归属只在身份映射成功、Access Control 允许创建 Task 后由 Employee Conversation Manager 确定。Hermes、Worker Bridge 或 AI Provider 不得自行生成企业侧工作区与线程 ID，也不得用 `employee_id`、`sender.id` 或 `hermes_thread_id` 覆盖这些权威关系。
 
 ### 3.9 `attachments`
 
@@ -295,7 +298,7 @@ Local Provider 示例：
 | --- | --- | --- | --- |
 | `message_received` | Gateway Adapter / Message Store | 原始消息已标准化并持久化，随后形成 Gateway 授权快照 | 授权和未授权消息都保存；拒绝消息不得创建 Task |
 | `file_received` | Adapter / 受控文件环节 | 消息附件已成功获取、登记并进入受控消息附件存储 | `attachments` 至少包含一个 `available` 附件；是否可用于 Task 由授权决定 |
-| `command_request` | Gateway / Debian 权威控制面 | 已授权 Task 出队并由 AI Router 选定 Provider 后，向 Hermes 发出的受控执行请求 | 必须为 `authorization.decision=allowed`，并包含 `workspace_id`、`ai_thread_id`、`task_id`、上下文、Provider runtime 和授权边界；`hermes_thread_id` 可为 `null` |
+| `command_request` | Gateway / Debian 权威控制面 | 已授权 Task 出队并由 AI Router 选定 Provider 后，向 Hermes 发出的受控执行请求 | 必须为 `authorization.decision=allowed`，并包含 `enterprise_identity_id`、`workspace_id`、`ai_thread_id`、`task_id`、上下文、Provider runtime 和授权边界；`employee_id` 与 `hermes_thread_id` 可为 `null` |
 | `task_completed` | Debian 权威控制面 | Hermes / Skill 的完成结果已被控制面接收并持久化 | 只表示任务处理完成，不表示结果已经成功回传原会话 |
 
 ### 4.1 `message_received`
@@ -430,7 +433,7 @@ flowchart TB
 
 错误事件是失败事实，不等于自动重试命令。是否重试由权威控制面依据幂等性、风险、次数上限和人工接管规则决定。新的错误码可以在兼容版本中追加；消费者遇到未知错误码时必须保留并转入通用失败处理，不能当作成功。
 
-访问拒绝属于 `authorization.decision=denied` 的策略结果，不是 `invalid_message`。拒绝消息保存在 Gateway Message Store，但不创建 Task，也不进入 AI Provider 或 Hermes。
+访问拒绝属于 `authorization.decision=denied` 的策略结果，不是 `invalid_message`。拒绝消息和已知身份解析结果保存在 Gateway，但不创建 Task、执行上下文或新的 AI Thread 执行关系，也不进入 AI Provider 或 Hermes。
 
 ## 9. 事件关联、幂等与顺序
 
@@ -438,9 +441,10 @@ flowchart TB
 
 ```text
 message_received（全部消息先持久化）
+  -> Identity Mapping（记录解析结果）
   -> Access Control
-     -> denied：只保存消息和授权决定
-     -> allowed：Context Builder -> Create Task -> Task Queue
+     -> denied：保存消息、身份解析结果和授权决定
+     -> allowed：Employee Conversation Manager -> Context Builder -> Create Task -> Task Queue
         -> AI Router -> AI Provider -> command_request
         -> Hermes -> task_completed
 ```
@@ -468,6 +472,7 @@ message_received（全部消息先持久化）
 | `text`、`file`、`reply` 微信入口 | **已验证**，仅限现有验证记录所述范围 |
 | `forward` 微信入口 | **部分验证**，仅完成外层识别 |
 | `image`、`voice` 微信入口 | **未验证** |
+| Gateway 工程与 Message Store Foundation | **已实现** 基础模型、消息写入查询和 `event_id` 幂等；不代表本协议已实现 |
 | Hermes 事件协议 | **设计基线，待实现前评审** |
 | Gateway `authorization` | **设计基线，待实现和验证** |
 | AI Provider `runtime` | **设计基线，Provider 状态采集与路由待实现** |

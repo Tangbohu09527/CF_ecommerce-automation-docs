@@ -23,6 +23,8 @@ Message Store
 
 Message Store 与 Task Store 必须分离：Message Store 保存所有消息，Task Store 只保存准入结果为 `allowed` 且满足任务收口条件的 AI 任务。未获准消息、群内未 `@` 当前机器人的消息以及只需留存但不执行的消息均没有 Task；不得用“创建一个拒绝 Task”代替权限审计。
 
+Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，只输出 `enterprise_identity_id` 和可选 `employee_id`，不创建或返回 `workspace_id`。只有身份映射成功且 Access Control 允许创建 Task 后，Employee Conversation Manager 才解析或创建 `workspace_id` 和 `ai_thread_id`。拒绝消息继续保存消息和身份解析结果，但不创建 Task、执行上下文或新的 AI Thread / AI 会话线程执行关系。
+
 Task Queue 在逻辑上包含持久化 Task Store、优先级调度、线程顺序控制、领取租约、延迟重试、取消和执行审计。具体可由一个或多个组件实现，但 Debian 保存权威任务状态及 Employee Workspace / 员工工作区、AI Thread / AI 会话线程归属；Provider、Hermes 或 Windows Worker 的本地状态不得覆盖它。
 
 ## 2. 任务生命周期
@@ -72,7 +74,8 @@ stateDiagram-v2
 | 字段 | 语义 |
 | --- | --- |
 | `task_id` | Debian Task Store 生成的稳定任务 ID |
-| `employee_id` | Task 所属企业员工引用，不使用微信 `wxid` 等来源标识代替 |
+| `enterprise_identity_id` | Task 所属 Gateway 企业身份的不可变权威主键，也是身份、工作区和权限关联依据 |
+| `employee_id` | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键，不使用微信 `wxid` 等来源标识代替 |
 | `workspace_id` | Gateway 生成的 Employee Workspace / 员工工作区稳定 ID |
 | `ai_thread_id` | Gateway 生成的 AI Thread / AI 会话线程稳定 ID，是任务顺序与上下文隔离依据 |
 | `hermes_thread_id` | 可选的 Hermes Runtime Thread / Hermes 运行时线程绑定；可为 `null`、可重建，不是权威主键 |
@@ -114,7 +117,7 @@ stateDiagram-v2
 
 结果回传使用独立 `result_delivery` 记录。Task `succeeded` 表示执行结果已在 Debian 持久化，不表示微信或其他入口已经发送成功。
 
-`result_delivery` 必须保留 `employee_id`、`workspace_id`、`ai_thread_id`、`task_id`、`source_message_id`、`source_platform`、`source_account_id` 和 `source_conversation_id`，确保结果从 Hermes 员工工作区仍能回到原 Physical Conversation / 物理会话。
+`result_delivery` 必须保留 `enterprise_identity_id`、`workspace_id`、`ai_thread_id`、`task_id`、`source_message_id`、`source_platform`、`source_account_id` 和 `source_conversation_id`，并可保留 `employee_id`，确保结果从 Hermes 员工工作区仍能回到原 Physical Conversation / 物理会话。
 
 ### 3.3 线程顺序与并行
 
@@ -228,7 +231,7 @@ Provider 失败后，仅在以下条件同时满足时重新路由：
 
 Task 审计必须能够回答：
 
-- 谁发起：来源账号、`requester_id`、可选企业身份和会话。
+- 谁发起：来源账号、`requester_id`、`enterprise_identity_id`、可选 `employee_id` 和会话。
 - 来源消息：`source_message_id`、批次中的其他消息和附件。
 - 为什么允许：权限决策引用、策略版本、有效范围和 `allowed_skills`。
 - Hermes 看到了什么：不可变 `context_snapshot_ref`、选入项和快照版本。

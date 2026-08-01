@@ -1,6 +1,6 @@
 # 企业 AI 自动化系统总体架构
 
-> 状态日期：2026-07-31。本文是总体架构视图；组件内部设计、安全边界和数据模型以[系统设计](../02_系统设计.md)为准，当前实施进度以[当前开发进度](../status/current-progress.md)为准。
+> 状态日期：2026-08-01。本文是总体架构视图；组件内部设计、安全边界和数据模型以[系统设计](../02_系统设计.md)为准，当前实施进度以[当前开发进度](../status/current-progress.md)为准。
 
 ## 架构目标
 
@@ -9,6 +9,7 @@
 ## 状态标识
 
 - **已验证：** 已完成明确范围内的技术验证，不等同于生产可用或端到端完成。
+- **已实现基础：** 已完成明确范围内的代码实现，不等同于完整组件、部署或端到端完成。
 - **已确定 / 待实施：** 架构边界已经确定，组件或集成尚未完成。
 - **待技术验证 / 待确认：** 需要通过实测或评审才能形成稳定结论。
 - **后续规划：** 不属于当前已实现能力。
@@ -19,7 +20,7 @@
 flowchart TB
     E["员工"] --> W["微信入口"]
     W --> A["agent-wechat<br/>V1 入口已验证"]
-    A --> G["CF Gateway<br/>逻辑边界，待设计与实施"]
+    A --> G["CF Gateway<br/>设计基线；Message Store Foundation 已实现"]
     G --> H["Hermes Agent<br/>待接入"]
     H --> S["Skills<br/>待建设"]
     S --> B["企业系统 API / File Service<br/>待逐项对接"]
@@ -28,7 +29,7 @@ flowchart TB
 
 主链路的目标是：员工在微信提交请求，`agent-wechat` 完成微信侧收发，CF Gateway 负责路由和安全隔离，Hermes 在授权范围内理解任务并选择 Skill，Skill 通过经批准的接口访问企业系统或文件服务，结果沿原链路返回原会话。
 
-图中的 CF Gateway 是**规划中的逻辑网关边界**，不是已经存在的单一程序或已部署模块。其后续设计需要与 `wechat-relay`、上下文服务、任务中心、权限、日志和审计职责衔接，详细拆分见[系统设计](../02_系统设计.md)。
+图中的 CF Gateway 是逻辑网关边界，不等同于一个完整且已部署的单一程序。`CF_agent-gateway` 已实现工程基础和 Message Store Foundation；身份、权限、上下文、任务、Adapter 与 Hermes 集成仍按该逻辑边界继续建设，详细拆分见[系统设计](../02_系统设计.md)。
 
 ## 分层职责
 
@@ -36,7 +37,7 @@ flowchart TB
 | --- | --- | --- |
 | 员工与微信入口 | 提交业务请求、补充信息、接收结果或确认请求 | 业务入口已确定 |
 | `agent-wechat` | 微信登录、私聊/群聊文本、文件与 ZIP 消息、引用消息、入口标识与附件读取；识别合并转发消息的外层信息 | V1 微信入口已验证；合并转发内部解析、未覆盖格式和实时事件仍待开发、验证或研究 |
-| CF Gateway | 消息路由、安全隔离，并衔接上下文、任务、权限和审计控制 | 待设计、待实施 |
+| CF Gateway | 消息路由、安全隔离，并衔接上下文、任务、权限和审计控制 | 设计基线已形成；工程基础和 Message Store Foundation 已实现，其余模块待实施 |
 | Hermes Agent | 理解意图、规划步骤、选择获授权的 Skill、生成结构化结果 | 生产 Agent 路线已确定；待接入 |
 | Skills | 封装库存、订单、文件等可审计的确定性业务动作 | 体系待建设，具体 Skill 待逐项定义 |
 | 企业系统与文件服务 | 提供受控业务数据、业务操作和正式文件访问 | 旺店通 ERP、旺店通 WMS、S6 与正式存储已存在；自动化接口待逐项验证和对接 |
@@ -52,9 +53,11 @@ flowchart TB
 
 当前已经完成 `agent-wechat` V1 微信入口验证，包括微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取。合并转发消息已验证类型识别、发送人获取和外层标题获取。微信消息入口层技术可行；当前消息读取采用已验证的 API 方式，实时事件机制仍待研究和开发。
 
+`CF_agent-gateway` 已完成 Python 3.12 + FastAPI 工程基础和 Message Store Foundation，包括 Conversation / Message / Attachment、消息写入与查询和 `event_id` 幂等；9 项测试通过。已提供 Dockerfile 和 Compose 配置，但尚未完成镜像构建和部署验证。
+
 以下能力仍不能表述为已经完成：
 
-- CF Gateway 及其消息路由、安全隔离和控制面集成。
+- CF Gateway 的 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter、Hermes / AI Provider 链路和生产部署。
 - Hermes Adapter、Hermes、GPT-5.6 API、Worker Bridge 与微信链路的端到端接入。
 - 库存、订单、文件等业务 Skills 系统。
 - 旺店通 ERP、旺店通 WMS、S6 和正式文件服务的自动化接口对接。

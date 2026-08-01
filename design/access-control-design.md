@@ -6,6 +6,8 @@
 
 Access Control 是 CF Gateway 的内部模块，不是独立消息入口，也不是 Gateway 的全部职责。Gateway 先通过 Message Store 保存所有进入系统的消息，由 Identity Mapping 确认来源账号对应的 Enterprise Identity / 企业身份，再调用 Access Control 判断是否创建 AI 任务。
 
+`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是权限主体及工作区所有者关联的权威主键。`employee_id` 只是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信 `wxid` 代替。
+
 Access Control 只决定：
 
 - 当前消息是否有权创建 Task。
@@ -70,7 +72,7 @@ AND is_mentioned = true
 | 结果 | Gateway 行为 |
 | --- | --- |
 | `allowed` | 计算有效 `permission_scope`，构建受控上下文并创建 Task；Task 随后进入 Task Queue |
-| `denied` | 消息继续保留在 Message Store，记录权限决策；不构建 Hermes 上下文、不创建 Task、不进入 AI Router |
+| `denied` | 消息继续保留在 Message Store，记录身份解析结果和权限决策；不构建 Hermes 上下文、不创建 Task、不进入 AI Router，也不自动创建新的工作区或 AI Thread 执行关系 |
 
 访问拒绝是权限决策，不是消息格式错误。是否向原会话发送固定拒绝提示仍待运营规则确认，拒绝提示不得调用 Hermes 生成。
 
@@ -84,7 +86,7 @@ AND is_mentioned = true
 - `account_id`
 - `sender_id`
 
-该组合必须先由 Identity Mapping 显式映射到 `enterprise_identity_id`，白名单才能产生 `user_allowed=true`。企业身份尚未解析时，不得只凭 `sender_name`、手机号片段、群名片或相似昵称自动合并为已授权用户；微信 `wxid` 等平台稳定标识是来源映射键，不是 `employee_id`。
+该组合必须先由 Identity Mapping 显式映射到 `enterprise_identity_id` 和可选 `employee_id`，白名单才能产生 `user_allowed=true`。Identity Mapping 不创建或返回 `workspace_id`。企业身份尚未解析时，不得只凭 `sender_name`、手机号片段、群名片或相似昵称自动合并为已授权用户；微信 `wxid` 等平台稳定标识是来源映射键，不是 `employee_id`。
 
 白名单最终授权 Enterprise Identity / 企业身份，而不是孤立的平台昵称。一个员工可以绑定多个来源平台账号，但每个来源账号都必须有独立、可审计的映射；同一来源账号存在多个有效企业身份映射时拒绝创建 Task。
 
@@ -205,12 +207,12 @@ Employee Workspace / 员工工作区存在、状态为 `active` 或出现在 Her
 
 1. Adapter 标准化消息，Gateway Message Store 完成持久化。
 2. 校验平台、机器人账号、Adapter 身份和消息基础结构。
-3. Identity Mapping 使用会话类型和发信人稳定标识解析 Enterprise Identity / 企业身份；无法唯一解析时拒绝默认。
+3. Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，解析 `enterprise_identity_id` 和可选 `employee_id`，并记录身份解析结果；无法唯一解析时拒绝默认。
 4. 查询有效用户白名单，计算 `user_allowed`。
 5. 群聊查询群策略并验证结构化 mention；私聊跳过群条件。
 6. 按拒绝默认规则形成 `allowed` 或 `denied` 决策并关联原消息。
 7. 对允许消息计算 `permission_scope`，生成带策略版本的不可变授权快照。
-8. 仅为允许消息由 Employee Conversation Manager 定位 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程，再构建上下文、创建 Task 并进入 Task Queue。
+8. 仅在身份映射成功且 Access Control 允许创建 Task 后，由 Employee Conversation Manager 解析或创建 `workspace_id` 和 `ai_thread_id`，再构建上下文、创建 Task 并进入 Task Queue。
 9. 在 Skill 调用和高风险动作前重新校验有效权限及确认状态。
 
 ### 7.2 决策原因
@@ -269,6 +271,7 @@ Gateway 在标准事件的 `authorization` 字段记录本次判定快照，至�
 Message Store 与权限审计是不同记录：
 
 - Message Store 按企业消息历史要求保存授权和未授权消息正文、引用及附件元数据。
+- 身份解析记录保存解析状态、`enterprise_identity_id`、可选 `employee_id`、映射版本和原因，并关联原消息；拒绝不删除该结果。
 - 权限审计保存 `event_id`、主体、会话、决策时间、策略版本、结果、原因码和有效范围摘要。
 - 普通运行日志不无条件复制完整消息正文、附件内容或敏感身份信息。
 
@@ -301,7 +304,7 @@ RBAC 扩展后，有效权限仍须由 Gateway 计算并写入授权快照。Her
 | 项目 | 状态 |
 | --- | --- |
 | 用户白名单、群权限和 Skill 权限模型 | **本文形成设计基线，待实现和业务确认** |
-| Message Store 与权限决策关联 | **目标设计，待实现** |
+| Message Store 基础 | **Foundation 已实现** 消息写入、查询和 `event_id` 幂等；身份与权限决策关联仍待实现 |
 | 权限配置存储、版本发布和审计 | **待设计实现** |
 | 企业身份映射 | **待实现和验证** |
 | 工作区权限边界与管理员跨员工查看 | **设计基线，权限项、审批和审计待实现** |

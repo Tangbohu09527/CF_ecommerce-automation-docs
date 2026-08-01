@@ -1,6 +1,6 @@
 # 员工工作区与 AI 会话线程设计
 
-> 状态日期：2026-08-01。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线，不代表 Identity Mapping、Conversation Manager、Hermes 员工工作台或端到端链路已经实现。
+> 状态日期：2026-08-01。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线，不代表 Identity Mapping、Employee Conversation Manager、Hermes 员工工作台或端到端链路已经实现。
 
 ## 1. 定位与术语
 
@@ -19,9 +19,9 @@ Physical Conversation / 物理会话由 `source.platform + source.account_id + p
 
 ### Enterprise Identity / 企业身份
 
-企业内部稳定的员工身份。一个 Enterprise Identity / 企业身份未来可以显式绑定一个或多个微信账号、飞书账号、钉钉账号和 Web 账号。
+企业内部稳定的员工身份。`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、Employee Workspace / 员工工作区和权限关联的权威主键。一个 Enterprise Identity / 企业身份未来可以显式绑定一个或多个微信账号、飞书账号、钉钉账号和 Web 账号。
 
-来源平台的 `sender.id`、微信 `wxid`、昵称或群名片都不是 `employee_id`。平台稳定标识只用于查找权威身份映射；展示名称只用于显示和辅助审计。
+`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键。来源平台的 `sender.id`、微信 `wxid`、昵称或群名片都不能代替 `employee_id`；平台稳定标识只用于查找权威身份映射，展示名称只用于显示和辅助审计。
 
 ### Employee Workspace / 员工工作区
 
@@ -79,26 +79,28 @@ Source Identity Mapping / 来源身份映射以 Adapter 和 Message Store 保存
 - `source.platform`。
 - `source.account_id`。
 - `sender.id`。
-- `sender.display_name`，仅作展示快照和辅助审计。
 
 有效映射输出：
 
 - `enterprise_identity_id`。
-- `employee_id`。
-- `workspace_id`。
+- 可选 `employee_id`。
+
+Identity Mapping 不创建或返回 `workspace_id`。`sender.display_name` 可以随消息作为展示快照和辅助审计信息保存，但不是身份映射输入键。
 
 固定原则如下：
 
 - 展示名称不能作为授权、合并或身份主键。
 - 微信 `wxid` 等平台稳定标识用于查找映射，但不得直接当作 `employee_id`。
-- 映射失败时消息及可得附件元数据仍保存在 Message Store。
-- 映射失败的消息不创建员工工作区任务，也不进入 Hermes 执行流程。
+- 映射成功、失败、冲突或已失效的解析结果都必须记录并关联原消息。
+- 映射失败时消息及可得附件元数据仍保存在 Message Store，不创建 Task、执行上下文或新的 AI Thread / AI 会话线程执行关系。
 - 非白名单用户消息仍保存在 Message Store；身份映射成功不等于 Access Control 允许创建 Task。
 - 一个员工可以显式绑定多个来源平台账号。
 - 一个来源账号在同一有效期内默认只能映射一个 Enterprise Identity / 企业身份；冲突时拒绝创建 Task。
 - 映射新增、修改、停用、冲突处理和有效期变化必须保留审计记录。
 
 Identity Mapping 回答“这个来源账号对应哪个企业员工？”。Access Control 回答“这个员工的这条消息能否创建任务？”。两者是相邻但不同的控制面职责。
+
+Employee Conversation Manager 在两者之后运行：只有身份映射成功且 Access Control 允许创建 Task，才解析或创建 `workspace_id` 和 `ai_thread_id`。
 
 ## 4. 工作区模型
 
@@ -107,8 +109,8 @@ Identity Mapping 回答“这个来源账号对应哪个企业员工？”。Acc
 | 字段 | 语义 |
 | --- | --- |
 | `workspace_id` | Gateway 生成的稳定工作区 ID |
-| `enterprise_identity_id` | 工作区所有者的 Enterprise Identity / 企业身份 |
-| `employee_id` | 企业员工引用，不使用来源平台账号代替 |
+| `enterprise_identity_id` | 工作区所有者的不可变权威主键 |
+| `employee_id` | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键，不使用来源平台账号代替 |
 | `display_name` | 工作台显示名称快照，不作为授权依据 |
 | `status` | `active`、`disabled` 或 `archived` |
 | `created_at` | 工作区创建时间 |
@@ -179,8 +181,9 @@ source.platform
   -> Message Store 保存
   -> Identity Mapping
   -> Access Control
-  -> Employee Workspace
-  -> 私聊 AI Thread
+  -> Employee Conversation Manager
+  -> 解析或创建 Employee Workspace
+  -> 解析或创建私聊 AI Thread
   -> Context Builder
   -> Task Queue
   -> Hermes
@@ -196,8 +199,9 @@ source.platform
        group_allowed
        AND user_allowed
        AND is_mentioned
-  -> Employee Workspace
-  -> 该群 + 该员工对应的 AI Thread
+  -> Employee Conversation Manager
+  -> 解析或创建 Employee Workspace
+  -> 解析或创建该群 + 该员工对应的 AI Thread
   -> Context Builder
   -> Task Queue
   -> Hermes
@@ -206,8 +210,10 @@ source.platform
 Identity Mapping 失败、工作区非 `active` 或 Access Control 条件不满足时：
 
 - 消息仍保存。
+- 身份解析结果仍记录并关联原消息。
 - 不创建 Task。
 - 不构建员工 Hermes 上下文。
+- 不自动创建新的 Employee Workspace / 员工工作区、AI Thread / AI 会话线程或执行绑定。
 - 不进入 Hermes Runtime Thread / Hermes 运行时线程的执行流程。
 
 ## 7. 上下文隔离
@@ -258,7 +264,7 @@ Context Builder 可以选择的候选上下文包括：
 
 每个 Task 至少关联：
 
-- `employee_id`。
+- `enterprise_identity_id`。
 - `workspace_id`。
 - `ai_thread_id`。
 - `source_message_id`。
@@ -269,6 +275,7 @@ Context Builder 可以选择的候选上下文包括：
 
 可选关联：
 
+- `employee_id`。
 - `hermes_thread_id`。
 - `selected_provider`。
 - `selected_model`。
@@ -316,7 +323,7 @@ Gateway 中的 Employee Workspace / 员工工作区和 AI Thread / AI 会话线�
 
 ### `enterprise_identity`
 
-企业员工身份。建议包含 `enterprise_identity_id`、`employee_id`、显示信息、状态、组织目录引用和审计时间。
+企业员工身份。`enterprise_identity_id` 是不可变主键；建议同时包含可空 `employee_id`、显示信息、状态、组织目录引用和审计时间。
 
 ### `source_identity_mapping`
 
@@ -367,6 +374,8 @@ AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。�
 - 微信私聊线程键为 `bot_account_id + private_chat_id`。
 - 微信群聊按 `bot_account_id + group_chat_id + sender_id` 隔离。
 - Gateway / Debian 控制面为员工身份、工作区、线程、消息、上下文、任务和回传路由的权威状态中心。
+- `enterprise_identity_id` 是身份、工作区和权限关联的不可变权威主键；`employee_id` 是可空业务编号，不是内部主键。
+- Identity Mapping 只输出 `enterprise_identity_id` 和可选 `employee_id`；Employee Conversation Manager 在准入允许后解析或创建 `workspace_id` 和 `ai_thread_id`。
 - 一个统一 Hermes 服务承载多个 Employee Workspace / 员工工作区，每个工作区可有多个 AI Thread / AI 会话线程。
 - `ai_thread_id` 是稳定权威标识，`hermes_thread_id` 只是可空、可替换的运行时绑定。
 
