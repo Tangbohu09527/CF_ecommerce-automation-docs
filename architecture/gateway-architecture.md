@@ -1,6 +1,6 @@
 # 企业 AI Gateway 架构
 
-> 状态日期：2026-08-01。本文定义企业 AI Gateway 的目标架构，并单独标记实际实现边界。Gateway 各模块已形成设计基线；`CF_agent-gateway` 已完成工程基础和 Message Store Foundation。Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter、AI Router、AI Provider、Hermes 接入和端到端链路仍待实现或接入。
+> 状态日期：2026-08-01。本文定义企业 AI Gateway 的目标架构，并单独标记实际实现边界。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store、Identity Mapping、工作区 / 线程、Access Control 与微信适配等基础代码；Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。当前状态不代表生产上线。
 
 ## 1. Gateway 定位
 
@@ -38,7 +38,7 @@ Gateway 内部控制链路如下：
 
 ```mermaid
 flowchart TB
-    W["agent-wechat<br/>当前已验证入口"] --> WA["wechat-adapter"]
+    W["agent-wechat<br/>当前已验证入口"] --> WA["wechat-adapter<br/>基础组件已实现；正式接线待完成"]
     F["飞书<br/>后续规划"] --> FA["Feishu Adapter<br/>待设计"]
     D["钉钉<br/>后续规划"] --> DA["DingTalk Adapter<br/>待设计"]
     A["API 入口<br/>待设计"] --> AA["API Adapter / Auth<br/>待设计"]
@@ -96,7 +96,7 @@ Gateway 不负责：
 
 | 来源 | 接入组件 | 当前状态 |
 | --- | --- | --- |
-| 微信 | `agent-wechat` + `wechat-adapter` | `agent-wechat` V1 入口已验证；Adapter 待开发 |
+| 微信 | `agent-wechat` + `wechat-adapter` | `agent-wechat` V1 入口和结构化 mention 已验证；HTTP Client、标准化、媒体解码、文本发送字段与系统消息解析已实现，正式接线、Polling / Checkpoint 和回传编排待完成 |
 | 飞书 | 平台 Adapter | 后续规划，未选型、未验证 |
 | 钉钉 | 平台 Adapter | 后续规划，未选型、未验证 |
 | API | API Adapter / 服务身份鉴权 | 后续规划，协议、鉴权和调用方范围待设计 |
@@ -121,7 +121,7 @@ Gateway 不负责：
 - 分配 Skill、文件或企业系统权限。
 - 保存权威任务状态，或直接调用 Hermes 和 Skills。
 
-当前已验证范围以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准。群聊消息已验证可读取，但能否从实际 API 载荷稳定识别针对当前机器人账号的结构化 `@` 仍须结合样本验证。
+当前已验证范围以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准。当前机器人显示名为 `Bot_测试版` 时，成员列表选择该机器人会得到 `isMentioned=true`；成员列表选择其他成员 T 或只复制 / 输入 `@Bot_测试版 手工文字对照` 时该字段缺失。固定规则为 `is_mentioned = raw.get("isMentioned") is True`，字段缺失按 `false`。
 
 ### 4.3 Adapter 职责
 
@@ -134,7 +134,7 @@ Gateway 不负责：
 - 获取并登记平台附件，使用受控文件引用关联消息历史。
 - 接收 Gateway 结果回传指令并调用平台发送接口。
 
-Adapter 不自行授予权限，也不直接创建 AI 任务。`user_allowed`、`group_allowed`、`is_mentioned` 和 `permission_scope` 均由 Gateway Access Control 根据权威配置形成。
+Adapter 不自行授予权限，也不直接创建 AI 任务。Adapter / 标准化层只按平台结构化事实生成 `is_mentioned` 和 `is_self`；Access Control 消费这些事实，并根据权威策略形成 `user_allowed`、`group_allowed` 和 `permission_scope`。当前微信规则不得根据正文 `@`、机器人当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承 `is_mentioned=true`。
 
 ## 5. Message Store
 
@@ -148,7 +148,7 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 
 权限拒绝只阻止 AI 任务创建，不删除、不跳过消息历史。
 
-当前代码实现边界为：commit `d32b65aa389626f820349367d2132b7d53d0ed4f` 已实现 Conversation / Message / Attachment 模型、`POST /internal/messages`、`GET /messages/{id}`、`GET /conversations/{conversation_id}/messages` 和 `event_id` 幂等，9 项测试通过。该基础不包含 Identity Mapping、Employee Workspace、AI Thread、Access Control、Context Builder、Task Queue、Adapter 或 Hermes 链路。
+当前代码实现边界为：main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Conversation / Message / Attachment、来源账号隔离，以及 `event_id` 与来源物理消息双重幂等；Gateway 仓库当前全量 162 项测试通过。Adapter 尚未正式写入 Message Store，Polling / Checkpoint 也未实现，因此不能表述为微信消息已经持续进入该存储。
 
 ### 5.1 消息记录
 
@@ -163,6 +163,8 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 | `conversation_id` | 原始物理会话标识，在来源平台和账号范围内解释 |
 | `sender_id` | 平台侧稳定发信人标识 |
 | `sender_name` | 平台提供的展示名称，不作为授权依据 |
+| `is_mentioned` | 标准化的结构化 mention 来源事实；微信仅当原始 `isMentioned` 严格为 `true` 时为 `true`，字段缺失为 `false` |
+| `is_self` | 标准化的消息是否由当前来源账号自身发送的事实，不作为企业身份或权限依据 |
 | `message_type` | 标准消息类型，如 `text`、`file`、`reply`、`forward` |
 | `content` | 标准化正文或外层标题；按数据分级和保留策略受控访问 |
 | `timestamp` | 平台消息时间及 Gateway 接收时间，二者不得混为同一语义 |
@@ -174,6 +176,8 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 ### 5.2 持久化规则
 
 - 原始载荷与标准消息分开保存，通过受控引用关联。
+- 来源物理消息唯一性按来源账号隔离，相同来源消息标识不得跨机器人账号合并。
+- `event_id` 幂等与来源物理消息幂等同时生效，任一重投都不得产生重复消息历史。
 - Message Store 成功写入后才能推进入口同步检查点；保存失败时不得假装消息已接收完成。
 - 重复投递关联同一 `id`，记录必要接收尝试，不重复创建任务或附件副本。
 - 未授权消息和授权消息遵循明确的数据分级、访问审计和保留周期；具体周期待确认。
@@ -209,11 +213,13 @@ Employee Conversation Manager 只处理 Identity Mapping 成功且 Access Contro
 
 Employee Workspace / 员工工作区是归属与隔离容器，不产生权限。工作区存在或为 `active` 不能扩大 Access Control 生成的 `permission_scope` 或 `allowed_skills`。完整模型见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
 
+当前代码已实现 Identity Mapping、Employee Workspace、AI Thread 及 Hermes Thread 绑定唯一性，但 Admission Orchestrator 尚未实现。Message Store、身份解析、Access Control 与获准后的工作区 / 线程解析因此尚未形成正式编排链路。
+
 ## 7. Access Control
 
 Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。它位于 Message Store 和 Identity Mapping 之后、Employee Conversation Manager、Context Builder 和任务创建之前。Identity Mapping 回答“这个来源账号对应哪个企业员工？”，Access Control 回答“这个员工的这条消息能否创建任务？”。权限决定由 Gateway 作出并强制执行，不由 Hermes 判断。
 
-### 6.1 准入规则
+### 7.1 准入规则
 
 | 会话类型 | 创建 AI 任务的条件 | 其他情况 |
 | --- | --- | --- |
@@ -222,9 +228,9 @@ Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。�
 
 其中 `group_allowed` 对应群策略中的 `group_enabled=true`，`user_allowed` 对应发信人白名单中的 `sender_allowed=true`。群聊任一条件为 `false` 或无法确认都拒绝创建任务。
 
-结构化 `@` 必须明确指向当前机器人账号。仅在正文出现机器人昵称、`@` 字符、引用或历史上曾与机器人交互，均不能替代 `is_mentioned=true`。
+当前微信入口只接受 `is_mentioned = raw.get("isMentioned") is True`；原字段缺失按 `false`。不得根据正文中的 `@` 字符、机器人当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承 `true`。
 
-### 6.2 拒绝处理
+### 7.2 拒绝处理
 
 未通过准入检查的消息：
 
@@ -494,21 +500,26 @@ Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 G
 
 | 项目 | 状态 |
 | --- | --- |
-| `agent-wechat` V1 微信入口 | **已验证**，限现有验证记录范围 |
-| `wechat-adapter` | **设计完成，代码待开发** |
+| `agent-wechat` V1 微信入口 | **已验证**，包括当前三组结构化 mention 对照样本，限现有验证记录范围 |
+| 微信适配基础 | **代码已实现** `agent-wechat` HTTP Client、微信标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析 |
+| Adapter 正式接线与同步 | **未实现** Adapter 到 Message Store 正式接线及 Polling / Checkpoint |
 | Hermes 事件协议 | **设计基线，待实现前评审** |
 | Gateway 架构 | **设计基线已形成** |
 | `CF_agent-gateway` 工程基础 | **已实现** Python 3.12 + FastAPI、YAML 配置、JSON 结构化日志、SQLAlchemy engine / session、SQLite 自动建表和 PostgreSQL 配置兼容 |
-| Message Store | **Foundation 已实现** Conversation / Message / Attachment、消息写入与查询、`event_id` 幂等；9 项测试通过 |
+| Message Store | **代码已实现** Conversation / Message / Attachment、来源账号隔离、`event_id` 与来源物理消息双重幂等；Adapter 尚未正式接线 |
 | Context Builder | **目标设计，待实现和验证** |
-| Access Control | **设计基线，待实现和验证** |
-| Identity Mapping、Employee Conversation Manager | **设计基线，待实现和验证** |
-| Employee Workspace / 员工工作区与 AI Thread / AI 会话线程 | **设计基线，实体、恢复和 Hermes 员工工作台待实现** |
-| Task Queue、AI Router、AI Provider Registry | **Task Queue 详细设计已形成；产品与实现待确认，代码未实现** |
+| Identity Mapping | **代码已实现**；尚未由 Admission Orchestrator 串入正式准入链路 |
+| Employee Workspace / 员工工作区、AI Thread / AI 会话线程与 Hermes Thread 绑定 | **基础代码已实现**，包括 Hermes Thread 绑定唯一性；Hermes 运行接入与端到端恢复未完成 |
+| Access Control | **代码已实现** 纯规则评估器；用户白名单、群策略和 Gateway 全局策略持久化已实现，正式准入调用链未接线 |
+| Admission Orchestrator | **未实现** |
+| Task Queue | **详细设计已形成，代码未实现** |
+| AI Router、AI Provider Registry | **目标设计，尚未形成端到端路由** |
 | Gateway Docker | **已提供 Dockerfile 和 Compose 配置；尚未完成镜像构建和部署验证** |
 | Provider Runtime State | **目标设计，状态采集方式待确认** |
-| 微信群结构化 `@` 识别 | **待结合实际 API 样本验证** |
+| 微信群结构化 mention | **入口已验证、标准化代码已实现**；字段缺失按 `false`，不做正文或名称推断 |
 | Hermes、Worker Bridge、Skills | **待接入 / 待开发** |
+| 端到端回传 | **未实现** |
+| Gateway 全量测试 | **162 项通过**，对应 main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` |
 | 飞书、钉钉、API 入口 | **后续规划，未接入、未验证** |
 | API Provider、Local Provider 扩展 | **架构兼容目标，尚未接入或验证** |
 

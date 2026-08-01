@@ -1,6 +1,6 @@
 # Message Store 设计
 
-> 状态日期：2026-08-01。本文定义 CF Gateway 的 Message Store 设计基线。`CF_agent-gateway` 已实现 Conversation / Message / Attachment 基础模型、消息写入与查询和 `event_id` 幂等；身份解析、权限关联、完整附件存储策略、生产数据库和部署仍待实现或验证。
+> 状态日期：2026-08-01。本文定义 CF Gateway 的 Message Store 设计基线。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Conversation / Message / Attachment、来源账号隔离，以及 `event_id` 与来源物理消息双重幂等；Adapter 正式接线、完整附件存储策略、生产数据库和部署仍待实现或验证。
 
 ## 1. 定位
 
@@ -23,7 +23,7 @@ Message Store 与 Task Store 是两个独立的权威数据域：Message Store �
 
 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用独立实体，不通过复制每名员工的整份消息历史实现隔离。Message Store 保存来源事实，工作区、线程、Context Snapshot / 上下文快照和权限记录决定某次 Task 可以引用哪些消息。
 
-当前代码实现对应 commit `d32b65aa389626f820349367d2132b7d53d0ed4f`，包含 `POST /internal/messages`、`GET /messages/{id}` 和 `GET /conversations/{conversation_id}/messages`，9 项测试通过。该实现不包含 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 或 Hermes 链路。
+当前代码实现对应 main commit `f0f0ea0cbcc1029104002b566912afabd23423c7`。除上述 Message Store 能力外，相邻的 Identity Mapping、Employee Workspace、AI Thread、Hermes Thread 绑定唯一性、Access Control 纯规则评估器，以及用户白名单、群策略和 Gateway 全局策略持久化也已实现；Gateway 仓库当前全量 162 项测试通过。Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现，因此这些模块尚未组成运行链路。
 
 ## 2. 消息模型
 
@@ -42,6 +42,8 @@ Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用�
 | `conversation_name` | 来源当时提供的会话展示名快照；可为空，不作为权限依据 |
 | `sender_id` | 来源账号范围内稳定的发送人 ID |
 | `sender_name` | 来源当时提供的发送人展示名快照；可为空，不作为授权依据 |
+| `is_mentioned` | 标准化 mention 来源事实；微信仅当原始 `isMentioned` 严格为 `true` 时为 `true`，字段缺失为 `false` |
+| `is_self` | 标准化的消息是否由当前来源账号自身发送的事实，不作为企业身份或授权依据 |
 | `message_type` | 统一消息类型，如 `text`、`file`、`image`、`voice`、`reply`、`forward` |
 | `content` | 标准化正文、外层标题或结构化内容引用；不得包含附件二进制 |
 | `timestamp` | 来源消息时间；不可用时明确为空，不用 Gateway 接收时间冒充 |
@@ -60,13 +62,13 @@ Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用�
 - `source_message_id` 是来源平台事实，可能只在某个机器人账号或会话内唯一。
 - `event_id` 标识不可变事件；同一消息的附件获取、权限决策或状态变化可以产生新的事件，但不创建新的消息记录。
 
-推荐以 `source.platform + source.account_id + conversation_id + source_message_id` 建立来源唯一约束，并以 `event_id` 建立事件幂等约束。若来源不提供稳定消息 ID，Adapter 必须记录该事实，并使用经验证的来源字段和内容指纹形成受控幂等键；该退化键只用于防重，不能伪装成平台原生 ID。
+当前实现已以来源账号隔离来源物理消息唯一性，并以 `event_id` 建立事件幂等约束；两层幂等同时生效。概念来源键为 `source.platform + source.account_id + conversation_id + source_message_id`，相同来源消息标识不得跨来源账号合并。若未来来源不提供稳定消息 ID，Adapter 必须记录该事实，并使用经验证的来源字段和内容指纹形成受控幂等键；该退化键仍是待实现设计，只用于防重，不能伪装成平台原生 ID。
 
 重复投递采用幂等更新：返回已有 `messages.id`，补齐此前未知但本次已确认的字段，不用空值覆盖已有事实，也不重复创建附件、权限决策或 Task。消息去重、附件下载去重、Task 幂等和 Skill 业务写入幂等分别处理。
 
 ### 2.3 私聊、群聊与多入口
 
-- `source` 必须包含平台和来源账号，使相同会话或发送人 ID 不会跨账号、跨平台串联。
+- `source` 必须包含平台和来源账号，使相同会话或发送人 ID 不会跨账号、跨平台串联；当前代码已实现来源账号隔离，但 Adapter 尚未正式接线。
 - 私聊和群聊共用 `messages` 模型，但权限条件、AI 线程映射和上下文选择规则不同。
 - `conversation_name`、`sender_name` 只保存接收时的展示快照；后续改名不改写历史身份事实。
 - 微信、飞书、钉钉及未来 API 入口由各自 Adapter 解释原始字段，再映射到统一模型；平台私有字段保存在受控原始载荷中，不扩散为核心字段。
@@ -87,6 +89,8 @@ Message Store、Employee Workspace / 员工工作区和 AI Thread / AI 会话线
 同一条物理消息可以被多个受控 Context Snapshot / 上下文快照引用，例如当前群消息同时是两项获准任务的必要公共背景；系统不得因此复制或改写原始消息。每次引用必须记录 `enterprise_identity_id`、`workspace_id`、`ai_thread_id`、Task、选择原因和当时权限，且不得跨员工使用未授权的私聊、任务或附件。
 
 Identity Mapping 失败或 Access Control 拒绝只阻止创建员工 Task，不删除 Message Store 记录或身份解析结果，也不创建执行上下文或自动建立新的 AI Thread / AI 会话线程执行关系。只有身份映射成功且 Access Control 允许创建 Task 后，Employee Conversation Manager 才解析或创建 `workspace_id` 和 `ai_thread_id`。完整归属与隔离规则见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
+
+当前 Identity Mapping、Employee Workspace、AI Thread 和 Hermes Thread 绑定唯一性已有代码实现，但 Admission Orchestrator 尚未实现，Context Snapshot 与 Task Queue 也未实现。因此“持久化 → 身份解析 → 准入 → 工作区 / 线程 → Task”仍是目标顺序，不是已经运行的串行流程。
 
 ## 3. 附件模型
 

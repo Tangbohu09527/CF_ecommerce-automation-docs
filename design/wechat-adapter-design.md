@@ -1,6 +1,6 @@
 # wechat-adapter 设计
 
-> 状态日期：2026-07-31。本文是未来 Adapter 的设计基线，不是实现说明。当前已完成 `agent-wechat` V1 微信入口验证；`wechat-adapter` 开发和 Hermes 接入均尚未完成。
+> 状态日期：2026-08-01。本文同时标记设计与代码边界。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 `agent-wechat` HTTP Client、微信消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析；Adapter 到 Message Store 正式接线、Polling / Checkpoint、Hermes 接入与端到端回传仍未实现。入口验证和模块代码实现均不代表生产上线。
 
 ## 设计定位
 
@@ -19,7 +19,7 @@ V1 使用 Polling，不依赖尚未确认的 WebSocket 微信消息事件。Adap
 
 ## 1. 输入模型
 
-Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段；字段的精确类型、空值规则和不同消息类型下的响应结构仍须在开发前基于实际 API 样本固化。
+Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段；除已经实测固化的 `isMentioned` 外，其余字段的精确类型、空值规则和不同消息类型下的响应结构仍须继续基于实际 API 样本维护。
 
 | 字段 | 用途 | 处理规则 |
 | --- | --- | --- |
@@ -30,8 +30,19 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
 | `content` | 文本、标题或上游提供的内容 | 按消息类型解释；在进入 Hermes 上下文前进行长度、格式和敏感信息边界检查 |
 | `localId` | 微信侧本地消息标识 | 作为会话内同步检查点和去重键的核心部分；稳定性、排序和作用域仍需继续实测 |
 | `reply` | 上游可获得的引用信息 | 仅提取实际存在的引用消息或引用文件信息；结构缺失时保持为空，不补造引用内容 |
+| `isMentioned` | 上游结构化 mention 事实 | 仅按 `raw.get("isMentioned") is True` 生成 `is_mentioned`；字段缺失或不是布尔 `true` 时为 `false` |
 
 除原始字段外，Adapter 可以从受控配置补充 `sourceAccount`、Adapter 接收时间和 Polling 批次标识。这些是采集元数据，不得冒充微信原始字段。
+
+### 结构化 mention 实测
+
+当前机器人微信显示名为 `Bot_测试版`，三组对照结果为：
+
+- 从微信成员列表真正选择 `@Bot_测试版`：`isMentioned=true`。
+- 从成员列表真正 `@` 群内其他成员 T：`isMentioned` 字段缺失。
+- 只复制或输入 `@Bot_测试版 手工文字对照`，未从成员列表选择机器人：`isMentioned` 字段缺失。
+
+因此不得根据正文中的 `@` 字符、当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承 `is_mentioned=true`。
 
 ## 2. 标准事件模型
 
@@ -82,7 +93,9 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
     "id": "message_example",
     "type": "text",
     "raw_type": "source_specific_type",
-    "content": "示例消息"
+    "content": "示例消息",
+    "is_mentioned": false,
+    "is_self": false
   },
   "context": {
     "trace_id": "trace_example",
@@ -108,11 +121,13 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
 | `source` | 平台、上游组件、来源账号、采集方式和来源消息 ID | 来源账号来自受控配置；不能只用 `chatId` 区分多个微信账号 |
 | `conversation` | `chatId` 和已确认的私聊/群聊类型 | 会话类型无法可靠确定时不得猜测；应进入待补全或错误状态 |
 | `sender` | `sender`、`senderName`、可选企业身份映射 | 企业身份由权限系统解析，Adapter 不自行授予权限 |
-| `message` | Gateway 内部消息 ID、统一类型、原始类型、正文或外层标题 | `localId` 映射到 `source.native_message_id`；原始类型必须保留 |
+| `message` | Gateway 内部消息 ID、统一类型、原始类型、正文或外层标题，以及标准化的 `is_mentioned` / `is_self` 来源事实 | `localId` 映射到 `source.native_message_id`；原始类型必须保留；不得从正文或名称推断 mention |
 | `attachments` | 文件引用、名称、类型、大小、哈希和获取状态中实际可得的字段 | 未获取成功时不得生成可用文件引用；未知元数据保持为空 |
 | `context` | 可获得的引用关系、合并转发外层信息 | 不包含未被 `agent-wechat` 展开的合并转发内部记录 |
 
-`event_id` 和 Gateway 内部 `message.id` 使用稳定生成值，来源侧 `localId` 保存在 `source.native_message_id`。建议以 `source.account_id + conversation.id + source.native_message_id` 作为来源幂等键；该规则须在确认 `localId` 的稳定性和作用域后定稿，未经验证时不能仅用 `localId` 作为全局唯一键。
+`event_id` 和 Gateway 内部 `message.id` 使用稳定生成值，来源侧 `localId` 保存在 `source.native_message_id`。Message Store 已实现来源账号隔离下的来源物理消息幂等，并同时执行 `event_id` 幂等；相同来源消息标识不会跨来源账号合并。Adapter 正式接线及 Polling / Checkpoint 仍未实现，`localId` 的排序与游标语义仍须继续实测。
+
+示例中的 `authorization.is_mentioned=null` 表示私聊准入条件不适用；`message.is_mentioned=false` 是标准化来源事实。两者属于不同语义层，私聊授权快照的 `null` 不会改变原字段缺失按 `false` 标准化的规则。
 
 ### 引用上下文
 
@@ -132,8 +147,9 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
 | `voice` | 语音消息 | **待技术验证** |
 | `reply` | 带引用关系的消息包装 | **已验证：** 引用消息和引用文件；具体字段完整性仍需按样本固化 |
 | `forward` | 合并转发消息包装 | **外层已验证：** 可识别类型、发送人和标题；内部聊天记录及文件未支持 |
+| `system` | 微信系统消息 | **代码已实现：** 系统消息解析；尚未正式接线和端到端运行 |
 
-`reply` 和 `forward` 表示消息结构，不应丢失其正文或附件。引用正文、引用文件和合并转发外层信息分别放入 `message`、`attachments` 和 `context`。尚未纳入协议的 `video`、`system` 或其他上游类型保留原始类型并产生 `invalid_message`，不得强制伪装为已知类型。
+`reply` 和 `forward` 表示消息结构，不应丢失其正文或附件。引用正文、引用文件和合并转发外层信息分别放入 `message`、`attachments` 和 `context`。尚未纳入协议的 `video` 或其他上游类型保留原始类型并产生 `invalid_message`，不得强制伪装为已知类型。
 
 ## 4. 文件流程
 
@@ -152,7 +168,7 @@ flowchart TB
     H --> S["授权 Skill"]
 ```
 
-该流程是目标设计。当前已验证的是 `agent-wechat` 文件消息读取和部分文件获取，Adapter 以后的环节尚未实现。
+该流程是目标设计。当前已验证 `agent-wechat` 文件消息读取和部分文件获取；HTTP Client、微信标准化及媒体 JSON / Base64 解码已有代码实现。Adapter 到 Message Store、附件正式落库、安全处理、任务与 Hermes 链路尚未接线，流程未端到端运行。
 
 目标处理步骤：
 
@@ -166,7 +182,9 @@ flowchart TB
 
 文件获取失败时，消息事件仍应保留，附件状态标记为失败。依赖该文件的任务不得在缺失输入的情况下继续执行或伪造成功。ZIP 文件入口已验证不等于自动解压、安全检查或内部内容处理已经完成。
 
-## 5. V1 消息同步：Polling 模式
+媒体 JSON / Base64 解码已实现仅表示适配层能够解析当前支持的载荷，不表示图片、Office、PDF、中文文件名、多附件、正式持久化或端到端文件处理已经验证。
+
+## 5. V1 目标消息同步：Polling 模式
 
 ### 基本流程
 
@@ -181,7 +199,7 @@ flowchart TB
     G --> C["确认成功后更新会话检查点"]
 ```
 
-V1 计划按以下规则实现：
+Polling 与 Checkpoint 当前尚未实现。V1 计划按以下规则实现：
 
 1. 定时查询配置允许或控制面授权的会话，不默认扫描并处理全部联系人和群。
 2. 每个 `sourceAccount + chatId` 独立维护 `lastMsgLocalId`，不得使用跨会话的全局游标。
@@ -194,7 +212,7 @@ V1 计划按以下规则实现：
 
 ### 去重与检查点
 
-- 建议消息幂等键为 `sourceAccount + chatId + localId`，并在持久化层设置唯一约束；最终规则取决于 `localId` 稳定性验证。
+- Message Store 已实现来源账号隔离的来源物理消息幂等与 `event_id` 幂等；Polling 仍需确定如何用 `sourceAccount + chatId + localId` 维护读取游标和重叠窗口。
 - `lastMsgLocalId` 用于减少重复读取，持久化唯一键用于防止重复入库，两者不能互相替代。
 - 文件下载重试复用同一消息和附件记录，不重新创建业务任务。
 - Adapter 重启后从已提交检查点继续；若上游保留窗口不足以覆盖中断期，记录同步缺口并转人工核对，不能宣称已经自动恢复全部消息。
@@ -224,7 +242,7 @@ Adapter 不把原始微信响应直接拼接成 Hermes Prompt，也不直接调�
 4. Hermes 返回结构化任务结果，不直接调用微信 API。
 5. 控制面生成回传指令，Adapter 再通过 `agent-wechat` 向原 `chatId` 发送结果。
 
-任务协议、鉴权、超时、回传命令结构和 Worker Bridge 接口仍待后续详细设计与实现。消息和任务边界分别见[Message Store 设计](./message-store-design.md)与[Task Queue 设计](./task-queue-design.md)。
+HTTP Client 中的文本消息真实发送字段已实现，但任务协议、鉴权、超时、回传命令结构、Worker Bridge 接口及端到端回传仍待后续详细设计与实现。消息和任务边界分别见[Message Store 设计](./message-store-design.md)与[Task Queue 设计](./task-queue-design.md)。
 
 ## 8. 错误处理
 
@@ -244,10 +262,13 @@ Adapter 不把原始微信响应直接拼接成 Hermes Prompt，也不直接调�
 
 | 项目 | 状态 |
 | --- | --- |
-| 微信入口验证 | **已完成** |
-| `wechat-adapter` 代码 | **规划开发，尚未创建** |
-| Polling API 参数和边界实测 | **规划验证** |
+| 微信入口验证 | **已完成**，包括三组结构化 mention 对照样本 |
+| 微信适配基础 | **代码已实现** HTTP Client、消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和系统消息解析 |
+| Adapter 到 Message Store | **未实现** 正式接线 |
+| Polling / Checkpoint | **未实现**，API 参数和边界仍待实测 |
 | 标准事件 Schema 固化 | **规划开发前评审** |
-| Hermes / Worker Bridge 接入 | **规划接入** |
+| Admission Orchestrator | **未实现** |
+| Hermes / Worker Bridge 接入 | **未实现** |
+| 端到端回传 | **未实现**；真实文本发送字段已落地不等于结果回传链路已运行 |
 | WebSocket Event 模式 | **后续研究** |
 | 合并转发内部解析 | **规划增强，尚未支持** |

@@ -17,6 +17,7 @@
 - **已确定：** 正式文件操作经 Debian File Service 完成权限检查和审计，Hermes 不直接拥有正式存储的任意读写权。
 - **已确定：** 第一阶段不建设独立 OCR；自动化主线与 FileBrowser Enterprise 二次开发并行推进。
 - **已验证：** `agent-wechat` V1 入口已完成微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取验证；合并转发消息已验证类型识别、发送人获取和外层标题获取。
+- **已验证：** 微信群结构化 mention 实测中，只有从成员列表选择当前机器人时原始 `isMentioned=true`；`@` 其他成员或只复制 / 输入机器人名称时该字段缺失。Gateway 仅按 `raw.get("isMentioned") is True` 生成 `is_mentioned`，字段缺失按 `false`。
 - **待技术验证 / 待开发：** 图片、Office、PDF、中文文件名、连续多附件、失败重试和长期运行稳定性等未覆盖场景，以及合并转发内部聊天记录展开和内部文件自动提取。
 
 ## 文档入口
@@ -43,10 +44,10 @@
 | 仓库 | 状态 |
 | --- | --- |
 | `CF_ecommerce-automation-docs` | **已确定：** 当前文档仓库 |
-| `CF_agent-gateway` | **已实现基础：** Python 3.12 + FastAPI 工程和 Message Store Foundation 已完成；其余 Gateway 模块与部署验证仍待完成 |
+| `CF_agent-gateway` | **部分实现：** main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store 来源账号隔离与双重幂等、身份 / 工作区 / 线程基础、Access Control 规则与策略持久化，以及微信适配基础组件；全量 162 项测试通过。正式接线、任务与 Hermes 链路仍待完成 |
 | `filebrowser-enterprise` | **已确定：** 当前继续并行二次开发，暂不重命名；本仓库任务不得修改它 |
 | 其他 `CF_` 前缀代码仓库 | **后续规划：** 名称与边界须另行确认 |
 
 ## 当前状态
 
-当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口验证已经完成；合并转发消息的类型、发送人和外层标题识别也已补充验证，但内部聊天记录展开与内部文件自动提取尚未支持。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议以及员工工作区与 AI Thread 已形成设计基线。`CF_agent-gateway` 已完成 Python 3.12 + FastAPI 工程基础和 Message Store Foundation，包括 Conversation / Message / Attachment、消息写入与查询及 `event_id` 幂等；Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 与 Hermes 链路仍待实现。Gateway 已提供 Dockerfile 和 Compose 配置，但尚未完成 Docker 镜像构建和部署验证。设计完成或代码基础完成均不代表生产上线。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+当前仍处于**阶段 1**。Windows AI 节点与 Hyper-V Debian 测试节点的基础运行环境已经完成，`agent-wechat` V1 微信入口及结构化 mention 已完成限定范围验证；合并转发内部聊天记录展开与内部文件自动提取尚未支持。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store 来源账号隔离、`event_id` 与来源物理消息双重幂等、`is_mentioned` / `is_self`、Identity Mapping、Employee Workspace、AI Thread、Hermes Thread 绑定唯一性、Access Control 纯规则评估器、用户白名单 / 群策略 / Gateway 全局策略持久化，以及 `agent-wechat` HTTP Client、微信消息标准化、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析；当前全量 162 项测试通过。上述代码模块尚未通过 Adapter 到 Message Store 的正式接线和 Admission Orchestrator 组成运行链路；Polling / Checkpoint、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。Gateway 已提供 Dockerfile 和 Compose 配置，但尚未完成 Docker 镜像构建和部署验证。入口已验证或模块代码已实现均不表示端到端运行或生产上线。详见[当前开发进度](./status/current-progress.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。

@@ -1,10 +1,12 @@
 # Access Control 设计
 
-> 状态日期：2026-08-01。本文定义 Gateway 内部的企业访问控制模块，不是已部署配置或实现说明。当前 Identity Mapping、用户白名单、群权限、Skill 权限、工作区查看权限、策略存储和审计闭环均待实现与验证。
+> 状态日期：2026-08-01。本文定义 Gateway 内部的企业访问控制模块，并标记实际实现边界。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Identity Mapping、Access Control 纯规则评估器，以及用户白名单、群策略和 Gateway 全局策略持久化；Admission Orchestrator、正式准入调用链、Context Builder、Task Queue、Hermes 与端到端回传仍未实现。Skill 权限落地、管理员跨员工查看和完整审计闭环也未宣称完成。
 
 ## 1. 模块定位
 
 Access Control 是 CF Gateway 的内部模块，不是独立消息入口，也不是 Gateway 的全部职责。Gateway 先通过 Message Store 保存所有进入系统的消息，由 Identity Mapping 确认来源账号对应的 Enterprise Identity / 企业身份，再调用 Access Control 判断是否创建 AI 任务。
+
+上述是目标调用顺序。当前 Message Store、Identity Mapping、纯规则评估器和策略持久化为独立代码能力；由于 Adapter 到 Message Store 正式接线与 Admission Orchestrator 尚未实现，它们还没有组成运行中的消息准入链路。
 
 `enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是权限主体及工作区所有者关联的权威主键。`employee_id` 只是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信 `wxid` 代替。
 
@@ -46,7 +48,7 @@ Access Control 不决定：
 sender whitelist = true
 ```
 
-在事件协议中对应 `authorization.user_allowed=true`。`group_allowed` 和 `is_mentioned` 在私聊中为 `null`，不得用 `true` 填充不适用条件。
+在事件协议中对应 `authorization.user_allowed=true`。`group_allowed` 和 `authorization.is_mentioned` 在私聊中为 `null`，不得用 `true` 填充不适用条件。这里的 `null` 表示私聊授权条件不适用，不会改变微信标准化来源事实中原字段缺失按 `false` 处理的规则。
 
 ### 3.2 群聊
 
@@ -60,12 +62,21 @@ AND is_mentioned = true
 
 在事件协议中，`sender_allowed` 对应 `authorization.user_allowed`，`group_enabled` 的判定结果对应 `authorization.group_allowed`。任一条件为 `false` 或无法确认都拒绝创建任务。
 
+当前微信入口的唯一标准化规则是：
+
+```python
+is_mentioned = raw.get("isMentioned") is True
+```
+
+`isMentioned` 字段缺失或不是布尔 `true` 时，`is_mentioned=false`。实测中，从成员列表选择当前机器人 `Bot_测试版` 时为 `true`；选择其他成员 T 或只复制 / 输入 `@Bot_测试版 手工文字对照` 时字段缺失。
+
 当前不定义以下例外：
 
 - 回复过机器人即可免 `@`。
 - 群管理员可以绕过用户白名单。
 - 同一批次的后续消息自动继承此前 mention。
-- 正文包含机器人昵称或 `@` 字符即可视为结构化 mention。
+- 正文包含 `@` 字符、机器人当前名称 `Bot_测试版` 或旧名称 `1024` 即可视为结构化 mention。
+- 引用消息即可视为当前消息 mention。
 
 ### 3.3 判定结果
 
@@ -139,9 +150,8 @@ AND is_mentioned = true
 
 - 群已启用不代表群内所有成员被允许。
 - 用户在白名单不代表该用户在任意群或不 `@` 机器人时可以创建任务。
-- `is_mentioned=true` 必须来自平台结构化 mention 数据，并确认目标是当前 `account_id`。
-- 仅在文本中出现机器人显示名、`@` 字符或相似字符串不能作为 mention 证据。
-- 无法确定 mention 时拒绝创建任务，不能默认 `true`。
+- `agent-wechat` 接入只在 `raw.get("isMentioned") is True` 时生成 `is_mentioned=true`，不再按名称二次解析目标。
+- 原字段缺失按 `false`，不得根据机器人显示名、`@` 字符、相似字符串、引用消息或历史 mention 改写。
 - 私聊不读取群策略，`group_allowed` 和 `is_mentioned` 均为 `null`。
 
 群文件、引用、回复和连续补充消息是否能关联此前已授权的触发消息，仍需在任务批次设计中单独确定。当前不允许它们隐式继承 mention 或授权决定。
@@ -226,7 +236,7 @@ Employee Workspace / 员工工作区存在、状态为 `active` 或出现在 Her
 | `group_not_allowed` | 群未启用 AI、群策略失效或群不匹配 |
 | `bot_not_mentioned` | 群消息未明确 `@` 当前机器人 |
 | `identity_unresolved` | 无法可靠解析发信人或企业身份 |
-| `mention_unresolved` | 平台数据不足，无法可靠判断 mention |
+| `mention_unresolved` | 其他平台无法形成标准化布尔事实或发生真实标准化错误；微信 `isMentioned` 缺失不使用此原因，而是按 `false` / `bot_not_mentioned` 处理 |
 | `policy_unavailable` | 权威策略无法读取或版本无效 |
 | `scope_empty` | 有效权限交集为空 |
 | `skill_not_allowed` | 所选 Skill 或动作不在有效范围内 |
@@ -236,7 +246,7 @@ Employee Workspace / 员工工作区存在、状态为 `active` 或出现在 Her
 
 ## 8. 配置模型
 
-以下是概念配置对象，不决定数据库、配置中心或文件格式，也不代表配置服务已经实现。
+以下是概念配置对象，不决定完整配置中心或管理界面的最终形式。用户白名单、群策略和 Gateway 全局策略持久化已经实现；Skill grant、完整 policy bundle 发布、管理面、审批和审计闭环仍待实现或确认。
 
 | 配置对象 | 核心键 | 主要内容 |
 | --- | --- | --- |
@@ -303,13 +313,17 @@ RBAC 扩展后，有效权限仍须由 Gateway 计算并写入授权快照。Her
 
 | 项目 | 状态 |
 | --- | --- |
-| 用户白名单、群权限和 Skill 权限模型 | **本文形成设计基线，待实现和业务确认** |
-| Message Store 基础 | **Foundation 已实现** 消息写入、查询和 `event_id` 幂等；身份与权限决策关联仍待实现 |
-| 权限配置存储、版本发布和审计 | **待设计实现** |
-| 企业身份映射 | **待实现和验证** |
+| Access Control | **代码已实现** 纯规则评估器；尚未通过 Admission Orchestrator 串入消息准入链路 |
+| 用户白名单、群策略和 Gateway 全局策略 | **持久化代码已实现**；完整管理面、版本发布与审计闭环未完成 |
+| Skill 权限模型 | **设计基线，待业务确认和实现** |
+| Message Store | **代码已实现** 来源账号隔离、`event_id` 与来源物理消息双重幂等；身份与权限编排关联仍待 Admission Orchestrator |
+| 企业身份映射 | **代码已实现** |
+| Employee Workspace、AI Thread 与 Hermes Thread 绑定 | **基础代码已实现**，包括 Hermes Thread 绑定唯一性；运行接入未完成 |
+| Admission Orchestrator | **未实现** |
 | 工作区权限边界与管理员跨员工查看 | **设计基线，权限项、审批和审计待实现** |
-| 微信群结构化 mention 识别 | **待基于 `agent-wechat` 实际样本验证** |
+| 微信群结构化 mention | **入口已验证、标准化代码已实现**；仅 `raw.get("isMentioned") is True` 时为 `true`，字段缺失为 `false` |
+| `is_self` | **标准化代码已实现**；尚未通过正式准入链路端到端运行 |
 | 飞书、钉钉身份与 mention 映射 | **后续规划，未验证** |
 | 完整 RBAC | **后续规划** |
 
-当前只确认了企业级准入规则、工作区权限边界和职责划分，不代表 Identity Mapping、权限系统、Hermes 员工工作台、配置中心、审批流或 RBAC 已经上线。员工归属与线程设计见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
+当前已有模块代码不代表准入链路、配置管理闭环、Hermes 员工工作台、审批流、RBAC 或生产部署已经完成。Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。员工归属与线程设计见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。

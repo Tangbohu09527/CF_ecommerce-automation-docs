@@ -1,6 +1,6 @@
 # 微信入口与 Hermes 集成架构
 
-> 状态日期：2026-08-01。本文描述目标架构，不代表生产系统已经完成。当前仅完成 `agent-wechat` V1 微信入口验证；`wechat-adapter`、Identity Mapping、Employee Conversation Manager、Hermes 接入、Skills 和企业系统接口仍处于设计或待开发状态。
+> 状态日期：2026-08-01。本文描述目标架构，不代表生产系统已经完成。`agent-wechat` V1 入口和结构化 mention 已验证；Gateway 已实现消息、身份、工作区 / 线程、Access Control 与微信适配等基础代码。Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。
 
 ## 目标与范围
 
@@ -8,7 +8,7 @@
 
 本文只定义微信入口到 Hermes 的组件关系和职责边界。消息事件字段、Polling 和文件处理细节见 [wechat-adapter 设计](../design/wechat-adapter-design.md)；员工工作区与线程隔离见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)；Debian 权威控制面、任务中心、File Service 和 Worker Bridge 的完整边界以[系统设计](../02_系统设计.md)为准。
 
-## 当前验证结论
+## 当前验证与实现结论
 
 `agent-wechat` V1 已完成以下入口能力验证：
 
@@ -18,9 +18,15 @@
 - `sender` 和 `chatId` 识别。
 - 引用消息和引用文件读取。
 - 合并转发消息的外层类型、发送人和标题识别。
+- 群内从成员列表选择当前机器人 `Bot_测试版` 时，原始 `isMentioned=true`。
+- 群内从成员列表选择其他成员 T，或只复制 / 输入 `@Bot_测试版 手工文字对照` 时，`isMentioned` 字段缺失。
 - `/api/ws/events` 可以建立连接，但尚未确认微信消息事件推送。
 
-合并转发的内部聊天记录展开和内部文件自动提取尚未支持。V1 不依赖 WebSocket 实时事件，计划使用 Polling 获取新增消息。上述结论仅表示微信入口技术可行，不表示 `wechat-adapter`、Hermes、Skill 或端到端业务链路已经完成。验证边界见 [agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)。
+结构化 mention 的固定标准化规则为 `is_mentioned = raw.get("isMentioned") is True`，字段缺失按 `false`；不得根据正文 `@`、当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承。
+
+合并转发的内部聊天记录展开和内部文件自动提取尚未支持。V1 目标方案不依赖 WebSocket 实时事件，而是使用尚未实现的 Polling 获取新增消息。上述入口结论仅表示微信入口技术可行，不表示 Gateway 或端到端业务链路已经运行。验证边界见 [agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)。
+
+`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store 来源账号隔离与双重幂等、Identity Mapping、Employee Workspace、AI Thread、Hermes Thread 绑定唯一性、Access Control 纯规则评估器与三类策略持久化，以及 `agent-wechat` HTTP Client、微信标准化、媒体解码、文本发送字段和系统消息解析；全量 162 项测试通过。这些模块尚未通过 Admission Orchestrator 和正式 Adapter 接线组成运行链路。
 
 ## 总体架构
 
@@ -29,7 +35,7 @@
 ```mermaid
 flowchart TB
     E["员工微信"] --> A["agent-wechat<br/>V1 入口已验证"]
-    A --> W["wechat-adapter<br/>规划开发"]
+    A --> W["wechat-adapter<br/>基础组件已实现；正式接线待完成"]
     W --> H["Hermes Agent<br/>规划接入"]
     H --> S["Skills<br/>规划建设"]
     S --> B["企业系统<br/>接口待逐项对接"]
@@ -78,6 +84,8 @@ flowchart LR
 
 Gateway 生成稳定的 `workspace_id` 和 `ai_thread_id`。Hermes Runtime Thread / Hermes 运行时线程的 `hermes_thread_id` 可以为空或重新绑定，不是系统权威主键。Windows AI 节点未来可以按员工显示独立工作区与任务状态，但这属于目标界面，尚未实现；Gateway / Debian 控制面仍是权威状态源。
 
+当前代码已实现 Employee Workspace、AI Thread 和 Hermes Thread 绑定唯一性，但 Admission Orchestrator 与 Hermes 接入未实现，尚未形成从入站消息自动建立或恢复运行时线程的端到端流程。
+
 ## 组件职责
 
 ### agent-wechat
@@ -98,6 +106,8 @@ Gateway 生成稳定的 `workspace_id` 和 `ai_thread_id`。Hermes Runtime Threa
 - 企业身份授权、权威任务状态、正式文件归档或审计闭环。
 
 ### wechat-adapter
+
+当前已实现的适配基础包括 `agent-wechat` HTTP Client、微信消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析。Adapter 到 Message Store 正式接线、Polling / Checkpoint 与结果回传编排仍未实现。
 
 **负责：**
 
@@ -143,11 +153,11 @@ Skills 封装确定性的企业能力，例如库存查询、订单处理、文�
 
 ## 入站与回传流程
 
-### 入站消息
+### 目标入站消息流程
 
 1. 员工在私聊或允许的群聊中发送文本、文件或引用消息。
 2. `agent-wechat` 读取微信侧消息和当前可获得的元数据。
-3. `wechat-adapter` 轮询新增消息，按 `chatId` 和 `localId` 去重、生成 `message_received` 标准事件，并由 Message Store 保存 Physical Conversation / 物理会话消息。
+3. `wechat-adapter` 轮询新增消息，生成 `message_received` 标准事件；Message Store 在来源账号隔离范围内执行 `event_id` 与来源物理消息双重幂等并保存 Physical Conversation / 物理会话消息。
 4. Identity Mapping 把稳定来源账号映射到 Enterprise Identity / 企业身份；映射失败时保留消息但不创建 Task。
 5. Access Control 检查准入与权限；群聊必须同时满足 `group_allowed AND user_allowed AND is_mentioned`。
 6. Employee Conversation Manager 为获准消息定位 Employee Workspace / 员工工作区及私聊或“群 + 员工”AI Thread / AI 会话线程。
@@ -158,7 +168,9 @@ Skills 封装确定性的企业能力，例如库存查询、订单处理、文�
 
 Adapter 不把全部群聊历史直接提交给 Hermes。上下文必须按 Employee Workspace / 员工工作区、AI Thread / AI 会话线程、Task 和权限筛选，群内不同员工的任务不得串线。
 
-### 结果回传
+以上是目标流程。Polling / Checkpoint、Adapter 到 Message Store 正式接线、Admission Orchestrator、Context Builder 和 Task Queue 尚未实现，因此该入站链路尚未端到端运行。
+
+### 目标结果回传流程
 
 1. Hermes 返回完成、需要澄清、等待确认、可重试失败或最终失败等结构化结果。
 2. Debian 控制面先更新权威任务状态和审计记录。
@@ -167,6 +179,8 @@ Adapter 不把全部群聊历史直接提交给 Hermes。上下文必须按 Empl
 5. 发送结果和失败原因写回权威状态；发送失败不得被记录为任务回传成功。
 
 结果显示在 Hermes 员工工作区中不能替代原微信路由。Task 完成与微信发送成功必须分别记录；前者表示结果已经由 Debian 持久化，后者才表示结果到达原微信窗口。
+
+文本发送所需的真实请求字段已有代码实现，但控制面、Hermes、任务状态与 Adapter 之间的端到端回传编排尚未实现。
 
 ## 文件边界
 
@@ -186,6 +200,8 @@ flowchart LR
 
 ## 可靠性与安全原则
 
+以下是目标原则。当前只已落地消息层的来源账号隔离与双重幂等，Checkpoint、任务、Skill 和回传的端到端可靠性仍待实现。
+
 - **先持久化再派发：** 原始消息、标准事件、附件状态和同步检查点先写入 Debian 权威控制面，再进入 Hermes 任务链路。
 - **端到端幂等：** 消息同步去重不替代业务幂等；消息事件、任务执行、Skill 写操作和结果回传分别维护幂等标识。
 - **最小权限：** `sender` 和 `senderName` 只是微信入口身份信息，必须通过企业身份映射和权限检查后才能获得 Skill 或数据权限。
@@ -197,10 +213,17 @@ flowchart LR
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| 微信入口验证 | **已完成** | 已完成本文件所列 `agent-wechat` V1 范围验证，不等于生产验收 |
-| `wechat-adapter` | **规划开发** | 本次完成架构与事件设计，尚未创建或实现代码 |
-| Polling 消息同步 | **规划开发** | V1 目标方案，轮询周期、分页和保留窗口需结合 API 实测确认 |
+| 微信入口验证 | **已完成** | 已完成本文件所列 `agent-wechat` V1 与三组结构化 mention 样本验证，不等于生产验收 |
+| 微信适配基础 | **代码已实现** | HTTP Client、微信标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本发送字段和系统消息解析 |
+| Adapter 到 Message Store | **未实现** | 正式写入接线尚未完成 |
+| Polling / Checkpoint | **未实现** | 轮询周期、分页和保留窗口仍需结合 API 实测确认 |
 | WebSocket Event 模式 | **后续研究** | `/api/ws/events` 可连接，但微信消息事件推送尚未确认 |
-| Hermes 接入 | **规划接入** | Hermes、Worker Bridge、任务协议和结果回传尚未端到端实现 |
-| 员工工作区与 AI Thread | **设计完成，待开发** | Identity Mapping、Employee Conversation Manager、Hermes 员工工作台、运行时线程绑定和恢复尚未实现 |
+| Message Store | **代码已实现** | 来源账号隔离、`event_id` 与来源物理消息双重幂等；尚未接入 Adapter |
+| Identity Mapping | **代码已实现** | 尚未通过 Admission Orchestrator 进入正式准入链路 |
+| 员工工作区与 AI Thread | **基础代码已实现** | Employee Workspace、AI Thread 与 Hermes Thread 绑定唯一性已实现；Hermes 运行接入和恢复未完成 |
+| Access Control 与策略 | **代码已实现基础** | 纯规则评估器及用户白名单、群策略、Gateway 全局策略持久化已实现；正式准入调用链未接线 |
+| Admission Orchestrator | **未实现** | 已实现模块尚未串成运行链路 |
+| Context Builder / Task Queue | **未实现** | 仍停留在目标设计 |
+| Hermes 接入与端到端回传 | **未实现** | Hermes、Worker Bridge、任务协议和结果回传尚未端到端运行 |
 | Skills 与企业系统 | **规划建设 / 待验证** | 具体 Skill 和企业接口待逐项设计、实现和验收 |
+| Gateway 全量测试 | **162 项通过** | 对应 main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` |
