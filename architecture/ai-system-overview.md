@@ -1,6 +1,6 @@
 # 企业 AI 自动化系统总体架构
 
-> 状态日期：2026-08-01。本文是总体架构视图；组件内部设计、安全边界和数据模型以[系统设计](../02_系统设计.md)为准，当前实施进度以[当前开发进度](../status/current-progress.md)为准。
+> 状态日期：2026-08-03。本文是总体架构视图；组件内部设计、安全边界和数据模型以[系统设计](../02_系统设计.md)为准，当前实施进度以[当前开发进度](../status/current-progress.md)为准。
 
 ## 架构目标
 
@@ -20,48 +20,58 @@
 flowchart TB
     E["员工"] --> W["微信入口"]
     W --> A["agent-wechat<br/>V1 入口已验证"]
-    A --> G["CF Gateway<br/>设计基线；Message Store Foundation 已实现"]
+    A --> G["CF Gateway<br/>基础模块已实现；正式接线待完成"]
     G --> H["Hermes Agent<br/>待接入"]
     H --> S["Skills<br/>待建设"]
-    S --> B["企业系统 API / File Service<br/>待逐项对接"]
+    S --> B["企业系统 API<br/>待逐项对接"]
+    S --> C["FileBridge / filebrowser-agentctl<br/>待集成"]
+    C --> F["CF_filebrowser-enterprise<br/>正式企业 File Service"]
     B --> S --> H --> G --> A --> W
+    F --> C
 ```
 
 主链路的目标是：员工在微信提交请求，`agent-wechat` 完成微信侧收发，CF Gateway 负责路由和安全隔离，Hermes 在授权范围内理解任务并选择 Skill，Skill 通过经批准的接口访问企业系统或文件服务，结果沿原链路返回原会话。
 
-图中的 CF Gateway 是逻辑网关边界，不等同于一个完整且已部署的单一程序。`CF_agent-gateway` 已实现工程基础和 Message Store Foundation；身份、权限、上下文、任务、Adapter 与 Hermes 集成仍按该逻辑边界继续建设，详细拆分见[系统设计](../02_系统设计.md)。
+图中的 CF Gateway 是逻辑网关边界，不等同于一个完整且已部署的单一程序。`CF_agent-gateway` 已实现 Message Store、Identity Mapping、Employee Workspace / AI Thread、Access Control、策略持久化与微信适配等基础模块；Adapter 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue 与 Hermes 集成仍按该逻辑边界继续建设，详细拆分见[系统设计](../02_系统设计.md)。
 
 ## 分层职责
 
 | 层级 | 核心职责 | 当前状态 |
 | --- | --- | --- |
 | 员工与微信入口 | 提交业务请求、补充信息、接收结果或确认请求 | 业务入口已确定 |
-| `agent-wechat` | 微信登录、私聊/群聊文本、文件与 ZIP 消息、引用消息、入口标识与附件读取；识别合并转发消息的外层信息 | V1 微信入口已验证；合并转发内部解析、未覆盖格式和实时事件仍待开发、验证或研究 |
-| CF Gateway | 消息路由、安全隔离，并衔接上下文、任务、权限和审计控制 | 设计基线已形成；工程基础和 Message Store Foundation 已实现，其余模块待实施 |
+| `agent-wechat` | 微信登录、私聊/群聊文本、文件与 ZIP 消息、引用消息、入口标识与附件读取；识别结构化 mention 和合并转发消息的外层信息 | V1 微信入口及结构化 mention 已验证；合并转发内部解析、未覆盖格式和实时事件仍待开发、验证或研究 |
+| CF Gateway | 消息路由、安全隔离，并衔接上下文、任务、权限和审计控制 | main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store、身份 / 工作区 / 线程、Access Control、策略持久化与微信适配基础，全量 162 项测试通过；正式接线、任务、Hermes 链路与部署仍待完成 |
 | Hermes Agent | 理解意图、规划步骤、选择获授权的 Skill、生成结构化结果 | 生产 Agent 路线已确定；待接入 |
 | Skills | 封装库存、订单、文件等可审计的确定性业务动作 | 体系待建设，具体 Skill 待逐项定义 |
-| 企业系统与文件服务 | 提供受控业务数据、业务操作和正式文件访问 | 旺店通 ERP、旺店通 WMS、S6 与正式存储已存在；自动化接口待逐项验证和对接 |
+| 企业系统 | 提供受控业务数据和业务操作 | 旺店通 ERP、旺店通 WMS、S6 已存在；自动化接口待逐项验证和对接 |
+| `CF_filebrowser-enterprise` | 作为正式企业 File Service，提供人员入口、受控 API、文件 capability 与自身 Audit | V1 Beta 核心服务端能力已实现；前端剩余项与业务 Audit Action 待集成，最终 Debian 部署待验证 |
+| FileBridge / `filebrowser-agentctl` | 作为自动化侧受控客户端调用稳定 File Service API | 边界已确定；Gateway/Hermes 对接待集成、待验证 |
 
 ## 控制中心与执行节点
 
 - **Debian 权威控制中心：** 消息、上下文、任务、文件、权限、日志和审计的权威来源。`agent-wechat` 的生产部署位置计划为 Debian。
 - **Windows AI 执行节点：** 计划运行 Hermes、Worker Bridge、Skills，以及文档、浏览器和 Windows 侧执行工具。
-- **正式文件访问：** 自动化必须经过 File Service 的权限检查和审计。Hermes 与 Skill 不得任意遍历或直接改写正式存储。
-- **FileBrowser Enterprise：** 企业文件中心的人员访问与管理入口，与自动化主线并行推进；它不替代 File Service 的自动化访问边界。
+- **正式文件访问：** `CF_filebrowser-enterprise` 是唯一的正式企业 File Service，同时提供人员入口和受控 API。自动化必须经过其文件权限、Token capability、Share capability 和 Audit。
+- **受控客户端：** FileBridge / `filebrowser-agentctl` 只调用 File Service API，不直接遍历或改写正式存储，也不自行授权。Gateway、Hermes 和 Skills 同样不得绕过该边界。
 
 ## 当前实现边界
 
-当前已经完成 `agent-wechat` V1 微信入口验证，包括微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取。合并转发消息已验证类型识别、发送人获取和外层标题获取。微信消息入口层技术可行；当前消息读取采用已验证的 API 方式，实时事件机制仍待研究和开发。
+当前已经完成 `agent-wechat` V1 微信入口验证，包括微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取。群聊结构化 mention 的三组对照样本已验证，固定按 `raw.get("isMentioned") is True` 生成 `is_mentioned`，字段缺失按 `false`，不得从正文、名称、引用或历史 mention 推断。合并转发消息已验证类型识别、发送人获取和外层标题获取。微信消息入口层技术可行；当前消息读取采用已验证的 API 方式，实时事件机制仍待研究和开发。
 
-`CF_agent-gateway` 已完成 Python 3.12 + FastAPI 工程基础和 Message Store Foundation，包括 Conversation / Message / Attachment、消息写入与查询和 `event_id` 幂等；9 项测试通过。已提供 Dockerfile 和 Compose 配置，但尚未完成镜像构建和部署验证。
+`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Python 3.12 + FastAPI 工程基础，Message Store 来源账号隔离、`event_id` 与来源物理消息双重幂等、`is_mentioned` / `is_self`，Identity Mapping，以 `enterprise_identity_id` 为权威主键关联的 Employee Workspace / AI Thread 与 Hermes Thread 绑定唯一性，Access Control 纯规则评估器及三类策略持久化，以及 `agent-wechat` HTTP Client、微信消息标准化、媒体解码、文本发送字段和系统消息解析；全量 162 项测试通过。这些模块尚未通过 Adapter 到 Message Store 正式接线和 Admission Orchestrator 组成运行链路；Polling / Checkpoint、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。Gateway 已提供 Dockerfile 和 Compose 配置，但尚未完成镜像构建和部署验证。
+
+`CF_filebrowser-enterprise` 已实现 V1 Beta 核心服务端能力：API Token hash-only、旧 Token/Key V5 migration 与失败关闭、一次性明文、Browse / Preview / Download 三权 UI、Archive / Extract 权限与文件系统安全、Share `configured` / `effective` capability 服务端契约和密码 Share Token 绕过关闭。Audit 侧已实现 Persistent Audit Store、Audit V3 migration、request-scoped Audit Recorder、Token 创建/撤销/拒绝 Audit、管理员 `GET /api/audit`、过滤、Cursor 和日志脱敏。
+
+这些 File Service 实现不代表 Share capability 前端 UI、登录/用户/权限/Share 管理 Audit、核心文件和 Archive Audit Action、WebDAV / OnlyOffice Audit Action 已经完成，也不代表最终 Debian 部署、V1 Beta tag/candidate 或正式生产上线已经完成。
 
 以下能力仍不能表述为已经完成：
 
-- CF Gateway 的 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter、Hermes / AI Provider 链路和生产部署。
+- CF Gateway 的 Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes / AI Provider 链路、端到端回传和生产部署。
 - Hermes Adapter、Hermes、GPT-5.6 API、Worker Bridge 与微信链路的端到端接入。
 - 库存、订单、文件等业务 Skills 系统。
-- 旺店通 ERP、旺店通 WMS、S6 和正式文件服务的自动化接口对接。
-- 图片、Office、PDF、中文文件名、连续多附件等未覆盖入口场景，以及解压、文件自动处理、企业权限体系和完整审计闭环。
+- 旺店通 ERP、旺店通 WMS、S6 接口，以及 FileBridge / `filebrowser-agentctl`、Gateway/Hermes 对稳定 File Service API 的自动化对接。
+- 图片、Office、PDF、中文文件名、连续多附件等未覆盖入口场景，以及解压、文件自动处理、企业权限体系、File Service 剩余业务 Audit Action 和完整审计闭环。
+- File Service 的 Share capability 前端 UI、最终 Debian 部署验收和 V1 Beta 最终 tag/candidate。
 - WebSocket 实时事件接入及其重连、去重和补偿机制。
 - 合并转发内部聊天记录展开、内部文件自动提取及 `forward parser`。
 - 独立 OCR 与知识库处理链路；第一阶段不建设独立 OCR。
@@ -110,3 +120,4 @@ flowchart TB
 3. **最小授权。** 每个任务只获得所需的 Skill、数据和文件权限，高风险写操作需要人工确认。
 4. **全链路可追踪。** 消息、任务、Skill 调用、系统接口、文件和结果回传使用关联标识记录状态和失败原因。
 5. **规划不等于实现。** 未完成技术验证、接口对接或业务验收的能力，统一保持“待实施 / 待验证 / 后续规划”标识。
+6. **稳定 File Service 契约。** V1 Beta 完成后，Gateway/Hermes 只按稳定 File Service API 与服务端 `effective` capability 集成，客户端不得自行推导或放大授权。
