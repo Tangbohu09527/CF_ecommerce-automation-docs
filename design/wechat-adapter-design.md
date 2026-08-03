@@ -1,6 +1,6 @@
 # wechat-adapter 设计
 
-> 状态日期：2026-08-01。本文同时标记设计与代码边界。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 `agent-wechat` HTTP Client、微信消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析；Adapter 到 Message Store 正式接线、Polling / Checkpoint、Hermes 接入与端到端回传仍未实现。入口验证和模块代码实现均不代表生产上线。
+> 状态日期：2026-08-03。本文同时标记设计与代码边界。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信文本消息验证 `poll_once`、Polling / Checkpoint、Message Store、Identity Mapping、Access Control、Admission 到 Employee Workspace / AI Thread 的入站链路；`bootstrap_mode=latest` 首次启动结果为 `messages_seen: 256`、`messages_skipped_by_checkpoint: 256`、`messages_processed: 0`，仅证明建立高水位且不消费历史消息，不代表常驻轮询或长期稳定性已经验证。附件正式处理、Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信、Skill 执行链和生产部署仍未完成。详见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 设计定位
 
@@ -125,7 +125,7 @@ Adapter 从 `agent-wechat` 读取原始消息。当前设计关注以下字段�
 | `attachments` | 文件引用、名称、类型、大小、哈希和获取状态中实际可得的字段 | 未获取成功时不得生成可用文件引用；未知元数据保持为空 |
 | `context` | 可获得的引用关系、合并转发外层信息 | 不包含未被 `agent-wechat` 展开的合并转发内部记录 |
 
-`event_id` 和 Gateway 内部 `message.id` 使用稳定生成值，来源侧 `localId` 保存在 `source.native_message_id`。Message Store 已实现来源账号隔离下的来源物理消息幂等，并同时执行 `event_id` 幂等；相同来源消息标识不会跨来源账号合并。Adapter 正式接线及 Polling / Checkpoint 仍未实现，`localId` 的排序与游标语义仍须继续实测。
+`event_id` 和 Gateway 内部 `message.id` 使用稳定生成值，来源侧 `localId` 保存在 `source.native_message_id`。Message Store 已实现来源账号隔离下的来源物理消息幂等，并同时执行 `event_id` 幂等；相同来源消息标识不会跨来源账号合并。真实微信文本消息经 `poll_once` 进入 Message Store 及后续准入链路已在 Debian Staging 验证；附件接线、`localId` 的排序与游标语义、重叠窗口和长期轮询仍须继续实现或实测。
 
 示例中的 `authorization.is_mentioned=null` 表示私聊准入条件不适用；`message.is_mentioned=false` 是标准化来源事实。两者属于不同语义层，私聊授权快照的 `null` 不会改变原字段缺失按 `false` 标准化的规则。
 
@@ -168,7 +168,7 @@ flowchart TB
     H --> S["授权 Skill"]
 ```
 
-该流程是目标设计。当前已验证 `agent-wechat` 文件消息读取和部分文件获取；HTTP Client、微信标准化及媒体 JSON / Base64 解码已有代码实现。Adapter 到 Message Store、附件正式落库、安全处理、任务与 Hermes 链路尚未接线，流程未端到端运行。
+该流程是目标设计。当前已验证 `agent-wechat` 文件消息读取和部分文件获取；HTTP Client、微信标准化及媒体 JSON / Base64 解码已有代码实现。真实微信文本消息已通过 Adapter 进入 Message Store 和准入链路，但附件正式接线、落库与安全处理，以及 Context Builder、Task Queue、Hermes Runtime 和 Skill 链路尚未完成，因此文件流程未端到端运行。
 
 目标处理步骤：
 
@@ -199,7 +199,15 @@ flowchart TB
     G --> C["确认成功后更新会话检查点"]
 ```
 
-Polling 与 Checkpoint 当前尚未实现。V1 计划按以下规则实现：
+commit `587f59f` 已在 Debian Staging 通过 `python -m cf_agent_gateway.wechat_poll_once` 验证单次真实轮询及检查点。首次以 `bootstrap_mode=latest` 启动时，结果为：
+
+```text
+messages_seen: 256
+messages_skipped_by_checkpoint: 256
+messages_processed: 0
+```
+
+该结果只确认首次启动建立当前消息高水位、不消费历史消息；没有验证常驻调度、长时间稳定性、断线重连、重启恢复或完整分页边界。V1 后续实现和验证仍遵循以下规则：
 
 1. 定时查询配置允许或控制面授权的会话，不默认扫描并处理全部联系人和群。
 2. 每个 `sourceAccount + chatId` 独立维护 `lastMsgLocalId`，不得使用跨会话的全局游标。
@@ -212,7 +220,7 @@ Polling 与 Checkpoint 当前尚未实现。V1 计划按以下规则实现：
 
 ### 去重与检查点
 
-- Message Store 已实现来源账号隔离的来源物理消息幂等与 `event_id` 幂等；Polling 仍需确定如何用 `sourceAccount + chatId + localId` 维护读取游标和重叠窗口。
+- Message Store 已实现来源账号隔离的来源物理消息幂等与 `event_id` 幂等；Polling 已验证 `bootstrap_mode=latest` 的首次高水位，仍需确定并验证如何用 `sourceAccount + chatId + localId` 维护持续读取游标和重叠窗口。
 - `lastMsgLocalId` 用于减少重复读取，持久化唯一键用于防止重复入库，两者不能互相替代。
 - 文件下载重试复用同一消息和附件记录，不重新创建业务任务。
 - Adapter 重启后从已提交检查点继续；若上游保留窗口不足以覆盖中断期，记录同步缺口并转人工核对，不能宣称已经自动恢复全部消息。
@@ -264,11 +272,14 @@ HTTP Client 中的文本消息真实发送字段已实现，但任务协议、�
 | --- | --- |
 | 微信入口验证 | **已完成**，包括三组结构化 mention 对照样本 |
 | 微信适配基础 | **代码已实现** HTTP Client、消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和系统消息解析 |
-| Adapter 到 Message Store | **未实现** 正式接线 |
-| Polling / Checkpoint | **未实现**，API 参数和边界仍待实测 |
+| Adapter 到 Message Store | **Debian Staging 已验证真实微信文本入站**；附件正式处理未完成 |
+| Polling / Checkpoint | **有限范围已验证**：`poll_once` 与 `bootstrap_mode=latest` 首次高水位为 `256 / 256 / 0`；常驻轮询、长期稳定性及完整边界未验证 |
 | 标准事件 Schema 固化 | **规划开发前评审** |
-| Admission Orchestrator | **未实现** |
-| Hermes / Worker Bridge 接入 | **未实现** |
-| 端到端回传 | **未实现**；真实文本发送字段已落地不等于结果回传链路已运行 |
+| Admission | **Debian Staging 已验证** Identity Mapping、Access Control、拒绝默认及授权后创建 Employee Workspace / AI Thread 的真实链路 |
+| Context Builder / Task Queue | **未完成** |
+| Hermes Runtime / Worker Bridge 接入 | **未完成** |
+| Skill 执行链 | **未完成** |
+| AI 回复回传微信 | **未完成**；真实文本发送字段已落地不等于结果回传链路已运行 |
+| 生产部署 | **未完成**；本次仅为 Debian Staging venv 部署验证 |
 | WebSocket Event 模式 | **后续研究** |
 | 合并转发内部解析 | **规划增强，尚未支持** |

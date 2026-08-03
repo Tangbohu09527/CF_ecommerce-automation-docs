@@ -20,7 +20,7 @@
 flowchart TB
     E["员工"] --> W["微信入口"]
     W --> A["agent-wechat<br/>V1 入口已验证"]
-    A --> G["CF Gateway<br/>基础模块已实现；正式接线待完成"]
+    A --> G["CF Gateway<br/>Debian Staging 真实微信已验证至 AI Thread"]
     G --> H["Hermes Agent<br/>待接入"]
     H --> S["Skills<br/>待建设"]
     S --> B["企业系统 API<br/>待逐项对接"]
@@ -32,7 +32,7 @@ flowchart TB
 
 主链路的目标是：员工在微信提交请求，`agent-wechat` 完成微信侧收发，CF Gateway 负责路由和安全隔离，Hermes 在授权范围内理解任务并选择 Skill，Skill 通过经批准的接口访问企业系统或文件服务，结果沿原链路返回原会话。
 
-图中的 CF Gateway 是逻辑网关边界，不等同于一个完整且已部署的单一程序。`CF_agent-gateway` 已实现 Message Store、Identity Mapping、Employee Workspace / AI Thread、Access Control、策略持久化与微信适配等基础模块；Adapter 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue 与 Hermes 集成仍按该逻辑边界继续建设，详细拆分见[系统设计](../02_系统设计.md)。
+图中的 CF Gateway 是逻辑网关边界，不等同于一个已生产部署的完整系统。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信消息验证 Gateway Runtime、Polling / Checkpoint、Message Store、Identity Mapping、Access Control、Admission、Employee Workspace 和 AI Thread；Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime、AI 回复回传微信和 Skill 执行链仍待建设。验证证据见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)，详细拆分见[系统设计](../02_系统设计.md)。
 
 ## 分层职责
 
@@ -40,7 +40,7 @@ flowchart TB
 | --- | --- | --- |
 | 员工与微信入口 | 提交业务请求、补充信息、接收结果或确认请求 | 业务入口已确定 |
 | `agent-wechat` | 微信登录、私聊/群聊文本、文件与 ZIP 消息、引用消息、入口标识与附件读取；识别结构化 mention 和合并转发消息的外层信息 | V1 微信入口及结构化 mention 已验证；合并转发内部解析、未覆盖格式和实时事件仍待开发、验证或研究 |
-| CF Gateway | 消息路由、安全隔离，并衔接上下文、任务、权限和审计控制 | main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store、身份 / 工作区 / 线程、Access Control、策略持久化与微信适配基础，全量 162 项测试通过；正式接线、任务、Hermes 链路与部署仍待完成 |
+| CF Gateway | 消息路由、安全隔离，并衔接上下文、任务、权限和审计控制 | commit `587f59f` 已在 Debian Staging 以真实微信验证至 AI Thread；Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime、AI 回复回传微信、Skill 执行链和生产部署仍待完成 |
 | Hermes Agent | 理解意图、规划步骤、选择获授权的 Skill、生成结构化结果 | 生产 Agent 路线已确定；待接入 |
 | Skills | 封装库存、订单、文件等可审计的确定性业务动作 | 体系待建设，具体 Skill 待逐项定义 |
 | 企业系统 | 提供受控业务数据和业务操作 | 旺店通 ERP、旺店通 WMS、S6 已存在；自动化接口待逐项验证和对接 |
@@ -58,7 +58,9 @@ flowchart TB
 
 当前已经完成 `agent-wechat` V1 微信入口验证，包括微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取。群聊结构化 mention 的三组对照样本已验证，固定按 `raw.get("isMentioned") is True` 生成 `is_mentioned`，字段缺失按 `false`，不得从正文、名称、引用或历史 mention 推断。合并转发消息已验证类型识别、发送人获取和外层标题获取。微信消息入口层技术可行；当前消息读取采用已验证的 API 方式，实时事件机制仍待研究和开发。
 
-`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Python 3.12 + FastAPI 工程基础，Message Store 来源账号隔离、`event_id` 与来源物理消息双重幂等、`is_mentioned` / `is_self`，Identity Mapping，以 `enterprise_identity_id` 为权威主键关联的 Employee Workspace / AI Thread 与 Hermes Thread 绑定唯一性，Access Control 纯规则评估器及三类策略持久化，以及 `agent-wechat` HTTP Client、微信消息标准化、媒体解码、文本发送字段和系统消息解析；全量 162 项测试通过。这些模块尚未通过 Adapter 到 Message Store 正式接线和 Admission Orchestrator 组成运行链路；Polling / Checkpoint、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。Gateway 已提供 Dockerfile 和 Compose 配置，但尚未完成镜像构建和部署验证。
+`CF_agent-gateway` commit `587f59f` 已在 Debian 13、Python 3.13.5 的 Staging 环境与同机 `agent-wechat` Docker 容器完成真实微信联调。已验证链路为 Gateway Runtime、Polling、Checkpoint、Message Store、Identity Mapping、Access Control、Admission、Employee Workspace 和 AI Thread；未配置身份的消息会保存到 Message Store，但不会创建 Employee Workspace 或 AI Thread，授权身份可创建工作区、线程及来源绑定。该验证以 venv 运行，不覆盖 Gateway Docker 镜像或容器部署。详见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
+
+当前链路止于 AI Thread。Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime、AI 回复回传微信和 Skill 执行链尚未完成，`hermes_thread_id` 当前为空；因此不得表述为完整 AI Agent 闭环或生产上线。
 
 `CF_filebrowser-enterprise` 已实现 V1 Beta 核心服务端能力：API Token hash-only、旧 Token/Key V5 migration 与失败关闭、一次性明文、Browse / Preview / Download 三权 UI、Archive / Extract 权限与文件系统安全、Share `configured` / `effective` capability 服务端契约和密码 Share Token 绕过关闭。Audit 侧已实现 Persistent Audit Store、Audit V3 migration、request-scoped Audit Recorder、Token 创建/撤销/拒绝 Audit、管理员 `GET /api/audit`、过滤、Cursor 和日志脱敏。
 
@@ -66,8 +68,8 @@ flowchart TB
 
 以下能力仍不能表述为已经完成：
 
-- CF Gateway 的 Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes / AI Provider 链路、端到端回传和生产部署。
-- Hermes Adapter、Hermes、GPT-5.6 API、Worker Bridge 与微信链路的端到端接入。
+- CF Gateway 的 Context Builder、Task Queue、Gateway Hermes Adapter、Hermes / AI Provider 链路、AI 回复回传微信和生产部署。
+- Hermes Runtime、GPT-5.6 API、Worker Bridge 与微信链路的端到端接入。
 - 库存、订单、文件等业务 Skills 系统。
 - 旺店通 ERP、旺店通 WMS、S6 接口，以及 FileBridge / `filebrowser-agentctl`、Gateway/Hermes 对稳定 File Service API 的自动化对接。
 - 图片、Office、PDF、中文文件名、连续多附件等未覆盖入口场景，以及解压、文件自动处理、企业权限体系、File Service 剩余业务 Audit Action 和完整审计闭环。
@@ -111,7 +113,7 @@ flowchart TB
 
 后续可在入口适配层增加 `forward parser`，用于展开内部聊天记录和提取内部文件。该增强尚未实现，也不改变 Debian 权威控制中心、CF Gateway、File Service、权限和审计边界。
 
-当前状态保持为：微信入口验证**已完成**；Hermes Adapter、实时事件机制和合并转发解析增强**待开发**。入口验证完成不代表 Hermes 或端到端业务链路已经接通。
+当前状态保持为：微信入口验证**已完成**；Gateway Hermes Adapter、实时事件机制和合并转发解析增强**待开发**。入口验证完成不代表 Hermes 或端到端业务链路已经接通。
 
 ## 架构原则
 

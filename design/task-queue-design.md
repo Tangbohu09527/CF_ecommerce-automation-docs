@@ -1,6 +1,6 @@
 # Task Queue 设计
 
-> 状态日期：2026-08-01。本文定义 CF Gateway 的 Task Queue / Task Store 设计基线，不代表队列产品、数据库、调度参数、员工工作区或 AI Provider 已经选型、部署或验证。
+> 状态日期：2026-08-03。本文定义 CF Gateway 的 Task Queue / Task Store 设计基线。Employee Workspace 和 AI Thread 基础记录已在 Debian Staging 验证，但 Task Queue、队列产品、数据库、调度参数和 AI Provider 尚未实现、选型或验证。
 
 ## 1. 定位
 

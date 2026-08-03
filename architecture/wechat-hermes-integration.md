@@ -1,6 +1,6 @@
 # 微信入口与 Hermes 集成架构
 
-> 状态日期：2026-08-01。本文描述目标架构，不代表生产系统已经完成。`agent-wechat` V1 入口和结构化 mention 已验证；Gateway 已实现消息、身份、工作区 / 线程、Access Control 与微信适配等基础代码。Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现。
+> 状态日期：2026-08-03。本文描述目标架构，不代表生产系统已经完成。`CF_agent-gateway` commit `587f59f feat: wire wechat polling runtime` 已在 Debian Staging 完成真实微信消息从 Polling / Checkpoint 到 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace 和 AI Thread 的联调验证。Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信、Skill 执行链和生产部署均未完成；当前状态不代表生产上线或完整 AI Agent 闭环。详见[Gateway 微信 Debian Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 目标与范围
 
@@ -24,9 +24,9 @@
 
 结构化 mention 的固定标准化规则为 `is_mentioned = raw.get("isMentioned") is True`，字段缺失按 `false`；不得根据正文 `@`、当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承。
 
-合并转发的内部聊天记录展开和内部文件自动提取尚未支持。V1 目标方案不依赖 WebSocket 实时事件，而是使用尚未实现的 Polling 获取新增消息。上述入口结论仅表示微信入口技术可行，不表示 Gateway 或端到端业务链路已经运行。验证边界见 [agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)。
+合并转发的内部聊天记录展开和内部文件自动提取尚未支持。V1 运行链路不依赖 WebSocket 实时事件；commit `587f59f` 已使用 Polling / Checkpoint 获取并处理新增消息。入口能力边界见 [agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)，Gateway 的 Debian Staging 真实链路边界见[联调验证记录](../status/gateway-wechat-staging-validation.md)。
 
-`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Message Store 来源账号隔离与双重幂等、Identity Mapping、Employee Workspace、AI Thread、Hermes Thread 绑定唯一性、Access Control 纯规则评估器与三类策略持久化，以及 `agent-wechat` HTTP Client、微信标准化、媒体解码、文本发送字段和系统消息解析；全量 162 项测试通过。这些模块尚未通过 Admission Orchestrator 和正式 Adapter 接线组成运行链路。
+`CF_agent-gateway` commit `587f59f` 已在 Debian 13、Python 3.13.5 环境与 `agent-wechat` Docker 容器同机完成真实联调。已验证链路为 Polling、Checkpoint、Message Store、Identity Mapping、Access Control、Admission、Employee Workspace 和 AI Thread；链路止于 AI Thread，不包含 Context Builder、Task Queue、Hermes Runtime、Skill 执行或微信结果回传。
 
 ## 总体架构
 
@@ -35,7 +35,7 @@
 ```mermaid
 flowchart TB
     E["员工微信"] --> A["agent-wechat<br/>V1 入口已验证"]
-    A --> W["wechat-adapter<br/>基础组件已实现；正式接线待完成"]
+    A --> W["Gateway Runtime / wechat-adapter<br/>Staging 已验证至 AI Thread"]
     W --> H["Hermes Agent<br/>规划接入"]
     H --> S["Skills<br/>规划建设"]
     S --> B["企业系统<br/>接口待逐项对接"]
@@ -84,7 +84,7 @@ flowchart LR
 
 Gateway 生成稳定的 `workspace_id` 和 `ai_thread_id`。Hermes Runtime Thread / Hermes 运行时线程的 `hermes_thread_id` 可以为空或重新绑定，不是系统权威主键。Windows AI 节点未来可以按员工显示独立工作区与任务状态，但这属于目标界面，尚未实现；Gateway / Debian 控制面仍是权威状态源。
 
-当前代码已实现 Employee Workspace、AI Thread 和 Hermes Thread 绑定唯一性，但 Admission Orchestrator 与 Hermes 接入未实现，尚未形成从入站消息自动建立或恢复运行时线程的端到端流程。
+commit `587f59f` 已在 Debian Staging 验证获准真实微信消息自动创建 Employee Workspace、AI Thread 和来源绑定；拒绝样本只保存消息，不创建工作区或 AI Thread。Hermes Runtime 尚未接入，当前 `hermes_thread_id` 为空，运行时线程创建与恢复仍待 Gateway Hermes Adapter。
 
 ## 组件职责
 
@@ -107,7 +107,7 @@ Gateway 生成稳定的 `workspace_id` 和 `ai_thread_id`。Hermes Runtime Threa
 
 ### wechat-adapter
 
-当前已实现的适配基础包括 `agent-wechat` HTTP Client、微信消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析。Adapter 到 Message Store 正式接线、Polling / Checkpoint 与结果回传编排仍未实现。
+当前已实现的适配基础包括 `agent-wechat` HTTP Client、微信消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析。真实微信文本消息经 Polling / Checkpoint、Message Store 和 Admission 到 AI Thread 的链路已在 Debian Staging 验证；附件正式处理、长期轮询稳定性和结果回传编排仍未完成。
 
 **负责：**
 
@@ -168,7 +168,7 @@ Skills 封装确定性的企业能力，例如库存查询、订单处理、文�
 
 Adapter 不把全部群聊历史直接提交给 Hermes。上下文必须按 Employee Workspace / 员工工作区、AI Thread / AI 会话线程、Task 和权限筛选，群内不同员工的任务不得串线。
 
-以上是目标流程。Polling / Checkpoint、Adapter 到 Message Store 正式接线、Admission Orchestrator、Context Builder 和 Task Queue 尚未实现，因此该入站链路尚未端到端运行。
+以上是目标流程。真实微信文本消息的步骤 1 至 6 已在 Debian Staging 以限定样本验证至 AI Thread；Context Builder、Task Queue、Worker Bridge、Hermes Runtime 和 Skill 对应的步骤 7 至 10 尚未实现，因此完整入站执行链仍未端到端运行。
 
 ### 目标结果回传流程
 
@@ -200,7 +200,7 @@ flowchart LR
 
 ## 可靠性与安全原则
 
-以下是目标原则。当前只已落地消息层的来源账号隔离与双重幂等，Checkpoint、任务、Skill 和回传的端到端可靠性仍待实现。
+以下是目标原则。当前已在 Debian Staging 验证单次 Polling / Checkpoint、Message Store 与准入至 AI Thread；常驻轮询、重启恢复、任务、Skill 和回传的端到端可靠性仍待实现。
 
 - **先持久化再派发：** 原始消息、标准事件、附件状态和同步检查点先写入 Debian 权威控制面，再进入 Hermes 任务链路。
 - **端到端幂等：** 消息同步去重不替代业务幂等；消息事件、任务执行、Skill 写操作和结果回传分别维护幂等标识。
@@ -214,16 +214,14 @@ flowchart LR
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
 | 微信入口验证 | **已完成** | 已完成本文件所列 `agent-wechat` V1 与三组结构化 mention 样本验证，不等于生产验收 |
-| 微信适配基础 | **代码已实现** | HTTP Client、微信标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、文本发送字段和系统消息解析 |
-| Adapter 到 Message Store | **未实现** | 正式写入接线尚未完成 |
-| Polling / Checkpoint | **未实现** | 轮询周期、分页和保留窗口仍需结合 API 实测确认 |
+| Gateway 微信 Polling Runtime | **Debian Staging 已验证** | commit `587f59f` 已验证 `poll_once`、Polling / Checkpoint 与真实微信文本消息写入；常驻轮询、长期稳定性和完整分页边界未验证 |
 | WebSocket Event 模式 | **后续研究** | `/api/ws/events` 可连接，但微信消息事件推送尚未确认 |
-| Message Store | **代码已实现** | 来源账号隔离、`event_id` 与来源物理消息双重幂等；尚未接入 Adapter |
-| Identity Mapping | **代码已实现** | 尚未通过 Admission Orchestrator 进入正式准入链路 |
-| 员工工作区与 AI Thread | **基础代码已实现** | Employee Workspace、AI Thread 与 Hermes Thread 绑定唯一性已实现；Hermes 运行接入和恢复未完成 |
-| Access Control 与策略 | **代码已实现基础** | 纯规则评估器及用户白名单、群策略、Gateway 全局策略持久化已实现；正式准入调用链未接线 |
-| Admission Orchestrator | **未实现** | 已实现模块尚未串成运行链路 |
+| Message Store | **Debian Staging 已验证** | 未配置身份的真实消息保存成功；附件正式处理和生产存储未验证 |
+| Identity Mapping 与 Admission | **Debian Staging 已验证** | 已验证未知身份拒绝路径和测试身份授权路径，不代表完整身份管理或权限矩阵已验收 |
+| Employee Workspace 与 AI Thread | **Debian Staging 已验证** | 授权样本创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`；`hermes_thread_id` 当前为空 |
+| Access Control 与策略 | **限定路径已验证** | 已验证 User Policy、Gateway Policy 和 `normal` 风险级别允许路径，以及未知身份拒绝路径 |
 | Context Builder / Task Queue | **未实现** | 仍停留在目标设计 |
-| Hermes 接入与端到端回传 | **未实现** | Hermes、Worker Bridge、任务协议和结果回传尚未端到端运行 |
+| Gateway Hermes Adapter / Hermes Runtime | **未实现** | 下一阶段接入；Worker Bridge 和任务协议尚未运行 |
+| AI 回复回传微信 | **未实现** | 文本发送字段已实现不等于 AI 结果回传链路已运行 |
 | Skills 与企业系统 | **规划建设 / 待验证** | 具体 Skill 和企业接口待逐项设计、实现和验收 |
-| Gateway 全量测试 | **162 项通过** | 对应 main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` |
+| 生产部署与完整 AI Agent 闭环 | **未完成** | 本次为 Debian Staging venv 部署和有限真实联调 |

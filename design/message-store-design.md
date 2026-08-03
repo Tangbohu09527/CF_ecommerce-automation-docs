@@ -1,6 +1,6 @@
 # Message Store 设计
 
-> 状态日期：2026-08-01。本文定义 CF Gateway 的 Message Store 设计基线。`CF_agent-gateway` main commit `f0f0ea0cbcc1029104002b566912afabd23423c7` 已实现 Conversation / Message / Attachment、来源账号隔离，以及 `event_id` 与来源物理消息双重幂等；Adapter 正式接线、完整附件存储策略、生产数据库和部署仍待实现或验证。
+> 状态日期：2026-08-03。本文定义 CF Gateway 的 Message Store 设计基线。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信文本消息验证 Polling / Checkpoint 到 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace / AI Thread 的入站链路。附件正式处理与完整存储策略、Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信、Skill 执行链、生产数据库和生产部署仍待实现或验证。详见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 1. 定位
 
@@ -23,7 +23,7 @@ Message Store 与 Task Store 是两个独立的权威数据域：Message Store �
 
 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用独立实体，不通过复制每名员工的整份消息历史实现隔离。Message Store 保存来源事实，工作区、线程、Context Snapshot / 上下文快照和权限记录决定某次 Task 可以引用哪些消息。
 
-当前代码实现对应 main commit `f0f0ea0cbcc1029104002b566912afabd23423c7`。除上述 Message Store 能力外，相邻的 Identity Mapping、Employee Workspace、AI Thread、Hermes Thread 绑定唯一性、Access Control 纯规则评估器，以及用户白名单、群策略和 Gateway 全局策略持久化也已实现；Gateway 仓库当前全量 162 项测试通过。Adapter 到 Message Store 正式接线、Polling / Checkpoint、Admission Orchestrator、Context Builder、Task Queue、Hermes 接入和端到端回传仍未实现，因此这些模块尚未组成运行链路。
+commit `587f59f` 已将真实微信文本消息从 Gateway Runtime 的 Polling / Checkpoint 串入 Message Store、Identity Mapping、Access Control、Admission 和 Employee Workspace / AI Thread。未配置身份的消息已验证可保存到 Message Store，且不创建工作区或 AI Thread；通过用户策略、Gateway 策略和 `normal` 风险级别准入的测试身份已验证创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`。该链路止于 AI Thread，不包含附件正式处理、Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信或 Skill 执行，也不代表生产部署。
 
 ## 2. 消息模型
 
@@ -68,7 +68,7 @@ Employee Workspace / 员工工作区和 AI Thread / AI 会话线程映射使用�
 
 ### 2.3 私聊、群聊与多入口
 
-- `source` 必须包含平台和来源账号，使相同会话或发送人 ID 不会跨账号、跨平台串联；当前代码已实现来源账号隔离，但 Adapter 尚未正式接线。
+- `source` 必须包含平台和来源账号，使相同会话或发送人 ID 不会跨账号、跨平台串联；当前代码已实现来源账号隔离，真实微信文本消息接线已通过 Debian Staging 验证，附件接线仍未完成。
 - 私聊和群聊共用 `messages` 模型，但权限条件、AI 线程映射和上下文选择规则不同。
 - `conversation_name`、`sender_name` 只保存接收时的展示快照；后续改名不改写历史身份事实。
 - 微信、飞书、钉钉及未来 API 入口由各自 Adapter 解释原始字段，再映射到统一模型；平台私有字段保存在受控原始载荷中，不扩散为核心字段。
@@ -90,7 +90,7 @@ Message Store、Employee Workspace / 员工工作区和 AI Thread / AI 会话线
 
 Identity Mapping 失败或 Access Control 拒绝只阻止创建员工 Task，不删除 Message Store 记录或身份解析结果，也不创建执行上下文或自动建立新的 AI Thread / AI 会话线程执行关系。只有身份映射成功且 Access Control 允许创建 Task 后，Employee Conversation Manager 才解析或创建 `workspace_id` 和 `ai_thread_id`。完整归属与隔离规则见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
 
-当前 Identity Mapping、Employee Workspace、AI Thread 和 Hermes Thread 绑定唯一性已有代码实现，但 Admission Orchestrator 尚未实现，Context Snapshot 与 Task Queue 也未实现。因此“持久化 → 身份解析 → 准入 → 工作区 / 线程 → Task”仍是目标顺序，不是已经运行的串行流程。
+当前“持久化 -> 身份解析 -> Access Control -> Admission -> 工作区 / AI Thread”已通过 Debian Staging 真实微信消息串行验证。未配置身份时消息保留但不创建工作区或 AI Thread；授权测试身份通过准入后创建了工作区、AI Thread 和来源绑定。Context Snapshot、Task Queue、Hermes Runtime 及 `hermes_thread_id` 绑定运行链路仍未完成，因此当前验证链路止于 AI Thread。
 
 ## 3. 附件模型
 

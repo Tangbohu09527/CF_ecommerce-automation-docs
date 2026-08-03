@@ -1,12 +1,12 @@
 # agent-wechat 定位与职责
 
-> 状态日期：2026-07-31。`agent-wechat` 是微信消息入口层，不是 AI Agent 核心或业务执行引擎。
+> 状态日期：2026-08-03。`agent-wechat` 是微信消息入口层，不是 AI Agent 核心或业务执行引擎。
 
 ## 组件定位
 
 `agent-wechat` 位于员工微信会话与企业 AI 自动化系统之间，负责把微信侧可获取的消息、会话、联系人和附件事件交给后续系统，并将系统生成的回复发送回指定微信会话。
 
-生产部署位置计划为 Debian，使微信入口靠近权威消息与任务控制面。测试环境中的 V1 入口验证已经完成，说明微信消息入口层技术可行，但不代表 CF Gateway、Hermes 或业务流程已经贯通。完整记录见[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)。
+生产部署位置计划为 Debian，使微信入口靠近权威消息与任务控制面。测试环境中的 V1 入口验证已经完成；后续 Gateway 入站权限执行链也已在 Debian Staging 验证至 AI Thread。Hermes Runtime、AI 回复回传微信、Skill 执行链和完整业务流程仍未贯通。入口与 Gateway 记录分别见[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)和[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 负责范围
 
@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | 接收员工微信文本 | 私聊文本、群聊文本已验证 | 不代表持续运行稳定性或所有消息类型已经验收 |
 | 识别引用消息 | 已验证 | 只代表入口能够读取引用消息，不代表后续上下文关联已经完成 |
-| 识别入口标识 | `sender`、`chatId` 已验证 | 不代表企业身份映射、权限校验或 AI 线程映射已经完成 |
+| 识别入口标识 | `sender`、`chatId` 已验证 | 入口标识本身不授予权限；企业身份、权限和 AI Thread 由 Gateway 处理 |
 | 获取聊天信息 | 已验证聊天读取 | 只提供微信侧可获得的信息；权威上下文选择、线程隔离和快照由后续控制面负责 |
 | 获取联系人信息 | 已验证联系人读取 | 联系人信息不直接等同于企业身份、岗位或业务授权 |
 | 接收文件消息 | 文件消息和 ZIP 文件已验证 | 图片、Office、PDF、中文文件名、连续多附件、大小边界和下载失败场景仍待验证 |
@@ -22,7 +22,7 @@
 | 识别合并转发消息 | 类型、发送人和外层标题已验证 | 尚不能展开内部聊天记录或自动提取内部文件 |
 | 通过 API 读取消息 | 已验证 | 这是当前已验证的读取方式 |
 | WebSocket 实时事件 | 待研究 | 接口可用性、事件范围、重连、去重和补偿机制均未完成研究与验证 |
-| 向 AI 系统发送事件 | 待 Gateway 设计与联调 | 事件结构、去重、鉴权、重试和持久化边界尚待确定 |
+| 向 Gateway 发送事件 | Staging 已验证至 AI Thread | Polling / Checkpoint、持久化、身份与准入已验证；不代表 Hermes、长期稳定性或生产验收完成 |
 | 接收 AI 回复并发送微信 | 消息发送已验证；端到端待完成 | 发送能力已验证，不代表 Hermes 结果回传链路已完成 |
 
 ## 不负责范围
@@ -38,7 +38,7 @@
 
 ## 与 CF Gateway 的边界
 
-`agent-wechat` 输出微信侧事件，CF Gateway 作为已形成设计基线的逻辑边界承接消息路由和安全隔离，并连接上下文、任务、权限与审计能力。Gateway 工程基础、Message Store 消息写入查询和 `event_id` 幂等已实现；`agent-wechat` 到 Adapter / Gateway 的实际事件接入、鉴权、同步检查点、失败重试和回传链路仍**待实施与验证**。
+`agent-wechat` 输出微信侧事件，CF Gateway 承接消息路由和安全隔离，并连接上下文、任务、权限与审计能力。commit `587f59f` 已在 Debian Staging 验证 `agent-wechat` 到 Gateway Polling / Checkpoint、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread。失败重试与长期运行稳定性仍待验证，Hermes Runtime 和 AI 结果回传链路仍待实施。
 
 即使 `agent-wechat` 已经读到消息，也不能据此宣称任务已建立、Hermes 已处理或业务系统已执行；这些状态必须以后续权威控制中心记录为准。
 

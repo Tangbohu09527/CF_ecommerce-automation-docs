@@ -1,6 +1,6 @@
 # 消息与任务流程
 
-> 状态日期：2026-08-01。本文描述目标流程，不代表所有组件已经实现。`agent-wechat` V1 微信入口层已经验证；CF Gateway 已形成设计基线，工程基础和 Message Store Foundation 已实现。Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Hermes Adapter、Hermes、Skills、企业系统接口、实时事件机制、合并转发解析增强和文件自动处理仍待开发、接入或验证。
+> 状态日期：2026-08-03。本文的普通问答、企业业务和文件处理图均描述目标流程，不代表全链路已经实现。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信验证 Gateway Runtime、Polling / Checkpoint、Message Store、Identity Mapping、Access Control、Admission、Employee Workspace 和 AI Thread。Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime、AI 回复回传微信、Skill 执行链、企业系统接口、实时事件机制、合并转发解析增强和文件自动处理仍待开发、接入或验证。详见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 普通问答
 
@@ -21,7 +21,7 @@ sequenceDiagram
     W-->>E: 在原微信会话回复
 ```
 
-`agent-wechat` 的私聊文本、群聊文本、引用消息、`sender` 和 `chatId` 识别已经验证，但从 Gateway 到 Hermes 再回到原会话的完整问答链路尚未完成。当前 API 读取方式已验证；WebSocket 实时事件仍待研究。CF Gateway 还需承担来源校验、路由、安全隔离及与权威上下文和任务状态的衔接。
+`agent-wechat` 的私聊文本、群聊文本、引用消息、`sender` 和 `chatId` 识别已经验证；真实微信消息经 Gateway Runtime、Polling / Checkpoint、Message Store、Identity Mapping、Access Control 和 Admission 创建 Employee Workspace / AI Thread 的入站链路也已在 Debian Staging 验证。当前已验证链路止于 AI Thread，Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime 和 AI 回复回传微信尚未完成，因此上图仍是目标问答流程。当前 API 读取方式已验证；WebSocket 实时事件仍待研究。
 
 合并转发消息当前可识别类型并获取发送人和外层标题，但尚不能展开内部聊天记录。若后续需要将其内部消息作为 Hermes 上下文，应先增加 `forward parser`，再由控制面按身份、会话、任务和权限筛选；不得把未解析的内部记录写成当前可用上下文。
 

@@ -45,7 +45,7 @@ is_mentioned = raw.get("isMentioned") is True
 - 根据引用消息判断。
 - 自动继承上一条 mention。
 
-该结论是微信入口实测；Gateway 中的 `is_mentioned` / `is_self` 标准化代码已实现。它不代表 Adapter 已正式写入 Message Store，也不代表准入、Task、Hermes 或结果回传链路已经运行。
+该结论只证明微信入口和结构化字段语义，不能单独证明后续组件状态。后续 `CF_agent-gateway` commit `587f59f` 已在 Debian Staging 验证 Adapter / Polling、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread；Task、Hermes、Skill 与结果回传仍未运行。详见[Gateway Debian Staging 真实微信联调验证记录](./gateway-wechat-staging-validation.md)。
 
 ## 合并转发消息补充验证
 
@@ -65,17 +65,14 @@ is_mentioned = raw.get("isMentioned") is True
 ## 未完成能力
 
 - 实时事件机制：包括 WebSocket 接口可用性、事件范围、断线重连、去重和补偿机制，仍待研究和开发，不得表述为已完成。
-- Adapter 到 Message Store 正式接线。
-- Polling 与 Checkpoint。
-- Admission Orchestrator；Message Store、Identity Mapping、Access Control、Employee Workspace 和 AI Thread 等已实现基础模块尚未被编排为正式准入链路。
 - Context Builder 和 Task Queue。
-- Hermes Agent 与 Worker Bridge 接入。
+- Gateway Hermes Adapter、Hermes Runtime 与 Worker Bridge 接入。
 - Skills 系统及具体业务 Skill 的定义、实现和验收。
 - 旺店通 ERP、旺店通 WMS 和 S6 接口验证与对接。
 - 图片、Office、PDF、中文文件名、连续多附件、大小边界、失败重试和长期稳定性等未覆盖入口场景。
 - 合并转发解析增强：展开内部聊天记录、自动提取内部文件和 `forward parser` 实现。
 - 临时文件管理、ZIP 自动解压、OCR/视觉、Skill 处理、File Service 对接、产物回写和文件中心归档。
-- 完整权限调用链、任务状态、审计闭环和端到端结果回传。
+- 完整权限矩阵、任务状态、审计闭环和端到端结果回传。
 
 ## 后续文件处理流程
 
@@ -89,8 +86,9 @@ is_mentioned = raw.get("isMentioned") is True
 
 - **已完成：** 微信入口验证。
 - **已完成：** 结构化 mention 三组对照验证。
-- **代码已实现：** Gateway 微信适配基础，包括 HTTP Client、标准化、媒体 JSON / Base64 解码、文本消息真实发送字段和微信系统消息解析。
-- **待开发：** Adapter 到 Message Store 正式接线、Polling / Checkpoint 和 Admission Orchestrator。
-- **待开发：** Context Builder、Task Queue、Hermes 接入和端到端回传。
+- **Staging 已验证：** Gateway 微信入口、Polling / Checkpoint、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread。
+- **待开发：** Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime、AI 回复回传微信和 Skill 执行链。
 - **待开发：** 实时事件机制。
 - **待开发：** 合并转发解析增强。
+
+Gateway Staging 验证不改变本文的入口验证范围，也不代表生产上线或完整 AI Agent 闭环。

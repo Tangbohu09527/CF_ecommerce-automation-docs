@@ -1,6 +1,6 @@
 # 员工工作区与 AI 会话线程设计
 
-> 状态日期：2026-08-01。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线，不代表 Identity Mapping、Employee Conversation Manager、Hermes 员工工作台或端到端链路已经实现。
+> 状态日期：2026-08-03。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信消息验证 Identity Mapping、Access Control / Admission、Employee Workspace、AI Thread 与来源绑定；Hermes Runtime、员工工作台和完整端到端链路尚未实现。
 
 ## 1. 定位与术语
 
@@ -101,6 +101,8 @@ Identity Mapping 不创建或返回 `workspace_id`。`sender.display_name` 可�
 Identity Mapping 回答“这个来源账号对应哪个企业员工？”。Access Control 回答“这个员工的这条消息能否创建任务？”。两者是相邻但不同的控制面职责。
 
 Employee Conversation Manager 在两者之后运行：只有身份映射成功且 Access Control 允许创建 Task，才解析或创建 `workspace_id` 和 `ai_thread_id`。
+
+Identity Management V1 属于后续规划。微信 ID 将作为微信来源身份记录的稳定主键和映射键，但不取代 Gateway 内部权威的 `enterprise_identity_id`，也不取代可空业务编号 `employee_id`。微信昵称、备注和头像只作为管理员展示信息，最近活跃时间作为管理视图状态；这些展示字段不得参与授权或自动合并身份。完整需求见[功能需求](../01_功能需求.md#11-identity-management-v1)。
 
 ## 4. 工作区模型
 
@@ -379,14 +381,21 @@ AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。�
 - 一个统一 Hermes 服务承载多个 Employee Workspace / 员工工作区，每个工作区可有多个 AI Thread / AI 会话线程。
 - `ai_thread_id` 是稳定权威标识，`hermes_thread_id` 只是可空、可替换的运行时绑定。
 
+### 已实现 / 已验证
+
+- Identity Mapping、Employee Workspace / 员工工作区实体、AI Thread / AI 会话线程和来源绑定基础能力已实现。
+- commit `587f59f` 已在 Debian Staging 验证未知身份消息保存后不创建 Employee Workspace / AI Thread。
+- 同一版本已验证授权测试身份创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`。
+- AI Thread 已创建，但 Hermes Runtime 尚未接入，当前 `hermes_thread_id` 为空。
+
 ### 尚未实现
 
-- Identity Mapping。
-- Employee Workspace / 员工工作区实体与管理能力。
-- Employee Conversation Manager / 员工会话管理器。
+- Identity Management V1 管理员 / 员工角色、员工增删、白名单和微信展示信息管理。
 - Hermes 独立员工界面。
-- `hermes_thread_id` 绑定与重绑定。
+- Gateway Hermes Adapter，以及 `hermes_thread_id` 创建、绑定与重绑定。
 - 工作区恢复流程。
 - 从微信、Gateway、Task Queue 到 Hermes 和原会话回传的端到端联调。
+
+下一阶段为 Gateway Hermes Adapter。本次 Staging 验证不代表生产上线或完整 AI Agent 闭环；详细证据见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
 
 相关边界见[系统设计](../02_系统设计.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)、[Hermes 事件协议](./hermes-event-schema.md)、[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)和[Access Control 设计](./access-control-design.md)。
