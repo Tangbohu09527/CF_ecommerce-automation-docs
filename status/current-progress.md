@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 状态日期：2026-08-01。本文记录已经验证的事实、已经形成的设计基线和仍待完成的工作；“已完成”仅限所列验证或文档设计范围，不等同于生产上线或端到端业务验收。
+> 状态日期：2026-08-03。本文记录已经验证的事实、已经形成的设计基线和仍待完成的工作；“已完成”仅限所列验证、实现或文档设计范围，不等同于生产上线或端到端业务验收。
 
 ## 已完成
 
@@ -21,6 +21,8 @@
 | Message Store Foundation | commit `d32b65aa389626f820349367d2132b7d53d0ed4f` 已实现 Conversation / Message / Attachment、`POST /internal/messages`、`GET /messages/{id}`、`GET /conversations/{conversation_id}/messages` 和 `event_id` 幂等；9 项测试通过 | Identity Mapping、权限、上下文、Task 或 Adapter / Hermes 链路已经实现 |
 | Gateway Docker 配置 | 已提供 Dockerfile 和 Compose 配置 | 已完成 Docker 镜像构建、容器运行或部署验证 |
 | 员工工作区与 AI Thread 设计 | 已完成 Enterprise Identity / 企业身份、Employee Workspace / 员工工作区、AI Thread / AI 会话线程及 Hermes Runtime Thread / Hermes 运行时线程的设计基线 | Identity Mapping、Employee Conversation Manager、Hermes 员工工作台、工作区恢复或端到端接入已经实现 |
+| File Service 安全与 capability | `CF_filebrowser-enterprise` 远端 `feat/v1-integration` commit `4096a0161952a5faa43058f251f8dff0dcedf890` 已实现 API Token hash-only 存储、旧 Token/Key V5 migration、强制迁移失败关闭、Token 前端一次性展示（明文只在创建响应返回）、Browse / Preview / Download 三权 UI、Archive / Extract 权限与文件系统安全、Share `configured` / `effective` capability 服务端契约和密码 Share Token 绕过关闭 | Share capability 前端 UI、自动化主线对接、最终 Debian 部署、生产上线或 V1 Beta 最终 tag/candidate 已完成 |
+| File Service Audit 基础 | 同一集成基线已实现 Persistent Audit Store、Audit V3 migration、request-scoped Audit Recorder、API Token 创建/撤销/拒绝 Audit、管理员 `GET /api/audit`、Audit 过滤、Cursor 和日志脱敏 | 登录、用户、权限、Share 管理、核心文件、Archive、WebDAV、OnlyOffice 等全部业务 Audit Action 已完成 |
 
 ## 待完成
 
@@ -33,7 +35,11 @@
 | Hermes 员工工作台 | 按员工显示独立工作区、线程、任务历史、队列状态、Provider、模型、耗时、上下文快照和原会话来源的界面待开发 |
 | Skill 体系 | 运行边界已确定，库存、订单、文件等具体 Skill 尚待定义、实现和验收 |
 | ERP/S6 接口 | 旺店通 ERP、旺店通 WMS、S6 的接口、字段、数据口径、权限和数据时效待逐项验证与对接 |
-| 文件自动处理 | 文件消息和 ZIP 入口已验证；临时文件管理、自动解压、OCR/视觉、Skill 处理、File Service 对接、产物回写和归档均待完成 |
+| Share capability 前端 UI | 服务端 `configured` / `effective` capability 契约已实现，Share capability 前端 UI 仍待集成 |
+| File Service 业务 Audit Action | 登录、用户、权限、Share 管理 Audit，核心文件和 Archive Audit Action，以及 WebDAV / OnlyOffice Audit Action 仍待集成；Audit Store / Recorder 已实现不代表这些 Action 已覆盖 |
+| File Service 自动化对接 | FileBridge / `filebrowser-agentctl`、Gateway 与 Hermes 对稳定 File Service API 的对接待集成；受控客户端不得直接访问正式存储或自行扩大 capability |
+| File Service 部署与发布 | 最终 Debian 部署验收和 V1 Beta 最终 tag/candidate 待验证；当前尚未正式生产部署 |
+| 文件自动处理 | 文件消息和 ZIP 入口已验证；临时文件管理、自动解压、OCR/视觉、Skill 处理、产物回写、归档以及自动化主线对稳定 File Service API 的调用均待集成 |
 | 实时事件机制 | 当前 API 读取方式已验证；WebSocket 接口、事件范围、重连、去重和补偿机制待研究和开发 |
 | 合并转发解析增强 | 内部聊天记录展开、内部文件自动提取和 `forward parser` 尚待开发 |
 | 企业权限体系 | Access Control 已形成设计基线；用户、群、岗位、Skill、系统接口、文件路径、管理员跨员工查看权限矩阵及高风险确认机制待业务确认和实施 |
@@ -45,8 +51,8 @@
 - 文件内容解析、视觉模型和知识库属于后续规划，不代表当前已经具备。
 - 合并转发消息仅完成外层识别；内部聊天记录展开和内部文件自动提取属于待开发的增强解析能力，不影响普通微信文件入口。
 - 第一阶段不建设独立 OCR；是否补充 OCR 能力需按实际业务需求重新评估。
-- FileBrowser Enterprise 与自动化主线并行推进，正式文件自动化访问仍必须经过 File Service、权限检查和审计。
+- `CF_filebrowser-enterprise` 是正式企业 File Service；FileBridge / `filebrowser-agentctl` 只是受控客户端。正式文件自动化访问必须经过 File Service API、文件权限、Token capability、Share capability 和 Audit，不建设第二套 File Service。
 
 ## 当前阶段结论
 
-项目仍处于阶段 1。`agent-wechat` V1 微信入口层已经验证，说明微信消息入口层技术可行；合并转发当前只完成外层识别。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议和员工工作区与 AI Thread 已形成设计基线，`CF_agent-gateway` 工程基础和 Message Store Foundation 已完成代码实现。下一步工作集中在 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 与 Hermes / AI Provider 链路、Hermes 员工工作台、Skills、ERP/S6 接口和端到端主链路建设；Docker 实际构建部署、实时事件机制与合并转发解析增强仍待验证或开发。在这些环节完成并通过验收前，不对外宣称企业业务自动化已经可用。验证范围详见[agent-wechat V1 入口验证记录](./agent-wechat-validation.md)，员工隔离边界见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
+项目仍处于阶段 1。`agent-wechat` V1 微信入口层已经验证，说明微信消息入口层技术可行；合并转发当前只完成外层识别。Gateway 架构、Message Store、Access Control、Task Queue、Hermes 事件协议和员工工作区与 AI Thread 已形成设计基线，`CF_agent-gateway` 工程基础和 Message Store Foundation 已完成代码实现。`CF_filebrowser-enterprise` 已实现上述 V1 Beta 核心服务端能力，但 Share capability 前端、剩余业务 Audit Action、自动化对接、最终 Debian 部署验收和 V1 Beta 最终 tag/candidate 尚未完成，因此不得表述为正式生产上线或完整审计闭环。V1 Beta 完成后，Gateway/Hermes 只按稳定 File Service 契约进行对接。其他下一步工作仍集中在 Identity Mapping、Employee Conversation Manager、Access Control、Context Builder、Task Queue、Adapter 与 Hermes / AI Provider 链路、Hermes 员工工作台、Skills、ERP/S6 接口和端到端主链路建设；Docker 实际构建部署、实时事件机制与合并转发解析增强仍待验证或开发。在这些环节完成并通过验收前，不对外宣称企业业务自动化已经可用。验证范围详见[agent-wechat V1 入口验证记录](./agent-wechat-validation.md)，员工隔离边界见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
