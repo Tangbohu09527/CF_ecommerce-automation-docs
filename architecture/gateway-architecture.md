@@ -1,6 +1,6 @@
 # 企业 AI Gateway 架构
 
-> 状态日期：2026-08-03。本文定义企业 AI Gateway 的目标架构，并单独标记实际实现边界。`CF_agent-gateway` commit `587f59f feat: wire wechat polling runtime` 已在 Debian Staging 完成真实微信消息从 Polling / Checkpoint 到 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace 和 AI Thread 的联调验证。验证链路止于 AI Thread；Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信、Skill 执行链和生产部署均未完成。当前状态不代表生产上线或完整 AI Agent 闭环，详见[Gateway 微信 Debian Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+> 状态日期：2026-08-04。本文定义企业 AI Gateway 的目标架构，并单独标记实际实现边界。V1 Staging 已完成真实微信文本从 Polling、Message Store、Identity / Permission Admission、Employee Workspace / AI Thread 到 Hermes API 和原微信会话回复的闭环，并验证 Runtime Thread Binding 与 self message 防回环。Context Builder、Task Queue、完整 Worker Bridge、Skill、文件链路和生产部署均未完成。目标群聊线程键保持 `bot_account_id + group_chat_id + sender_id`；Gateway V1 当前 whole-room thread 行为是已知实现偏差，不构成设计变更。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 1. Gateway 定位
 
@@ -19,7 +19,7 @@ Gateway 包含 `Message Ingestion`、`Message Store`、`Identity Mapping`、`Acc
 
 Gateway 不管理具体 AI 主机，不维护 AI 主机清单、GPU 节点心跳或主机级进程状态。本地 AI 主机、私有模型服务和云端模型 API 均通过 `AI Provider` 抽象接入；具体主机、容器、GPU 和服务实例由 Provider 自身的执行或运维层管理。
 
-Gateway 的权威控制面位于 Debian。当前 `CF_agent-gateway` 已在 Debian Staging 与 `agent-wechat` 同机完成本文件所述入站链路验证，但生产部署尚未完成。Gateway 是逻辑架构边界，不预先限定为一个进程、一个容器或一种网关产品；内部模块后续可以拆分部署，但消息、权限、上下文、任务、队列和 Provider 路由的权威记录仍在 Debian。
+Gateway 的权威控制面位于 Debian。当前 Gateway Worker 已在 Debian Staging 与 `agent-wechat` Docker、Windows Hermes API 完成 V1 文本闭环验证，但生产部署尚未完成。Gateway 是逻辑架构边界，不预先限定为一个进程、一个容器或一种网关产品；内部模块后续可以拆分部署，但消息、权限、上下文、任务、队列和 Provider 路由的权威记录仍在 Debian。
 
 ## 2. 总体架构
 
@@ -66,6 +66,8 @@ flowchart TB
 
 图中的飞书、钉钉、API 入口及多种 AI Provider 是目标扩展位置，不表示已经选型、部署或验证。详细设计分别见[Message Store 设计](../design/message-store-design.md)、[Access Control 设计](../design/access-control-design.md)、[Task Queue 设计](../design/task-queue-design.md)、[Hermes 事件协议](../design/hermes-event-schema.md)和[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
 
+当前 V1 Staging 文本链路没有实现图中的 Context Builder、Task Queue 和完整 AI Router / Worker Bridge，而是由获准 AI Thread 进入 Hermes Dispatch / API，再经 Response Relay 和 WeChat Outbound Sender 返回原会话。这是有限运行基线，不改变上述目标架构。
+
 ## 3. Gateway 核心职责
 
 Gateway 负责：
@@ -96,7 +98,7 @@ Gateway 不负责：
 
 | 来源 | 接入组件 | 当前状态 |
 | --- | --- | --- |
-| 微信 | `agent-wechat` + `wechat-adapter` | `agent-wechat` V1 入口和结构化 mention 已验证；commit `587f59f` 已在 Debian Staging 验证 Gateway Runtime、Polling / Checkpoint、Message Store、权限准入及 AI Thread 建立，AI 回复回传编排未完成 |
+| 微信 | `agent-wechat` + `wechat-adapter` | V1 入口、结构化 mention 和 Staging 文本 AI 闭环已验证；非文本链路、长期稳定性和生产验收未完成 |
 | 飞书 | 平台 Adapter | 后续规划，未选型、未验证 |
 | 钉钉 | 平台 Adapter | 后续规划，未选型、未验证 |
 | API | API Adapter / 服务身份鉴权 | 后续规划，协议、鉴权和调用方范围待设计 |
@@ -121,7 +123,7 @@ Gateway 不负责：
 - 分配 Skill、文件或企业系统权限。
 - 保存权威任务状态，或直接调用 Hermes 和 Skills。
 
-当前已验证范围以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准。当前机器人显示名为 `Bot_测试版` 时，成员列表选择该机器人会得到 `isMentioned=true`；成员列表选择其他成员 T 或只复制 / 输入 `@Bot_测试版 手工文字对照` 时该字段缺失。固定规则为 `is_mentioned = raw.get("isMentioned") is True`，字段缺失按 `false`。
+当前已验证范围以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)为准。当前机器人显示名脱敏记作 `机器人示例名`；成员列表选择该机器人会得到 `isMentioned=true`，选择其他成员 T 或只复制 / 输入 `@机器人示例名 手工文字对照` 时该字段缺失。固定规则为 `is_mentioned = raw.get("isMentioned") is True`，字段缺失按 `false`。
 
 ### 4.3 Adapter 职责
 
@@ -134,11 +136,11 @@ Gateway 不负责：
 - 获取并登记平台附件，使用受控文件引用关联消息历史。
 - 接收 Gateway 结果回传指令并调用平台发送接口。
 
-Adapter 不自行授予权限，也不直接创建 AI 任务。Adapter / 标准化层只按平台结构化事实生成 `is_mentioned` 和 `is_self`；Access Control 消费这些事实，并根据权威策略形成 `user_allowed`、`group_allowed` 和 `permission_scope`。当前微信规则不得根据正文 `@`、机器人当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承 `is_mentioned=true`。
+Adapter 不自行授予权限，也不直接创建 AI 任务。Adapter / 标准化层按平台结构化事实生成 `is_mentioned` 和 `is_self`；当前 Polling 对 `is_self=true` 的机器人自发消息在进入 sink 前过滤并推进 Checkpoint，不交给 Access Control 或 Hermes。非 self 消息进入后，Access Control 消费结构化 mention 等事实，并根据权威策略形成 `user_allowed`、`group_allowed` 和 `permission_scope`。当前微信规则不得根据正文 `@`、机器人名称、引用消息或上一条 mention 推断或继承 `is_mentioned=true`。
 
 ## 5. Message Store
 
-Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须先保存，再进行权限判断，包括：
+Gateway 是企业消息历史中心。除 Polling 已识别并在 sink 前过滤的 `is_self=true` 自发消息外，所有成功进入 Gateway 入站处理的消息必须先保存，再进行权限判断，包括：
 
 - 白名单用户的私聊和群聊消息。
 - 非白名单用户的消息。
@@ -146,9 +148,9 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 - 群内未 `@` 当前机器人的消息。
 - 当前不支持建立任务的消息类型。
 
-权限拒绝只阻止 AI 任务创建，不删除、不跳过消息历史。
+权限拒绝只阻止 AI 任务创建，不删除、不跳过消息历史。self message 过滤不是权限拒绝：它发生在 Polling / sink 边界，仍推进 Checkpoint，用于避免机器人回复回环。
 
-当前验证边界为：commit `587f59f` 已在 Debian Staging 通过真实微信消息验证 Gateway Runtime、Polling / Checkpoint 与 Message Store 的正式入站链路。首次使用 `bootstrap_mode=latest` 会建立高水位而不消费历史消息；未知身份消息会保存到 Message Store，但不会创建 Employee Workspace 或 AI Thread。该验证不覆盖生产运行、长期稳定性或 AI 结果回传，详细证据见[Gateway 微信 Debian Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+当前验证边界为：V1 Staging 已通过真实微信文本验证 Polling / Checkpoint、Message Store、权限准入、Hermes 调用和结果回传。首次使用 `bootstrap_mode=latest` 会建立高水位而不消费历史消息；未知身份消息不会进入 Hermes；`is_self=true` 消息跳过 sink / admission / Hermes 并推进 Checkpoint。该验证不覆盖生产运行、长期稳定性或非文本链路，详细证据见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ### 5.1 消息记录
 
@@ -164,7 +166,7 @@ Gateway 是企业消息历史中心。所有成功进入 Gateway 的消息必须
 | `sender_id` | 平台侧稳定发信人标识 |
 | `sender_name` | 平台提供的展示名称，不作为授权依据 |
 | `is_mentioned` | 标准化的结构化 mention 来源事实；微信仅当原始 `isMentioned` 严格为 `true` 时为 `true`，字段缺失为 `false` |
-| `is_self` | 标准化的消息是否由当前来源账号自身发送的事实，不作为企业身份或权限依据 |
+| `is_self` | 标准化的消息是否由当前来源账号自身发送的事实；当前微信 Polling 对 `true` 在 sink 前过滤，不作为企业身份或权限依据 |
 | `message_type` | 标准消息类型，如 `text`、`file`、`reply`、`forward` |
 | `content` | 标准化正文或外层标题；按数据分级和保留策略受控访问 |
 | `timestamp` | 平台消息时间及 Gateway 接收时间，二者不得混为同一语义 |
@@ -213,7 +215,9 @@ Employee Conversation Manager 只处理 Identity Mapping 成功且 Access Contro
 
 Employee Workspace / 员工工作区是归属与隔离容器，不产生权限。工作区存在或为 `active` 不能扩大 Access Control 生成的 `permission_scope` 或 `allowed_skills`。完整模型见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)。
 
-commit `587f59f` 已在 Debian Staging 验证 Message Store、Identity Mapping、Access Control、Admission 与获准后的 Employee Workspace / AI Thread 建立链路。未配置身份时消息保存成功，但不创建工作区或 AI Thread；已授权测试身份会创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`。本次验证创建的 AI Thread 尚未接入 Hermes Runtime，当前 `hermes_thread_id` 为空。
+V1 Staging 已验证 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace / AI Thread、Hermes Runtime Thread Binding 和文本结果回传。未配置身份时消息不得进入 Hermes；已授权测试身份可建立运行时线程绑定并获得文本响应。
+
+已知实现偏差：Gateway V1 当前 `thread_keys` 忽略群聊 `sender_id`，现有测试也允许同群不同员工复用 AI Thread。这和上一段已确定的群聊线程键不一致。目标设计保持不变；在代码修正并增加同群多员工隔离测试前，该行为不得作为设计基线或验收通过。
 
 ## 7. Access Control
 
@@ -228,7 +232,7 @@ Access Control 是 Gateway 的内部模块，不是 Gateway 的全部职责。�
 
 其中 `group_allowed` 对应群策略中的 `group_enabled=true`，`user_allowed` 对应发信人白名单中的 `sender_allowed=true`。群聊任一条件为 `false` 或无法确认都拒绝创建任务。
 
-当前微信入口只接受 `is_mentioned = raw.get("isMentioned") is True`；原字段缺失按 `false`。不得根据正文中的 `@` 字符、机器人当前名称 `Bot_测试版`、旧名称 `1024`、引用消息或上一条 mention 推断或继承 `true`。
+当前微信入口只接受 `is_mentioned = raw.get("isMentioned") is True`；原字段缺失按 `false`。不得根据正文中的 `@` 字符、机器人当前脱敏示例名 `机器人示例名`、旧脱敏示例名 `机器人旧示例名`、引用消息或上一条 mention 推断或继承 `true`。
 
 ### 7.2 拒绝处理
 
@@ -452,7 +456,7 @@ Message Gateway
   -> Skills
 ```
 
-当前已验证链路只完成到 AI Thread 创建，`hermes_thread_id` 为空；Hermes Runtime 和 Skill 执行链尚未接入。下一阶段为 Gateway Hermes Adapter，且在完成结果持久化与回传编排前，不得表述为 AI 已回复微信。
+V1 Staging 已完成 Hermes API Client、文本 Dispatch、Response Relay、Runtime Thread Binding 和原微信会话回复。目标 Context Builder、Task Queue、通用 Provider 路由、完整 Worker Bridge 和 Skill 执行链尚未接入；文本闭环不得被表述为这些目标能力已经完成。
 
 Provider 是模型或 AI 执行能力的抽象，Hermes 仍是唯一生产 Agent。具体 Provider Adapter 和 Worker Bridge 如何把所选模型、凭证引用和任务交给 Hermes，仍待接口设计；该抽象不允许以 Provider 替代 Hermes 的 Agent 职责。
 
@@ -505,15 +509,15 @@ Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 G
 | 项目 | 状态 |
 | --- | --- |
 | `agent-wechat` V1 微信入口 | **已验证**，包括当前三组结构化 mention 对照样本及 Debian Staging 真实微信消息入口，限现有验证记录范围 |
-| 微信适配与 Gateway Runtime | **代码已实现并完成 Staging 真实联调** HTTP Client、微信标准化、媒体解码、系统消息解析及轮询 Runtime |
-| Adapter 正式接线、Polling / Checkpoint | **Debian Staging 已验证**，真实微信消息已进入 Gateway Runtime；`bootstrap_mode=latest` 首次启动建立高水位且不消费历史消息 |
-| Hermes 事件协议 | **设计基线，待实现前评审** |
+| 微信适配与 Gateway Runtime | **V1 Staging 文本闭环已验证** HTTP Client、微信标准化、轮询 Runtime、Hermes Relay 和 `chatId + text` 出站 |
+| Adapter 正式接线、Polling / Checkpoint | **Debian Staging 已验证**；`is_self=true` 在 sink 前过滤并推进 Checkpoint |
+| Hermes 事件协议 | **目标设计基线 / V1 文本子集已运行**；完整 Task、Provider、文件和 Skill 事件待评审、待实现 |
 | Gateway 架构 | **设计基线已形成** |
 | `CF_agent-gateway` 工程基础 | **已实现** FastAPI、YAML 配置、JSON 结构化日志、SQLAlchemy engine / session、SQLite 自动建表和 PostgreSQL 配置兼容；本次 Debian Staging 使用 Python 3.13.5 |
 | Message Store | **代码已实现并完成 Staging 真实联调**，未知身份消息保存成功且不会进入执行上下文 |
 | Context Builder | **未完成**，目标设计已形成，尚未实现和验证 |
 | Identity Mapping | **代码已实现并完成 Staging 真实联调**，来源微信 ID 已验证可绑定 Enterprise Identity |
-| Employee Workspace / 员工工作区、AI Thread / AI 会话线程与 Hermes Thread 绑定 | **工作区、AI Thread 与来源绑定已完成 Staging 真实联调**；Hermes Runtime 未接入，当前 `hermes_thread_id` 为空 |
+| Employee Workspace / 员工工作区、AI Thread / AI 会话线程与 Hermes Thread 绑定 | **V1 Staging 已验证运行时绑定**；群聊 whole-room thread 与目标 `group + sender` 隔离存在已知实现偏差 |
 | Access Control | **代码已实现并完成 Staging 真实联调**，未知身份拒绝与已授权身份放行均已验证 |
 | Admission | **代码已实现并完成 Staging 真实联调**，获准消息已验证可进入工作区与 AI Thread |
 | Task Queue | **详细设计已形成，代码未实现** |
@@ -522,10 +526,10 @@ Skills 只接收 Hermes 在当前任务权限内发起的调用，并继续受 G
 | Gateway Docker | **已提供 Dockerfile 和 Compose 配置**；本次 Gateway 使用 Python venv 运行，不构成 Gateway 容器部署验证 |
 | Provider Runtime State | **目标设计，状态采集方式待确认** |
 | 微信群结构化 mention | **入口已验证、标准化代码已实现**；字段缺失按 `false`，不做正文或名称推断 |
-| Hermes Runtime / Gateway Hermes Adapter | **未完成**，AI Thread 已创建但 `hermes_thread_id` 为空；下一阶段为 Gateway Hermes Adapter |
-| Worker Bridge、Skills | **待接入 / 待开发**，Skill 执行链未完成 |
-| AI 回复回传微信 | **未实现** |
-| Staging 联调验证版本 | **已验证** commit `587f59f feat: wire wechat polling runtime`，详见[验证记录](../status/gateway-wechat-staging-validation.md) |
+| Hermes API / Client / Dispatch / Response Relay | **V1 Staging 文本链路已验证** |
+| Worker Bridge、Skills | **部分文本路径已验证 / 完整能力待开发**；任务租约、文件工作区和 Skill 执行链未完成 |
+| AI 回复回传微信 | **文本已验证**；图片、附件、文件和其他富媒体未完成 |
+| Staging 联调验证基线 | **V1 文本闭环已验证**；详见[验证记录](../status/gateway-wechat-staging-validation.md) |
 | 生产部署 | **未完成** |
 | 飞书、钉钉、API 入口 | **后续规划，未接入、未验证** |
 | API Provider、Local Provider 扩展 | **架构兼容目标，尚未接入或验证** |

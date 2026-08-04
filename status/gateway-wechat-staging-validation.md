@@ -1,103 +1,130 @@
-# CF_agent-gateway Debian Staging 真实微信联调验证记录
+# CF_agent-gateway V1 Staging 微信文本闭环验证记录
 
-- **验证日期：** 2026-08-03
-- **验证对象：** `CF_agent-gateway` 微信轮询 Runtime 与权限执行链
-- **已验证版本：** `587f59f feat: wire wechat polling runtime`
-- **验证环境：** Debian Staging
+- **状态日期：** 2026-08-04
+- **验证对象：** `CF_agent-gateway` 微信文本消息、权限准入、Hermes 调度和结果回传链路
+- **验证基线：** V1 Staging 当前代码
+- **验证环境：** Debian 13 Staging + `agent-wechat` Docker + CF Agent Gateway Worker + Windows AI 主机 Hermes API
 
-## 验证范围与边界
+## 验证结论与边界
 
-本次验证确认 Gateway 微信入口与权限执行链已在 Debian Staging 通过真实微信消息联调。结论只覆盖以下链路，不代表生产上线，也不代表完整 AI Agent 闭环。
+V1 Staging 已完成真实微信文本消息 AI 闭环：获准员工发送的文本消息能够进入 Gateway，经过身份和权限准入，绑定 AI Thread，调用 Windows AI 主机上的 Hermes API，并把 Hermes 文本响应发送回原微信会话。
 
-**已完成：**
+该结论只表示当前 Staging 文本链路已闭环，不表示生产上线、完整企业业务自动化、附件处理或 Skill 执行已经完成。
 
-- 微信消息接入。
+**已完成 / 已验证：**
+
+- 微信文本消息 Polling 与 Checkpoint。
 - Message Store。
-- Identity。
-- Access Control。
-- Admission。
-- Employee Workspace。
-- AI Thread。
+- Identity Resolution / Identity Mapping。
+- Permission Admission / Access Control。
+- Employee Workspace 与 AI Thread 基础管理。
+- Hermes API Client、消息 Dispatch、Response Relay 和 Hermes Thread Binding。
+- `agent-wechat` 文本回复回传。
+- `is_self=true` 的自发消息防回环。
 
-**未完成：**
+**本次未完成，不得写成已实现：**
 
-- Hermes Runtime 接入。
-- AI 回复回传微信。
-- Skill 执行链。
-
-Context Builder、Task Queue 及其他未在本记录列为“已完成”的组件，仍以[当前开发进度](./current-progress.md)为准。
-
-## 运行环境
-
-| 项目 | 已验证环境 |
-| --- | --- |
-| 操作系统 | Debian 13 |
-| Python | 3.13.5 |
-| 微信入口 | `agent-wechat` Docker 容器 |
-| Gateway | `CF_agent-gateway`，与 `agent-wechat` 同机运行 |
-
-安装、配置和启动命令见[部署运维](../04_部署运维.md#cf_agent-gateway-debian-staging-部署验证2026-08-03)。
+- 图片理解、图片附件传递及其他附件的系统级传递。
+- 文件消息端到端处理、Office / PDF 处理和正式归档。
+- OCR、ZIP / 其他压缩包自动解析。
+- 企业知识库。
+- Skill 自动执行及具体业务 Skill。
+- Context Builder、Task Queue 和 Worker Bridge 的目标架构完整链路。
+- 生产环境自动部署、生产高可用和长期稳定性验收。
 
 ## 已验证真实链路
 
 ```text
-微信
+员工微信
   -> agent-wechat
-  -> Gateway Runtime
-  -> Polling
-  -> Checkpoint
+  -> CF_agent-gateway WeChat Polling
   -> Message Store
-  -> Identity Mapping
-  -> Access Control
-  -> Admission
+  -> Identity Resolution
+  -> Permission Admission
   -> Employee Workspace
-  -> AI Thread
+  -> AIThread
+  -> Hermes Dispatch
+  -> Hermes API
+  -> Hermes Response Relay
+  -> WeChat Outbound Sender
+  -> 微信回复
 ```
 
-该链路止于 Gateway 的 AI Thread，不包含 Hermes Runtime、Skill 执行或微信结果回传。
+目标架构中的 Context Builder、Task Queue 和完整 Worker Bridge 仍未实现。本次 V1 Staging 文本闭环是当前可运行的有限链路，不应据此把目标任务、文件或 Skill 架构标记为已完成。
 
-## 首次启动检查点验证
+## Hermes 集成验证
 
-首次以 `bootstrap_mode=latest` 启动，结果为：
+已验证 Gateway 能够：
+
+1. 使用 Hermes API Client 调用 Windows AI 主机上的 Hermes API。
+2. 将获准微信文本消息 Dispatch 给 Hermes。
+3. 保存并使用 Gateway AI Thread 与 Hermes Runtime Thread 的绑定。
+4. 接收 Hermes 文本响应并交给 Response Relay。
+5. 按原 `chatId` 生成出站发送请求并把结果返回原微信会话。
+
+`hermes_thread_id` 已在本次文本闭环中建立运行时绑定，但它仍是可重建的运行时标识，不替代 Gateway 权威的 `ai_thread_id`。
+
+## WeChat Outbound 契约修复
+
+`agent-wechat` 文本发送接口为：
+
+```http
+POST /api/messages/send
+```
+
+当前正确请求体：
+
+```json
+{
+  "chatId": "chat_example",
+  "text": "reply_example"
+}
+```
+
+旧实现使用 `content` 字段，和真实接口契约不一致；现已修复为 `text`，并通过真实微信回复回传验证。示例值均为脱敏占位值。
+
+## Self Message Echo Loop 防护
+
+机器人回复进入微信后，也可能被后续 Polling 再次读取。当前 Polling 在标准化和 sink 之前，对 `RawWechatMessage.is_self` 或映射载荷中的 `isSelf` 执行严格 `True` 检查；命中后直接过滤：
+
+- 不进入 sink / Message Store 入站处理。
+- 不进入 Identity Resolution、Permission Admission 或 Employee Workspace / AI Thread 处理。
+- 不调用 Hermes。
+- 仍推进对应 Checkpoint，避免反复读取同一自发消息。
+
+该顺序阻止“机器人回复 -> Polling -> 再次调用 Hermes -> 再次回复”的回环，同时保持当前 Polling 链路的 at-least-once delivery 语义。其他非 self 消息仍遵循“持久化成功后推进 Checkpoint”的规则。
+
+## 身份与权限验证边界
+
+- 未配置身份的消息可按 Message Store 和拒绝策略保留所需记录，但不得进入 Hermes 执行链。
+- 已授权测试身份在当前 User Policy、Gateway Policy 和 `normal` 风险策略下可以进入 Employee Workspace、AI Thread 与 Hermes 文本调用链。
+- 本记录只使用脱敏测试身份，不保存真实微信 ID、账号、Token、Cookie 或登录数据。
+- Identity Management 管理界面、完整岗位 / 群 / Skill / 文件权限矩阵和高风险审批仍未完成。
+
+## 已知实现偏差：微信群线程键
+
+当前已确定的目标设计保持不变：微信群聊 AI Thread 必须按以下键隔离：
 
 ```text
-messages_seen: 256
-messages_skipped_by_checkpoint: 256
-messages_processed: 0
+bot_account_id + group_chat_id + sender_id
 ```
 
-该结果验证首次启动会建立当前消息高水位，不消费历史消息。
+审计发现 Gateway V1 当前 `thread_keys` 行为忽略 `sender_id`，现有测试也表明同群不同员工可能复用同一 AI Thread。这和[系统设计](../02_系统设计.md#物理微信会话与-ai-线程)及[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md#5-ai-thread-映射规则)不一致。
 
-## 未配置身份的权限拒绝验证
+该差异是已知实现偏差，不是设计变更，也不能作为群聊员工上下文隔离已经验收的依据。在 Gateway 修正并补充“同群不同员工不复用 AI Thread”的测试前，群聊多员工线程隔离保持待修复 / 待复验。若未来确需改为整群共享，必须先更新[技术决策记录](../05_技术决策记录.md)，说明安全、权限、上下文和迁移影响。
 
-- **测试消息：** `runtime测试2`
-- **Message Store：** 保存成功。
-- **Employee Workspace：** 未创建。
-- **AI Thread：** 未创建。
+## 质量检查
 
-该结果验证未知身份消息允许持久化，但禁止进入执行上下文。
+当前 V1 Staging 代码基线已通过：
 
-## 已授权身份的准入验证
+```text
+pytest: 393 passed
+ruff: passed
+git diff --check: passed
+```
 
-测试身份与权限：
+这些检查证明当前代码基线和限定 Staging 文本闭环通过验证，不替代生产容量、故障恢复、长期运行、附件或业务验收。
 
-| 项目 | 值 |
-| --- | --- |
-| 微信 ID | `wxid_z9few7e31a7p22` |
-| Enterprise Identity | `EMP_TEST_001` |
-| user policy | `enabled` |
-| gateway policy | `enabled` |
-| `allowed_risk_levels` | `normal` |
+## 最终结论
 
-- **测试消息：** `runtime测试5`
-- **创建记录：** `employee_workspaces`、`ai_threads`、`thread_source_bindings`。
-
-该结果验证测试身份通过当前策略后可以建立 Employee Workspace、AI Thread 与来源绑定；它不表示 Hermes 或 Skill 已执行。
-
-## Hermes 当前状态
-
-AI Thread 已创建，但 Hermes Runtime 尚未接入，当前 `hermes_thread_id` 为空。下一阶段为 Gateway Hermes Adapter。
-
-## 验证结论
-
-`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 串通真实微信消息进入 Gateway 后的持久化、身份映射、权限判断、准入和员工线程建立链路。当前不得将该结果表述为生产上线、完整 AI Agent 闭环、Hermes 已运行、AI 已回复微信或 Skill 已执行。
+V1 Staging 微信文本消息 AI 闭环已经完成，包括 Hermes 调用、响应回传、运行时线程绑定和 self message 防回环。当前仍不得表述为图片或文件处理完成、Skill 可自动执行、企业知识库可用、完整业务自动化上线或生产环境已自动部署。

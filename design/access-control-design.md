@@ -1,12 +1,12 @@
 # Access Control 设计
 
-> 状态日期：2026-08-03。本文定义 Gateway 内部的企业访问控制模块，并标记实际实现边界。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信文本消息验证 Message Store、Identity Mapping、Access Control、Admission 到 Employee Workspace / AI Thread 的拒绝与授权链路。Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信、Skill 执行链和生产部署仍未完成；管理员跨员工查看和完整审计闭环也未宣称完成。详见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
+> 状态日期：2026-08-04。本文定义 Gateway 内部的企业访问控制模块，并标记实际实现边界。V1 Staging 已通过真实微信文本验证 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace / AI Thread、Hermes API 和原会话回复。Context Builder、Task Queue、完整 Worker Bridge、Skill、文件链路和生产部署仍未完成；管理员跨员工查看和完整审计闭环也未宣称完成。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 1. 模块定位
 
 Access Control 是 CF Gateway 的内部模块，不是独立消息入口，也不是 Gateway 的全部职责。Gateway 先通过 Message Store 保存所有进入系统的消息，由 Identity Mapping 确认来源账号对应的 Enterprise Identity / 企业身份，再调用 Access Control 判断是否创建 AI 任务。
 
-上述调用顺序已在 Debian Staging 以真实微信文本消息验证到 AI Thread：未配置身份时，消息保存在 Message Store，且不创建 Employee Workspace 或 AI Thread；配置测试身份及已启用的用户策略、Gateway 策略和 `normal` 风险级别后，准入链路创建了 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`。该结果不包含 Context Builder、Task Queue、Hermes Runtime、Skill 执行或微信结果回传。
+上述 Message Store、Identity Mapping、Access Control 和 Admission 顺序已在 Debian Staging 以真实微信文本消息验证：未配置身份时，消息保存在 Message Store，且不创建 Employee Workspace 或 AI Thread；配置脱敏测试身份及已启用的用户策略、Gateway 策略和 `normal` 风险级别后，准入链路创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`，随后建立 Hermes Runtime Thread 绑定、调用 Hermes 并把文本响应返回原微信会话。该结果不包含 Context Builder、Task Queue、完整 Worker Bridge、Skill 执行、非文本处理或生产部署。
 
 `enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是权限主体及工作区所有者关联的权威主键。`employee_id` 只是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信 `wxid` 代替。
 
@@ -68,14 +68,14 @@ AND is_mentioned = true
 is_mentioned = raw.get("isMentioned") is True
 ```
 
-`isMentioned` 字段缺失或不是布尔 `true` 时，`is_mentioned=false`。实测中，从成员列表选择当前机器人 `Bot_测试版` 时为 `true`；选择其他成员 T 或只复制 / 输入 `@Bot_测试版 手工文字对照` 时字段缺失。
+`isMentioned` 字段缺失或不是布尔 `true` 时，`is_mentioned=false`。实测中，从成员列表选择脱敏记作 `机器人示例名` 的当前机器人时为 `true`；选择其他成员 T 或只复制 / 输入 `@机器人示例名 手工文字对照` 时字段缺失。
 
 当前不定义以下例外：
 
 - 回复过机器人即可免 `@`。
 - 群管理员可以绕过用户白名单。
 - 同一批次的后续消息自动继承此前 mention。
-- 正文包含 `@` 字符、机器人当前名称 `Bot_测试版` 或旧名称 `1024` 即可视为结构化 mention。
+- 正文包含 `@` 字符、机器人当前脱敏示例名 `机器人示例名` 或旧脱敏示例名 `机器人旧示例名` 即可视为结构化 mention。
 - 引用消息即可视为当前消息 mention。
 
 ### 3.3 判定结果
@@ -320,11 +320,12 @@ RBAC 扩展后，有效权限仍须由 Gateway 计算并写入授权快照。Her
 | 企业身份映射 | **Debian Staging 已验证**：测试微信 ID 可映射到测试 Enterprise Identity；昵称、备注不作为授权依据 |
 | Employee Workspace / AI Thread | **Debian Staging 已验证**：授权测试身份创建工作区、AI Thread 和来源绑定 |
 | Admission | **Debian Staging 已验证**：未知身份拒绝，已授权身份准入 |
-| Hermes Thread 运行绑定 | **未完成**；当前 `hermes_thread_id` 为空，Hermes Runtime 尚未接入 |
+| Hermes Thread 运行绑定 | **V1 Staging 文本链路已验证**；`hermes_thread_id` 仍是可重建的非权威运行时标识 |
 | 工作区权限边界与管理员跨员工查看 | **设计基线，权限项、审批和审计待实现** |
 | 微信群结构化 mention | **入口已验证、标准化代码已实现**；仅 `raw.get("isMentioned") is True` 时为 `true`，字段缺失为 `false` |
-| `is_self` | **标准化代码已实现**；本次准入验证未单独覆盖其拒绝行为 |
+| `is_self` | **Polling 防回环已验证**；`true` 在 sink 前过滤并推进 Checkpoint，不进入 Access Control，因此不是权限拒绝行为 |
+| 微信群 AI Thread 隔离 | **目标设计已确定 / 实现偏差待修复**；V1 whole-room thread 行为不符合 `bot + group + sender` |
 | 飞书、钉钉身份与 mention 映射 | **后续规划，未验证** |
 | 完整 RBAC | **后续规划** |
 
-当前 Staging 结果只证明真实微信文本消息的持久化、身份映射、权限判断、准入和工作区 / AI Thread 创建链路，不代表配置管理闭环、Hermes 员工工作台、审批流、RBAC 或生产部署已经完成。附件正式处理、Context Builder、Task Queue、Hermes Runtime、AI 回复回传微信和 Skill 执行链仍未完成。员工归属与线程设计见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。
+当前 Staging 结果已证明真实微信文本的持久化、身份映射、权限判断、准入、工作区 / AI Thread、Hermes 调用和原会话回复，但不代表配置管理闭环、Hermes 员工工作台、审批流、RBAC 或生产部署已经完成。附件正式处理、Context Builder、Task Queue、完整 Worker Bridge 和 Skill 执行链仍未完成。员工归属、线程设计和当前实现偏差见[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)。

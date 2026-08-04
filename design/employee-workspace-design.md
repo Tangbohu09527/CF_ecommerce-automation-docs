@@ -1,6 +1,6 @@
 # 员工工作区与 AI 会话线程设计
 
-> 状态日期：2026-08-03。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 通过真实微信消息验证 Identity Mapping、Access Control / Admission、Employee Workspace、AI Thread 与来源绑定；Hermes Runtime、员工工作台和完整端到端链路尚未实现。
+> 状态日期：2026-08-04。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线。V1 Staging 已通过真实微信文本验证身份与准入、Employee Workspace / AI Thread、Hermes Runtime Thread Binding 和原会话回复；员工工作台、目标任务 / 文件 / Skill 链路和生产部署尚未实现。Gateway V1 群聊 whole-room thread 与本文既定隔离规则存在已知实现偏差。
 
 ## 1. 定位与术语
 
@@ -147,7 +147,9 @@ bot_account_id + private_chat_id
 bot_account_id + group_chat_id + sender_id
 ```
 
-因此，同一个群里罗明贺与张三分别 `@` 机器人时，默认进入各自 Employee Workspace / 员工工作区中的两个不同 AI Thread / AI 会话线程。整个群不得共用一个 Hermes 个人上下文。
+因此，同一个群里员工甲与员工乙分别 `@` 机器人时，默认进入各自 Employee Workspace / 员工工作区中的两个不同 AI Thread / AI 会话线程。整个群不得共用一个 Hermes 个人上下文。
+
+**已知实现偏差：** Gateway V1 当前 `thread_keys` 忽略 `sender_id`，现有测试允许同群不同员工复用 AI Thread。该行为不符合上述已确定规则，不构成设计变更。在代码修正并补充同群多员工隔离测试前，群聊线程隔离不得标记为验收通过；若未来确需整群共享，必须先更新技术决策记录并说明安全、权限、上下文和迁移影响。
 
 ### 多入口扩展
 
@@ -384,18 +386,19 @@ AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。�
 ### 已实现 / 已验证
 
 - Identity Mapping、Employee Workspace / 员工工作区实体、AI Thread / AI 会话线程和来源绑定基础能力已实现。
-- commit `587f59f` 已在 Debian Staging 验证未知身份消息保存后不创建 Employee Workspace / AI Thread。
-- 同一版本已验证授权测试身份创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`。
-- AI Thread 已创建，但 Hermes Runtime 尚未接入，当前 `hermes_thread_id` 为空。
+- Debian Staging 已验证未知身份消息不会进入 Employee Workspace / AI Thread 的执行链。
+- 授权测试身份已验证创建工作区、AI Thread、来源关系并建立 Hermes Runtime Thread Binding。
+- V1 文本响应已从 Hermes 返回原微信会话；`hermes_thread_id` 仍可重建且不替代 `ai_thread_id`。
 
 ### 尚未实现
 
 - Identity Management V1 管理员 / 员工角色、员工增删、白名单和微信展示信息管理。
 - Hermes 独立员工界面。
-- Gateway Hermes Adapter，以及 `hermes_thread_id` 创建、绑定与重绑定。
+- `hermes_thread_id` 的故障恢复、失效重绑和生产运维闭环。
 - 工作区恢复流程。
-- 从微信、Gateway、Task Queue 到 Hermes 和原会话回传的端到端联调。
+- 从微信、Gateway、Task Queue、完整 Worker Bridge、Skills 到原会话回传的目标任务链路；当前仅完成不含这些目标组件的 V1 文本闭环。
+- Gateway 群聊 whole-room thread 偏差修复及同群不同员工隔离复验。
 
-下一阶段为 Gateway Hermes Adapter。本次 Staging 验证不代表生产上线或完整 AI Agent 闭环；详细证据见[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
+下一阶段优先修复群聊线程隔离偏差，并继续建设 Context Builder、Task Queue、完整 Worker Bridge、文件和 Skill 链路。本次 Staging 文本闭环不代表生产上线或完整企业业务自动化；详细证据见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 相关边界见[系统设计](../02_系统设计.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)、[Hermes 事件协议](./hermes-event-schema.md)、[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)和[Access Control 设计](./access-control-design.md)。

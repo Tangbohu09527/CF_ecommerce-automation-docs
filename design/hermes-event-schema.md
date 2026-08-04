@@ -1,6 +1,6 @@
 # Hermes 事件协议
 
-> 状态日期：2026-08-03。本文是 Gateway、AI Provider、Hermes Worker Bridge 与 Hermes Agent 之间的事件协议设计基线，不是协议实现说明。`CF_agent-gateway` commit `587f59f` 已在 Debian Staging 验证微信 Polling 入站、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread；本协议的 Hermes 事件投递、Provider 路由、Hermes Runtime 与端到端链路仍待实现。
+> 状态日期：2026-08-04。本文是 Gateway、AI Provider、完整 Hermes Worker Bridge 与 Hermes Agent 之间的目标事件协议设计基线，不等于全部协议已实现。V1 Staging 已验证微信文本 Polling、消息与准入、Employee Workspace / AI Thread、Hermes API Client / Dispatch / Response Relay、Runtime Thread Binding 和原会话回复；完整事件协议、Task / Provider 路由、文件和 Skill 链路仍待实现。
 
 ## 1. 目标与边界
 
@@ -472,13 +472,14 @@ message_received（全部消息先持久化）
 | `text`、`file`、`reply` 微信入口 | **已验证**，仅限现有验证记录所述范围 |
 | `forward` 微信入口 | **部分验证**，仅完成外层识别 |
 | `image`、`voice` 微信入口 | **未验证** |
-| Gateway 入站与 Message Store | **Staging 已验证** Polling / Checkpoint、消息保存和后续准入链；不代表本协议已实现 |
-| Hermes 事件协议 | **设计基线，待实现前评审** |
+| Gateway 入站与 Message Store | **Staging 已验证** Polling / Checkpoint、消息保存、后续准入及文本闭环；不代表完整协议已实现 |
+| Hermes 事件协议 | **目标设计基线 / V1 文本子集已运行**；Task、Provider、文件和 Skill 事件仍待实现前评审 |
 | Gateway `authorization` | **运行准入已验证 / 协议字段待实现**，仅限现有允许与拒绝样本 |
 | AI Provider `runtime` | **设计基线，Provider 状态采集与路由待实现** |
-| Employee Workspace / 员工工作区与 AI Thread / AI 会话线程字段 | **基础记录与来源绑定已通过 Staging 验证**；Hermes 运行时绑定和恢复待实现 |
-| 微信 Polling Adapter | **Staging 已验证至 AI Thread**；临时文件与 Hermes 事件投递待开发 |
-| Hermes、Worker Bridge、Skills 接入 | **待接入 / 待开发** |
+| Employee Workspace / 员工工作区与 AI Thread / AI 会话线程字段 | **基础记录、来源关系和 Hermes 运行时绑定已通过 Staging 验证**；群聊 whole-room thread 偏差和恢复待修复 |
+| 微信 Polling Adapter | **Staging 文本闭环已验证**；self message 防回环已验证，临时文件待开发 |
+| Hermes Client / Dispatch / Response Relay | **V1 Staging 文本子集已验证** |
+| 完整 Worker Bridge、Skills 接入 | **待接入 / 待开发** |
 | `feishu`、`dingtalk` 入口 | **协议预留，未接入、未验证** |
 
 现有入口与 Gateway 验证事实分别以[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)和[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)为准，消息、任务、Gateway、权限和员工工作区边界分别见[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)、[Access Control 设计](./access-control-design.md)与[员工工作区与 AI 会话线程设计](./employee-workspace-design.md)，组件权威边界以[系统设计](../02_系统设计.md)为准。

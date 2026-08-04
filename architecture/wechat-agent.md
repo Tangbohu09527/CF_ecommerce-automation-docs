@@ -1,12 +1,12 @@
 # agent-wechat 定位与职责
 
-> 状态日期：2026-08-03。`agent-wechat` 是微信消息入口层，不是 AI Agent 核心或业务执行引擎。
+> 状态日期：2026-08-04。`agent-wechat` 是微信消息入口层，不是 AI Agent 核心或业务执行引擎；其 Docker、VNC / noVNC 和入口部署细节归 `CF_agent-wechat` 仓库维护。
 
 ## 组件定位
 
 `agent-wechat` 位于员工微信会话与企业 AI 自动化系统之间，负责把微信侧可获取的消息、会话、联系人和附件事件交给后续系统，并将系统生成的回复发送回指定微信会话。
 
-生产部署位置计划为 Debian，使微信入口靠近权威消息与任务控制面。测试环境中的 V1 入口验证已经完成；后续 Gateway 入站权限执行链也已在 Debian Staging 验证至 AI Thread。Hermes Runtime、AI 回复回传微信、Skill 执行链和完整业务流程仍未贯通。入口与 Gateway 记录分别见[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)和[Gateway Debian Staging 真实微信联调验证记录](../status/gateway-wechat-staging-validation.md)。
+生产部署位置计划为 Debian，使微信入口靠近权威消息与任务控制面。测试环境中的 V1 入口验证和 Gateway V1 Staging 微信文本 AI 闭环已经完成，包括 Hermes API 调用、原会话文本回复和 self message 防回环。图片 / 附件 / 文件、Skill 和完整业务流程仍未贯通。入口与 Gateway 记录分别见[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)和[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 负责范围
 
@@ -22,8 +22,8 @@
 | 识别合并转发消息 | 类型、发送人和外层标题已验证 | 尚不能展开内部聊天记录或自动提取内部文件 |
 | 通过 API 读取消息 | 已验证 | 这是当前已验证的读取方式 |
 | WebSocket 实时事件 | 待研究 | 接口可用性、事件范围、重连、去重和补偿机制均未完成研究与验证 |
-| 向 Gateway 发送事件 | Staging 已验证至 AI Thread | Polling / Checkpoint、持久化、身份与准入已验证；不代表 Hermes、长期稳定性或生产验收完成 |
-| 接收 AI 回复并发送微信 | 消息发送已验证；端到端待完成 | 发送能力已验证，不代表 Hermes 结果回传链路已完成 |
+| 向 Gateway 发送事件 | V1 Staging 文本闭环已验证 | Polling / Checkpoint、持久化、身份、准入、Hermes 调用与回传已验证；不代表长期稳定性或生产验收完成 |
+| 接收 AI 回复并发送微信 | `chatId + text` 文本回传已验证 | 不代表图片、附件、文件或其他富媒体结果回传已完成 |
 
 ## 不负责范围
 
@@ -38,7 +38,7 @@
 
 ## 与 CF Gateway 的边界
 
-`agent-wechat` 输出微信侧事件，CF Gateway 承接消息路由和安全隔离，并连接上下文、任务、权限与审计能力。commit `587f59f` 已在 Debian Staging 验证 `agent-wechat` 到 Gateway Polling / Checkpoint、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread。失败重试与长期运行稳定性仍待验证，Hermes Runtime 和 AI 结果回传链路仍待实施。
+`agent-wechat` 输出微信侧事件，CF Gateway 承接消息路由和安全隔离，并连接上下文、任务、权限与审计能力。V1 Staging 已验证从 `agent-wechat`、Gateway Polling / Checkpoint、消息与权限控制到 Hermes API 和原微信会话文本回复。`is_self=true` 的机器人自发消息由 Polling 过滤并推进 Checkpoint，不进入后续执行链。失败重试、长期稳定性、非文本结果和生产验收仍待验证。
 
 即使 `agent-wechat` 已经读到消息，也不能据此宣称任务已建立、Hermes 已处理或业务系统已执行；这些状态必须以后续权威控制中心记录为准。
 
@@ -50,6 +50,6 @@
 
 文件消息和 ZIP 文件入口已经通过 V1 验证。该结论仅说明入口可接收这两类验证对象；`agent-wechat` 仍只负责获取附件及来源元数据，并把它们交给后续受控流程。图片、Office、PDF、中文文件名、连续多附件和失败重试等场景仍待验证，文件安全检查、自动解压、正式归档、内容解析、权限与审计也不属于 `agent-wechat`。
 
-合并转发消息当前仅支持识别类型、获取发送人和外层标题，未支持展开内部聊天记录或自动提取内部文件。它属于增强解析能力，后续可由 `forward parser` 承担；该增强待开发，不影响普通微信文件经 `agent-wechat` 进入 Hermes 后续处理的架构方向。Hermes Adapter 和实时事件机制同样仍待开发。
+合并转发消息当前仅支持识别类型、获取发送人和外层标题，未支持展开内部聊天记录或自动提取内部文件。它属于增强解析能力，后续可由 `forward parser` 承担；该增强待开发，不影响普通微信文件经 `agent-wechat` 进入 Hermes 后续处理的架构方向。Hermes 文件上下文适配和实时事件机制同样仍待开发。
 
 第一阶段不建设独立 OCR。任何 OCR、视觉解析或知识库处理只能作为明确标注的后续规划，不能写成 `agent-wechat` 的现有能力。

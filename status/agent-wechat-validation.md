@@ -1,6 +1,6 @@
 # agent-wechat V1 入口验证记录
 
-- **验证时间：** 2026-07-30；合并转发消息补充验证记录于 2026-07-31；结构化 mention 结果于 2026-08-01 补充记录（均未记录具体时分）
+- **验证时间：** 2026-07-30；合并转发消息补充验证记录于 2026-07-31；结构化 mention 结果于 2026-08-01 补充记录；Gateway 文本闭环引用于 2026-08-04 更新
 - **验证对象：** `agent-wechat` V1 微信消息入口层
 - **验证结论：** 微信消息入口层技术可行
 
@@ -23,13 +23,13 @@
 
 ## 结构化 mention 补充验证
 
-验证时机器人当前微信显示名为 `Bot_测试版`。
+验证中的机器人显示名统一脱敏记作 `机器人示例名`，旧显示名记作 `机器人旧示例名`。
 
 | 测试 | 操作 | 原始结果 | 结论 |
 | --- | --- | --- | --- |
-| 1 | 真正通过微信成员列表选择 `@Bot_测试版` | `isMentioned=true` | 结构化 mention 成立 |
+| 1 | 真正通过微信成员列表选择 `@机器人示例名` | `isMentioned=true` | 结构化 mention 成立 |
 | 2 | 真正通过成员列表 `@` 群内其他成员 T | `isMentioned` 字段缺失 | 当前机器人未被 mention |
-| 3 | 只复制或输入 `@Bot_测试版 手工文字对照`，未从成员列表选择机器人 | `isMentioned` 字段缺失 | 正文看似含 `@` 不构成结构化 mention |
+| 3 | 只复制或输入 `@机器人示例名 手工文字对照`，未从成员列表选择机器人 | `isMentioned` 字段缺失 | 正文看似含 `@` 不构成结构化 mention |
 
 最终标准化规则固定为：
 
@@ -40,12 +40,12 @@ is_mentioned = raw.get("isMentioned") is True
 字段缺失按 `false`。禁止：
 
 - 根据正文中的 `@` 字符判断。
-- 根据当前名称 `Bot_测试版` 判断。
-- 根据机器人旧名称 `1024` 判断。
+- 根据当前脱敏示例名 `机器人示例名` 判断。
+- 根据旧脱敏示例名 `机器人旧示例名` 判断。
 - 根据引用消息判断。
 - 自动继承上一条 mention。
 
-该结论只证明微信入口和结构化字段语义，不能单独证明后续组件状态。后续 `CF_agent-gateway` commit `587f59f` 已在 Debian Staging 验证 Adapter / Polling、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread；Task、Hermes、Skill 与结果回传仍未运行。详见[Gateway Debian Staging 真实微信联调验证记录](./gateway-wechat-staging-validation.md)。
+该结论只证明微信入口和结构化字段语义，不能单独证明后续组件状态。后续 Gateway V1 Staging 已完成微信文本消息经身份、权限、AI Thread、Hermes API 到原会话回复的闭环；这不改变本文只记录 `agent-wechat` 入口验证的范围。详见[Gateway V1 Staging 微信文本闭环验证记录](./gateway-wechat-staging-validation.md)。
 
 ## 合并转发消息补充验证
 
@@ -62,17 +62,17 @@ is_mentioned = raw.get("isMentioned") is True
 
 合并转发属于增强解析能力。后续可增加 `forward parser`，但该增强尚未实现；它不影响普通微信文件经 `agent-wechat` 进入 Hermes 后续处理的现有架构方向。
 
-## 未完成能力
+## 未完成或不在本入口记录范围的能力
 
 - 实时事件机制：包括 WebSocket 接口可用性、事件范围、断线重连、去重和补偿机制，仍待研究和开发，不得表述为已完成。
 - Context Builder 和 Task Queue。
-- Gateway Hermes Adapter、Hermes Runtime 与 Worker Bridge 接入。
+- 目标架构中完整的 Context Builder、Task Queue 和 Worker Bridge 链路。
 - Skills 系统及具体业务 Skill 的定义、实现和验收。
 - 旺店通 ERP、旺店通 WMS 和 S6 接口验证与对接。
 - 图片、Office、PDF、中文文件名、连续多附件、大小边界、失败重试和长期稳定性等未覆盖入口场景。
 - 合并转发解析增强：展开内部聊天记录、自动提取内部文件和 `forward parser` 实现。
 - 临时文件管理、ZIP 自动解压、OCR/视觉、Skill 处理、File Service 对接、产物回写和文件中心归档。
-- 完整权限矩阵、任务状态、审计闭环和端到端结果回传。
+- 完整权限矩阵、任务状态、审计闭环，以及图片 / 附件 / 文件结果回传。
 
 ## 后续文件处理流程
 
@@ -86,9 +86,9 @@ is_mentioned = raw.get("isMentioned") is True
 
 - **已完成：** 微信入口验证。
 - **已完成：** 结构化 mention 三组对照验证。
-- **Staging 已验证：** Gateway 微信入口、Polling / Checkpoint、Message Store、Identity、Access Control / Admission、Employee Workspace 和 AI Thread。
-- **待开发：** Context Builder、Task Queue、Gateway Hermes Adapter、Hermes Runtime、AI 回复回传微信和 Skill 执行链。
+- **Staging 已验证：** Gateway 微信文本从 Polling / Checkpoint、Message Store、Identity、Access Control / Admission、Employee Workspace / AI Thread、Hermes API 到原微信会话回复的闭环，以及 `is_self=true` 防回环。
+- **待开发：** Context Builder、Task Queue、完整 Worker Bridge、Skill 执行链，以及图片、附件和文件处理链。
 - **待开发：** 实时事件机制。
 - **待开发：** 合并转发解析增强。
 
-Gateway Staging 验证不改变本文的入口验证范围，也不代表生产上线或完整 AI Agent 闭环。
+Gateway Staging 文本闭环不改变本文的入口验证范围，也不代表图片理解、文件处理、Skill 自动执行、企业知识库、生产自动部署或完整企业业务自动化已经完成。微信群同群不同员工的目标 AI Thread 隔离仍存在已知实现偏差，以[Gateway 验证记录](./gateway-wechat-staging-validation.md)为准。
