@@ -16,8 +16,8 @@
 - **已确定：** 新 Windows AI 电脑运行 Hermes、Worker Bridge、Skills 及文档、浏览器和 Windows 自动化工具。
 - **已确定：** `CF_filebrowser-enterprise` 是正式企业 File Service；FileBridge / `filebrowser-agentctl` 是受控客户端，Gateway、Hermes、Skills 和客户端均不得绕过其 API、文件权限、Token capability、Share capability 或 Audit。
 - **已确定：** 第一阶段不建设独立 OCR；自动化主线与 FileBrowser Enterprise 二次开发并行推进。
-- **已实现：** File Service 已实现以下 V1 Beta 服务端能力：Token hash-only 与一次性明文、旧 Token/Key V5 强制迁移、文件 capability 与 Archive/Extract 安全、Share 服务端 capability 契约，以及持久化 Audit、Token Audit 和管理员查询 API。
-- **待集成 / 待验证：** Share capability 前端 UI、其余业务 Audit Action、Gateway/Hermes 稳定契约对接、最终 Debian 部署验收和 V1 Beta 最终 tag/candidate 尚未完成；当前不代表正式生产上线。
+- **已实现：** `CF_filebrowser-enterprise` 的 `feat/v1-integration` commit `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 为当前代码基线。V1 Beta 核心代码已实现并通过自动化测试。
+- **待集成 / 待验证：** FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 自动化接入，Debian 与 migration 真实环境验证、备份恢复、升级回滚、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线尚未完成。
 - **已验证：** `agent-wechat` V1 入口已完成微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取验证；合并转发消息已验证类型识别、发送人获取和外层标题获取。
 - **已验证：** 微信群结构化 mention 实测中，只有从成员列表选择当前机器人时原始 `isMentioned=true`；`@` 其他成员或只复制 / 输入机器人名称时该字段缺失。Gateway 仅按 `raw.get("isMentioned") is True` 生成 `is_mentioned`，字段缺失按 `false`。
 - **已验证：** V1 Staging 微信文本消息 AI 闭环已完成：Polling、Message Store、Identity / Permission Admission、Employee Workspace / AI Thread、Hermes API 调用、Response Relay、原微信会话回复和 `is_self=true` 防回环均已通过验证。
@@ -54,11 +54,13 @@
 | `CF_ecommerce-automation-docs` | **已确定：** 当前文档仓库 |
 | `CF_agent-gateway` | **V1 Staging 文本闭环已完成：** 负责微信 Polling、消息与权限控制、AI Thread、Hermes 调度、响应回传和路由；群聊 whole-room thread 与既定 `group + sender` 设计的偏差待修复 |
 | `CF_agent-wechat` | **V1 Staging 微信入口已验证：** 负责 `agent-wechat` Docker 部署、登录与微信接入、VNC / noVNC 和入口验证；不承载 Gateway 权威状态或 Hermes 业务调度 |
-| `CF_filebrowser-enterprise` | **部分实现：** 唯一正式企业 File Service 的 V1 Beta 核心服务端能力已进入 `feat/v1-integration`；Share capability 前端 UI、剩余业务 Audit Action、自动化对接、最终 Debian 部署验收和 V1 Beta 最终 tag/candidate 仍为**待集成 / 待验证**，当前不代表正式生产上线；本仓库任务不得修改其实现 |
+| `CF_filebrowser-enterprise` | **V1 Beta 核心代码冻结候选：** `feat/v1-integration` 的 `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 已完成权限、API Token、Share 与 Share capability UI、Persistent Audit、WebDAV / OnlyOffice Audit 代码和自动化测试；自动化对接与 Debian / 发布验收仍为**待集成 / 待验证**，当前不代表正式生产上线；本仓库任务不得修改其实现 |
 | 其他 `CF_` 前缀代码仓库 | **后续规划：** 名称与边界须另行确认 |
 
 ## 当前状态
 
 当前仍处于**阶段 1**。Windows AI 节点、Debian 13 Staging、`agent-wechat` Docker 和 Gateway Worker 已完成 V1 微信文本消息 AI 闭环：获准文本消息进入 Employee Workspace / AI Thread 后调用 Windows Hermes API，并把响应返回原微信会话；Hermes Client、Dispatch、Response Relay、Runtime Thread Binding 和 self message 防回环均已验证。Context Builder、Task Queue、完整 Worker Bridge、Skills 和文件主链路仍待建设。微信群同群不同员工的目标隔离尚因 Gateway V1 whole-room thread 实现偏差而待修复 / 待复验。完整证据与 `393 passed`、`ruff`、`git diff --check` 结果见[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)。
 
-`CF_filebrowser-enterprise` 是唯一正式企业 File Service。其 V1 Beta 已实现 API Token hash-only 与一次性前端展示、旧 Token/Key V5 强制迁移及失败关闭、Browse / Preview / Download 三权 UI、Archive / Extract 权限与文件系统安全、Share `configured` / `effective` capability 服务端契约和密码 Share Token 绕过关闭，以及 Persistent Audit Store、Audit V3 migration、request-scoped Audit Recorder、API Token 创建 / 撤销 / 拒绝 Audit、管理员 `GET /api/audit`、Audit 过滤、Cursor 和日志脱敏。Share capability 前端 UI、登录 / 用户 / 权限 / Share 管理 Audit、核心文件与 Archive Audit Action、WebDAV / OnlyOffice Audit Action、FileBridge / Gateway / Hermes 自动化对接、最终 Debian 部署验收和 V1 Beta 最终 tag/candidate 仍待完成。Gateway 文本闭环和 FileBrowser 现有实现均不表示文件业务端到端运行或正式生产上线。详见[当前开发进度](./status/current-progress.md)、[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+`CF_filebrowser-enterprise` 是唯一正式企业 File Service。当前代码基线 `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 已实现 Browse / Preview / Download 三权、Create / Modify / Delete / Replace、Upload、Range Download、Preview / Thumbnail / Media、Archive Create / Extract、API Token hash-only 与 migration、Share capability 前端 UI、Browse / Preview 派生规则、Upload Share 强制 Create、Share 密码三态和 credential-active hash 绑定。Persistent Audit 已覆盖 Pending / Finalize / Recovery、RequestID、查询与签名 Cursor，以及 Token、登录、用户、权限、Share、核心文件、Archive、WebDAV 和 OnlyOffice Action。V1 Beta 核心代码已实现并通过自动化测试；前端 17 个文件共 109 项测试、typecheck、lint、i18n、production build、`go vet`、`go test ./http` 和 `go test ./...` 均已通过。
+
+FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 自动化接入，Debian、migration、备份恢复、升级回滚、Docker / Compose、Nginx / TLS / systemd、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线仍待完成。Gateway 文本闭环和 FileBrowser 代码测试均不表示文件业务端到端运行或正式生产上线。详见[当前开发进度](./status/current-progress.md)、[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。

@@ -25,7 +25,7 @@ flowchart TB
     H --> S["Skills<br/>待建设"]
     S --> B["企业系统 API<br/>待逐项对接"]
     S --> C["FileBridge / filebrowser-agentctl<br/>待集成"]
-    C --> F["CF_filebrowser-enterprise<br/>正式企业 File Service"]
+    C --> F["CF_filebrowser-enterprise<br/>V1 Beta 核心代码冻结候选"]
     B --> S --> H --> G --> A --> W
     F --> C
 ```
@@ -44,7 +44,7 @@ flowchart TB
 | Hermes Agent | 理解意图、规划步骤、选择获授权的 Skill、生成结构化结果 | V1 Staging 文本 API 调用与响应已验证；Skill 和生产运行待建设 |
 | Skills | 封装库存、订单、文件等可审计的确定性业务动作 | 体系待建设，具体 Skill 待逐项定义 |
 | 企业系统 | 提供受控业务数据和业务操作 | 旺店通 ERP、旺店通 WMS、S6 已存在；自动化接口待逐项验证和对接 |
-| `CF_filebrowser-enterprise` | 作为正式企业 File Service，提供人员入口、受控 API、文件 capability 与自身 Audit | V1 Beta 核心服务端能力已实现；前端剩余项与业务 Audit Action 待集成，最终 Debian 部署待验证 |
+| `CF_filebrowser-enterprise` | 作为唯一正式企业 File Service，提供人员入口、受控 API、文件 capability 与 Persistent Audit | V1 Beta 核心代码冻结候选；权限、API Token、Share 与 capability UI、Persistent Audit、WebDAV / OnlyOffice Audit 已实现并通过自动化测试，自动化接线和 Debian 验收待完成 |
 | FileBridge / `filebrowser-agentctl` | 作为自动化侧受控客户端调用稳定 File Service API | 边界已确定；Gateway/Hermes 对接待集成、待验证 |
 
 ## 控制中心与执行节点
@@ -62,9 +62,11 @@ V1 Staging 已在 Debian 13 的 `agent-wechat` Docker 与 Gateway Worker、Windo
 
 目标群聊线程键仍为 `bot_account_id + group_chat_id + sender_id`。Gateway V1 当前 whole-room thread 行为是已知实现偏差，不代表设计变更；在修复并通过同群多员工隔离测试前，不能宣称群聊员工上下文隔离已经验收。
 
-`CF_filebrowser-enterprise` 已实现 V1 Beta 核心服务端能力：API Token hash-only、旧 Token/Key V5 migration 与失败关闭、一次性明文、Browse / Preview / Download 三权 UI、Archive / Extract 权限与文件系统安全、Share `configured` / `effective` capability 服务端契约和密码 Share Token 绕过关闭。Audit 侧已实现 Persistent Audit Store、Audit V3 migration、request-scoped Audit Recorder、Token 创建/撤销/拒绝 Audit、管理员 `GET /api/audit`、过滤、Cursor 和日志脱敏。
+`CF_filebrowser-enterprise` 当前代码基线为 `feat/v1-integration` commit `f329de2fc6e9296ca949acab4873c30a83d5f5e7`。V1 Beta 核心代码已实现并通过自动化测试：Browse / Preview / Download 与 Create / Modify / Delete / Replace 权限语义、主要文件能力、API Token hash-only 与 migration，以及 Share capability UI、Browse / Preview 派生、Upload Share 强制 Create、密码三态和 credential-active hash 绑定均已覆盖。
 
-这些 File Service 实现不代表 Share capability 前端 UI、登录/用户/权限/Share 管理 Audit、核心文件和 Archive Audit Action、WebDAV / OnlyOffice Audit Action 已经完成，也不代表最终 Debian 部署、V1 Beta tag/candidate 或正式生产上线已经完成。
+Persistent Audit 已实现 Pending / Finalize / Recovery、RequestID、request-scoped Recorder、degraded 状态、管理员查询、过滤、分页、签名 Cursor 与防篡改；Action 覆盖 Token、登录、用户、权限、Share、核心文件、Archive、WebDAV 和 OnlyOffice。前端 17 个测试文件共 109 项测试、typecheck、lint、i18n、production build、`go vet`、`go test ./http` 和 `go test ./...` 已通过。
+
+这些 File Service 代码与测试不代表自动化接线、Debian 或 migration 真实环境、真实 WebDAV / OnlyOffice、V1 Beta Candidate、Git tag、GitHub Release 或正式生产上线已经完成。
 
 以下能力仍不能表述为已经完成：
 
@@ -72,8 +74,8 @@ V1 Staging 已在 Debian 13 的 `agent-wechat` Docker 与 Gateway Worker、Windo
 - 图片 / 附件 / 文件链路，以及 Worker Bridge、Skills 与微信链路的完整任务接入。
 - 库存、订单、文件等业务 Skills 系统。
 - 旺店通 ERP、旺店通 WMS、S6 接口，以及 FileBridge / `filebrowser-agentctl`、Gateway/Hermes 对稳定 File Service API 的自动化对接。
-- 图片、Office、PDF、中文文件名、连续多附件等未覆盖入口场景，以及解压、文件自动处理、企业权限体系、File Service 剩余业务 Audit Action 和完整审计闭环。
-- File Service 的 Share capability 前端 UI、最终 Debian 部署验收和 V1 Beta 最终 tag/candidate。
+- 图片、Office、PDF、中文文件名、连续多附件等未覆盖入口场景，以及解压、文件自动处理、企业权限体系、Audit WORM、外部防篡改存档、Audit 管理前端 UI 和完整生产 retention 验收。
+- File Service 的 Debian 与 migration 真实环境、备份恢复、升级回滚、Docker / Compose、Nginx / TLS / systemd、真实 WebDAV / OnlyOffice、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线。
 - WebSocket 实时事件接入及其重连、去重和补偿机制。
 - 合并转发内部聊天记录展开、内部文件自动提取及 `forward parser`。
 - 独立 OCR 与知识库处理链路；第一阶段不建设独立 OCR。
@@ -122,4 +124,4 @@ flowchart TB
 3. **最小授权。** 每个任务只获得所需的 Skill、数据和文件权限，高风险写操作需要人工确认。
 4. **全链路可追踪。** 消息、任务、Skill 调用、系统接口、文件和结果回传使用关联标识记录状态和失败原因。
 5. **规划不等于实现。** 未完成技术验证、接口对接或业务验收的能力，统一保持“待实施 / 待验证 / 后续规划”标识。
-6. **稳定 File Service 契约。** V1 Beta 完成后，Gateway/Hermes 只按稳定 File Service API 与服务端 `effective` capability 集成，客户端不得自行推导或放大授权。
+6. **稳定 File Service 契约。** 自动化主线接入时，Gateway、Hermes 和 Skills 只能通过稳定 File Service API、用户权限、最小 API Token、Share `effectiveCapabilities` 和 Persistent Audit 访问正式文件；不得自行推导或放大授权，也不得直接访问正式存储。
