@@ -64,7 +64,7 @@ V1 Staging 已在 Debian 13 的 `agent-wechat` Docker 与 Gateway Worker、Windo
 
 `CF_filebrowser-enterprise` 当前代码基线为 `feat/v1-integration` commit `f329de2fc6e9296ca949acab4873c30a83d5f5e7`。V1 Beta 核心代码已实现并通过自动化测试：Browse / Preview / Download 与 Create / Modify / Delete / Replace 权限语义、主要文件能力、API Token hash-only 与 migration，以及 Share capability UI、Browse / Preview 派生、Upload Share 强制 Create、密码三态和 credential-active hash 绑定均已覆盖。
 
-Persistent Audit 已实现 Pending / Finalize / Recovery、RequestID、request-scoped Recorder、degraded 状态、管理员查询、过滤、分页、签名 Cursor 与防篡改；Action 覆盖 Token、登录、用户、权限、Share、核心文件、Archive、WebDAV 和 OnlyOffice。前端 17 个测试文件共 109 项测试、typecheck、lint、i18n、production build、`go vet`、`go test ./http` 和 `go test ./...` 已通过。
+Persistent Audit 已实现 Pending / Finalize / Recovery、RequestID、request-scoped Recorder、degraded 状态、管理员查询、过滤、分页和用于防止查询分页状态被篡改的签名 Cursor 校验；Action 覆盖 Token、登录、用户、权限、Share、核心文件、Archive、WebDAV 和 OnlyOffice。前端 17 个测试文件共 109 项测试、typecheck、lint、i18n、production build、`go vet`、`go test ./http` 和 `go test ./...` 已通过。
 
 这些 File Service 代码与测试不代表自动化接线、Debian 或 migration 真实环境、真实 WebDAV / OnlyOffice、V1 Beta Candidate、Git tag、GitHub Release 或正式生产上线已经完成。
 
