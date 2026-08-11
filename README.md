@@ -17,7 +17,8 @@
 - **已确定：** `CF_filebrowser-enterprise` 是正式企业 File Service；FileBridge / `filebrowser-agentctl` 是受控客户端，Gateway、Hermes、Skills 和客户端均不得绕过其 API、文件权限、Token capability、Share capability 或 Audit。
 - **已确定：** 第一阶段不建设独立 OCR；自动化主线与 FileBrowser Enterprise 二次开发并行推进。
 - **已实现：** `CF_filebrowser-enterprise` 的 `feat/v1-integration` commit `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 为当前代码基线。V1 Beta 核心代码已实现并通过自动化测试。
-- **待集成 / 待验证：** FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 自动化接入，Debian 与 migration 真实环境验证、备份恢复、升级回滚、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线尚未完成。
+- **V2 CFserver Staging 已运行：** `CF_agent-gateway` 版本 `v2-enterprise-runtime-20260811`、commit `2ac4c86dbcbb3ac035c3688100e88c57407575b7` 已部署；PostgreSQL 与 Gateway 正在运行，数据挂载、Alembic `20260810_01 (head)` 和 Gateway readiness 已验证。
+- **待集成 / 待验证：** V2 的 Hermes API 尚未接入，WeChat runtime、`dispatch-worker`、`delivery-worker` 和完整链路尚未启用；FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 文件自动化接入，以及 FileBrowser Enterprise 的 Debian 部署验收、备份恢复、升级回滚、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线尚未完成。
 - **已验证：** `agent-wechat` V1 入口已完成微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取验证；合并转发消息已验证类型识别、发送人获取和外层标题获取。
 - **已验证：** 微信群结构化 mention 实测中，只有从成员列表选择当前机器人时原始 `isMentioned=true`；`@` 其他成员或只复制 / 输入机器人名称时该字段缺失。Gateway 仅按 `raw.get("isMentioned") is True` 生成 `is_mentioned`，字段缺失按 `false`。
 - **已验证：** V1 Staging 微信文本消息 AI 闭环已完成：Polling、Message Store、Identity / Permission Admission、Employee Workspace / AI Thread、Hermes API 调用、Response Relay、原微信会话回复和 `is_self=true` 防回环均已通过验证。
@@ -35,6 +36,8 @@
 | [员工工作区与 AI 会话线程设计](./design/employee-workspace-design.md) | 企业身份、员工工作区、AI 线程隔离与 Hermes 运行时绑定 |
 | [开发规范](./03_开发规范.md) | 仓库、Git、数据与文档规则 |
 | [部署运维](./04_部署运维.md) | 测试环境基线、待部署服务与排障原则 |
+| [V2 Enterprise Runtime 文档](./docs/README.md) | V2 架构、部署、运维、Context、Admin API 与当前限制 |
+| [CFserver V2 Staging 部署状态](./docs/deployment/cfserver-staging-status.md) | 实际版本、运行服务、migration、验证结果与下一阶段计划 |
 | [技术决策记录](./05_技术决策记录.md) | 当前有效决定及其原因和影响 |
 | [AI 系统总体架构](./architecture/ai-system-overview.md) | 面向企业业务的分层架构和当前实现边界 |
 | [企业 AI Gateway 架构](./architecture/gateway-architecture.md) | Gateway 目标架构、实际实现边界和线程隔离规则 |
@@ -52,15 +55,17 @@
 | 仓库 | 状态 |
 | --- | --- |
 | `CF_ecommerce-automation-docs` | **已确定：** 当前文档仓库 |
-| `CF_agent-gateway` | **V1 Staging 文本闭环已完成：** 负责微信 Polling、消息与权限控制、AI Thread、Hermes 调度、响应回传和路由；群聊 whole-room thread 与既定 `group + sender` 设计的偏差待修复 |
+| `CF_agent-gateway` | **V2 CFserver Staging 基础服务已运行 / V1 文本闭环已验证：** V2 当前运行 PostgreSQL 与 Gateway，Hermes API 尚未接入，Workers 和 WeChat runtime 尚未启用；V1 群聊 whole-room thread 与既定 `group + sender` 设计的偏差待修复 |
 | `CF_agent-wechat` | **V1 Staging 微信入口已验证：** 负责 `agent-wechat` Docker 部署、登录与微信接入、VNC / noVNC 和入口验证；不承载 Gateway 权威状态或 Hermes 业务调度 |
 | `CF_filebrowser-enterprise` | **V1 Beta 核心代码冻结候选：** `feat/v1-integration` 的 `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 已完成权限、API Token、Share 与 Share capability UI、Persistent Audit、WebDAV / OnlyOffice Audit 代码和自动化测试；自动化对接与 Debian / 发布验收仍为**待集成 / 待验证**，当前不代表正式生产上线；本仓库任务不得修改其实现 |
 | 其他 `CF_` 前缀代码仓库 | **后续规划：** 名称与边界须另行确认 |
 
 ## 当前状态
 
-当前仍处于**阶段 1**。Windows AI 节点、Debian 13 Staging、`agent-wechat` Docker 和 Gateway Worker 已完成 V1 微信文本消息 AI 闭环：获准文本消息进入 Employee Workspace / AI Thread 后调用 Windows Hermes API，并把响应返回原微信会话；Hermes Client、Dispatch、Response Relay、Runtime Thread Binding 和 self message 防回环均已验证。Context Builder、Task Queue、完整 Worker Bridge、Skills 和文件主链路仍待建设。微信群同群不同员工的目标隔离尚因 Gateway V1 whole-room thread 实现偏差而待修复 / 待复验。完整证据与 `393 passed`、`ruff`、`git diff --check` 结果见[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)。
+当前仍处于**阶段 1**。在 V1 Staging 历史链路中，Windows AI 节点、Debian 13 Staging、`agent-wechat` Docker 和 Gateway Worker 已完成微信文本消息 AI 闭环：获准文本消息进入 Employee Workspace / AI Thread 后调用 Windows Hermes API，并把响应返回原微信会话；Hermes Client、Dispatch、Response Relay、Runtime Thread Binding 和 self message 防回环均已验证。Context Builder、Task Queue、完整 Worker Bridge、Skills 和文件主链路仍待建设。微信群同群不同员工的目标隔离尚因 Gateway V1 whole-room thread 实现偏差而待修复 / 待复验。完整证据与 `393 passed`、`ruff`、`git diff --check` 结果见[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)。
+
+CFserver 的 V2 Enterprise Runtime Staging 已完成部署准备并运行基础服务：代码版本为 `v2-enterprise-runtime-20260811`，PostgreSQL 与 Gateway 已启动，数据目录挂载、Alembic `20260810_01 (head)` 和 Gateway readiness 已验证。Hermes API 接入、WeChat runtime 与 Workers 启用、微信真实联调和 Context Runtime 运行验证仍待完成。详见 [CFserver V2 Staging 部署状态](./docs/deployment/cfserver-staging-status.md)。
 
 `CF_filebrowser-enterprise` 是唯一正式企业 File Service。当前代码基线 `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 已实现 Browse / Preview / Download 三权、Create / Modify / Delete / Replace、Upload、Range Download、Preview / Thumbnail / Media、Archive Create / Extract、API Token hash-only 与 migration、Share capability 前端 UI、Browse / Preview 派生规则、Upload Share 强制 Create、Share 密码三态和 credential-active hash 绑定。Persistent Audit 已覆盖 Pending / Finalize / Recovery、RequestID、查询与签名 Cursor，以及 Token、登录、用户、权限、Share、核心文件、Archive、WebDAV 和 OnlyOffice Action。V1 Beta 核心代码已实现并通过自动化测试；前端 17 个文件共 109 项测试、typecheck、lint、i18n、production build、`go vet`、`go test ./http` 和 `go test ./...` 均已通过。
 
-FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 自动化接入，Debian、migration、备份恢复、升级回滚、Docker / Compose、Nginx / TLS / systemd、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线仍待完成。Gateway 文本闭环和 FileBrowser 代码测试均不表示文件业务端到端运行或正式生产上线。详见[当前开发进度](./status/current-progress.md)、[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+`CF_filebrowser-enterprise` 的 FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 自动化接入，以及 Debian、migration、备份恢复、升级回滚、Docker / Compose、Nginx / TLS / systemd、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线仍待完成。Gateway 文本闭环和 FileBrowser 代码测试均不表示文件业务端到端运行或正式生产上线。详见[当前开发进度](./status/current-progress.md)、[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。

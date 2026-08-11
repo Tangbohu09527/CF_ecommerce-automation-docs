@@ -6,25 +6,28 @@
 | --- | --- |
 | 适用版本 | `v2-enterprise-runtime-20260811` |
 | 目标环境 | CFserver Staging |
-| 操作系统 | Debian 13 |
-| 文档状态 | 当前发布版部署基线 |
+| 操作系统 | Debian 13.6 |
+| 文档状态 | 部署准备完成，staging已运行 |
 | 配套手册 | [Runtime 运维手册](../operations/runtime-operations.md) |
+| 实际状态 | [CFserver Staging 部署状态](./cfserver-staging-status.md) |
 
-本文说明 V2 Enterprise Runtime 在 CFserver 上的部署边界、目录、网络、持久化和上线核对要求。本文不定义发布包中尚未确认的镜像名、镜像 tag、端口号、健康检查路径、Compose project 名、迁移命令或 Secret 值；这些信息必须从对应版本的发布清单和受控环境配置中取得。
+本文说明 V2 Enterprise Runtime 在 CFserver 上的部署边界、目录、网络、持久化和上线核对要求。部署准备已经完成，Staging 已运行；截至 2026-08-11，实际运行范围为 `postgres` 与 `gateway`，Hermes API 尚未接入，Workers 和 WeChat runtime 尚未启用。实际版本、镜像、migration 和验证证据统一记录在 [CFserver Staging 部署状态](./cfserver-staging-status.md)。
+
+本文仍不定义端口号、Compose project 名、Secret 值或尚未确认的完整拓扑参数；这些信息必须从对应版本的发布清单和受控环境配置中取得。
 
 ## 2. 部署边界
 
-CFserver 承载 Debian 侧的消息接入、事实持久化、权限和运行时编排。生产 Agent Hermes 运行在 Windows AI 电脑侧，通过受控链路与 `dispatch-worker` 集成。
+CFserver 是企业 AI 节点，承载 FileBrowser Enterprise、`CF_agent-gateway`、PostgreSQL、Workers 和 Artifact storage 等节点职责。生产 Agent Hermes 仍计划运行在 Windows AI 电脑侧，通过受控链路与 `dispatch-worker` 集成；该链路尚未在本次 Staging 部署中启用。
 
-当前 Staging 部署包含以下逻辑服务：
+V2 Enterprise Runtime 的完整目标拓扑包含以下逻辑服务。表中的“当前状态”只描述本次 CFserver Staging 实际运行情况：
 
-| 逻辑服务 | 部署职责 | 是否需要持久化 | 是否应直接暴露到公网 |
-| --- | --- | --- | --- |
-| `postgres` | 保存消息归档、线程、时间线、上下文快照、Outbox、响应和投递状态等权威事实 | 是 | 否 |
-| `gateway` | 接收内部请求，执行权限检查、事实写入、路由和编排，并提供版本已实现的管理查询能力 | 依据发布配置；核心事实应在 PostgreSQL | 否 |
-| `agent-wechat` | 对接微信消息通道，将消息交给 Gateway，并承接版本支持的回复投递接口 | 会话或登录数据是否持久化以发布配置为准 | 仅在接入模式确实要求入站端口时开放 |
-| `dispatch-worker` | 消费 Dispatch Outbox，将已持久化任务交给 Hermes | 否；状态以权威存储为准 | 否 |
-| `delivery-worker` | 消费已持久化响应并执行投递 | 否；状态以权威存储为准 | 否 |
+| 逻辑服务 | 当前状态 | 部署职责 | 是否需要持久化 | 是否应直接暴露到公网 |
+| --- | --- | --- | --- | --- |
+| `postgres` | **已运行** | 保存消息归档、线程、时间线、上下文快照、Outbox、响应和投递状态等权威事实 | 是 | 否 |
+| `gateway` | **已运行** | 接收内部请求，执行权限检查、事实写入、路由和编排，并提供版本已实现的管理查询能力 | 依据发布配置；核心事实应在 PostgreSQL | 否 |
+| `agent-wechat` | **暂未启用** | 对接微信消息通道，将消息交给 Gateway，并承接版本支持的回复投递接口 | 会话或登录数据是否持久化以发布配置为准 | 仅在接入模式确实要求入站端口时开放 |
+| `dispatch-worker` | **暂未启用** | 消费 Dispatch Outbox，将已持久化任务交给 Hermes | 否；状态以权威存储为准 | 否 |
+| `delivery-worker` | **暂未启用** | 消费已持久化响应并执行投递 | 否；状态以权威存储为准 | 否 |
 
 部署边界必须保持一致：Gateway 负责事实、权限和编排；Hermes 负责推理和工具选择。不得把 Debian 权威状态迁移到 Hermes 本地，也不得让 Hermes 绕过 Gateway 直接修改权威业务事实。
 
@@ -33,15 +36,18 @@ CFserver 承载 Debian 侧的消息接入、事实持久化、权限和运行时
 | 项目 | 基线 |
 | --- | --- |
 | 设备角色 | CFserver，Debian 权威控制中心 |
+| 操作系统 | Debian 13.6 |
 | CPU | Intel Core i5-12400 |
 | 内存 | 16 GB RAM |
-| 存储 | RAID1 storage |
+| 存储 | RAID1 3.6 TB |
+| Docker Engine | 26.1.5 |
+| Docker Compose | 2.26.1 |
 | 部署配置根目录 | `/opt/cf-agent-gateway` |
 | 持久数据根目录 | `/srv/storage/cf-agent-gateway` |
 
 RAID1 只提供磁盘冗余，不等同于备份。数据库备份必须可从独立故障域恢复，且恢复流程需要定期演练。
 
-上线前至少核对：
+完整目标拓扑继续启用前至少核对：
 
 - Debian 13 已完成安全更新，系统时间和时区配置正确。
 - RAID1 状态正常，文件系统空间和 inode 充足。
@@ -96,7 +102,7 @@ RAID1 只提供磁盘冗余，不等同于备份。数据库备份必须可从�
 
 ### 6.1 网络分区
 
-建议由发布 Compose 清单创建一个用户定义的内部 bridge network，本文以 `<backend-network>` 表示其逻辑角色，实际名称不作固定。五个服务通过该网络使用容器 DNS 通信。
+建议由发布 Compose 清单创建一个用户定义的内部 bridge network，本文以 `<backend-network>` 表示其逻辑角色，实际名称不作固定。完整目标拓扑中的五个服务通过该网络使用容器 DNS 通信；当前仅确认 `postgres` 与 `gateway` 已运行。
 
 | 通信方向 | 允许条件 |
 | --- | --- |
@@ -147,9 +153,9 @@ docker compose -f <compose-file> -p <project-name> config
 
 占位符必须替换为发布工单中的已审核值。在 Debian shell 中执行时同样不得把 Secret 直接拼入命令行。
 
-### 8.2 启动顺序
+### 8.2 完整拓扑启动顺序
 
-严格按以下顺序执行，详细检查点见 [Runtime 运维手册](../operations/runtime-operations.md)：
+完整拓扑按以下顺序执行，详细检查点见 [Runtime 运维手册](../operations/runtime-operations.md)。当前部署流程已经执行至 Gateway 启动；已验证范围以第 10.1 节为准，第 4、5 步仍是计划：
 
 1. 启动 database，即实际映射到 `postgres` 的服务，并等待 readiness 通过。
 2. 执行本版本 migration，确认成功后才能继续。
@@ -181,11 +187,20 @@ Docker/Systemd 是本版本支持的部署方式，但本文不虚构 unit 名�
 - migration 作为受控发布步骤执行，不应仅依赖通用 `ExecStartPre` 在每次重启时盲目运行。
 - unit、EnvironmentFile 和 journal 中不得泄露 Secret。
 
-主机重启演练必须验证：服务不会抢在 migration 门禁前处理流量，数据库 volume 未变化，worker heartbeat 恢复，积压事实仍可继续处理。
+当前运行服务的主机重启演练必须验证：服务不会抢在 migration 门禁前处理流量，且数据库 volume 未变化。Workers 启用后，还必须验证 worker heartbeat 恢复和积压事实可继续处理。
 
-## 10. 上线验证
+## 10. 验证状态
 
-### 10.1 基础检查
+### 10.1 当前已验证
+
+- `postgres:16` 与 `cf-agent-gateway:v2-enterprise-runtime-20260811` 已启动。
+- 数据目录挂载正常。
+- Alembic migration 已到 `20260810_01 (head)`。
+- Gateway `GET /ready` 返回 `{"status":"ready"}`。
+
+完整记录见 [CFserver Staging 部署状态](./cfserver-staging-status.md)。
+
+### 10.2 完整拓扑基础检查（待完成）
 
 - 所有容器的实际镜像版本与发布清单一致。
 - `docker ps`/Compose 状态无反复重启，健康状态满足发布标准。
@@ -195,7 +210,7 @@ Docker/Systemd 是本版本支持的部署方式，但本文不虚构 unit 名�
 - CFserver 到 Hermes 的网络和认证验证通过。
 - Docker network 未包含无关容器，PostgreSQL 未暴露到公网。
 
-### 10.2 端到端检查
+### 10.3 端到端检查（待完成）
 
 使用脱敏 Staging 测试消息验证以下事实链，禁止使用真实业务文件或真实 Secret：
 
@@ -221,5 +236,6 @@ Docker/Systemd 是本版本支持的部署方式，但本文不虚构 unit 名�
 - [项目总纲](../../00_项目总纲.md)
 - [部署运维总则](../../04_部署运维.md)
 - [V2 Enterprise Runtime 架构总览](../architecture/v2-enterprise-runtime.md)
+- [CFserver Staging 部署状态](./cfserver-staging-status.md)
 - [Runtime 运维手册](../operations/runtime-operations.md)
 - [当前限制](../status/current-limitations.md)

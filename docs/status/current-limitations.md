@@ -18,6 +18,9 @@
 | 4 | Memory Runtime 未实现 | 未实现 | 当前版本没有长期认知或 automatic memory |
 | 5 | WDT / S6 未接入 | 未集成 | 当前版本不能执行或验证 WDT / S6 业务闭环 |
 | 6 | Dispatch 与 Response 事务桥后续优化 | 后续优化 | 当前不得宣称分发到响应全阶段构成单一原子事务 |
+| 7 | Hermes 尚未接入生产节点 | 未集成 | CFserver Staging 尚不能执行真实 Hermes 分发 |
+| 8 | WeChat runtime 尚未启用 | 未启用 | 当前尚不能进行微信真实收发联调 |
+| 9 | Worker 等待上下游启用 | 未启用 | `dispatch-worker` 与 `delivery-worker` 当前均未运行 |
 
 ## 3. 详细说明
 
@@ -79,7 +82,7 @@ Windows 环境中的 symlink 相关测试当前被 skip。现有 Windows 测试�
 
 **当前处置**
 
-- 仅按当前已发布的消息、路由、线程、分发、Hermes 集成、Context、响应和投递能力运行。
+- 当前发布版本的代码能力边界包含消息、路由、线程、分发、Hermes 集成、Context、响应和投递；这不表示这些能力对应的 CFserver 服务均已启用。
 - 遇到需要 Skill Runtime 的业务请求时，明确标记为当前不支持，不伪造成功状态。
 
 **后续方向**
@@ -151,11 +154,75 @@ Dispatch Outbox、Dispatch Worker、Response Persistence 和 Delivery Worker 已
 
 后续可优化 Dispatch 与 Response 的事务衔接、一致性检查和恢复体验。具体事务模型、幂等契约和迁移方案尚未在本文确定。
 
+### 3.7 Hermes 尚未接入生产节点
+
+**现状**
+
+CFserver Staging 当前只运行 PostgreSQL 与 Gateway。Hermes API 尚未接入计划中的生产 Agent 节点，因此当前 `dispatch-worker` 未启用。
+
+**运维影响**
+
+- Gateway readiness 正常不能证明 Hermes 调用链路可用。
+- 当前不得宣称 Dispatch、Hermes 推理或响应持久化已经在 CFserver 完成端到端验证。
+- 不得用临时直连或未受控凭据绕过既定 Gateway 与 Hermes 集成边界。
+
+**当前处置**
+
+- 保持 `dispatch-worker` 停用，直至 Hermes API 的网络、认证、超时和错误处理完成受控配置与验证。
+- 以 PostgreSQL、Gateway 和 migration 的已验证状态作为当前验收边界。
+
+**后续方向**
+
+接入 Hermes API 后启动 `dispatch-worker`，再使用脱敏测试数据验证 Dispatch、Hermes 调用和响应持久化链路。
+
+### 3.8 WeChat runtime 尚未启用
+
+**现状**
+
+CFserver Staging 尚未启用 WeChat runtime，`agent-wechat` 尚未完成本环境部署和真实联调。
+
+**运维影响**
+
+- 当前没有可承诺的微信入站或出站链路。
+- Gateway health 不能替代微信登录、消息接收、附件获取或回复投递验证。
+- 不得把历史 V1 Staging 验证直接视为本次 V2 CFserver 部署的验证结果。
+
+**当前处置**
+
+- 不接收真实微信业务流量。
+- 微信凭据、Cookie 和登录数据继续按 Secret 边界管理，不写入仓库或普通日志。
+
+**后续方向**
+
+部署 `agent-wechat` 后，按受控身份完成微信真实联调，并分别记录入站、归档、响应持久化和投递结果。
+
+### 3.9 Worker 等待上下游启用
+
+**现状**
+
+`dispatch-worker` 与 `delivery-worker` 的代码属于当前发布版本，但两个 Docker 服务在 CFserver Staging 均暂未启用。前者等待 Hermes API，后者等待 WeChat runtime。
+
+**运维影响**
+
+- 当前没有 Worker heartbeat 或积压消费结果可供验收。
+- Dispatch Outbox、Hermes 响应和微信投递的完整运行链路尚未验证。
+- PostgreSQL 与 Gateway 正常运行不代表 Workers 已运行。
+
+**当前处置**
+
+- 保持 Workers 停用，避免在上下游未就绪时产生不可交付的工作。
+- 当前健康检查只覆盖已运行的 PostgreSQL、Gateway、数据挂载和 migration 状态。
+
+**后续方向**
+
+按依赖顺序接入 Hermes 和 WeChat runtime，再分别启动、观察并验收 `dispatch-worker` 与 `delivery-worker`。
+
 ## 4. 状态声明规则
 
 - **已发布**只用于 `v2-enterprise-runtime-20260811` 已存在并可按当前实现运行的模块。
 - **未实现**不得写为“已接入”“已支持”或“可用”。
 - **未集成**不得因接口设想、Hermes 推理能力或手工操作而写成业务闭环。
+- **未启用**表示发布版本可能包含相应模块，但当前部署没有运行该服务，也没有对应运行验证。
 - **测试 skip** 必须保留为验证缺口，不能计入通过数。
 - **后续方向**不构成接口、时间或交付承诺。
 - 当前限制清单不是新增功能清单；任何边界变化都应以代码、测试、部署证据和技术决策为依据。
@@ -169,6 +236,7 @@ Dispatch Outbox、Dispatch Worker、Response Persistence 和 Delivery Worker 已
 - Skill Runtime 与 Memory Runtime 均明确标记为未实现。
 - WDT / S6 均明确标记为未接入。
 - Dispatch、Response Persistence 与 Delivery 的阶段状态可分别观察和排障。
+- CFserver 当前只确认 PostgreSQL 与 Gateway 已运行；Hermes、WeChat runtime 和 Workers 均未写成已启用。
 - 文档没有把 RAG、embedding、vector database、automatic memory 或业务系统闭环写成当前能力。
 
-整体模块边界见 [V2 Enterprise Runtime 架构总览](../architecture/v2-enterprise-runtime.md)，部署拓扑见 [Staging Debian 部署](../deployment/staging-debian.md)，运维步骤见 [Runtime 运维](../operations/runtime-operations.md)。
+整体模块边界见 [V2 Enterprise Runtime 架构总览](../architecture/v2-enterprise-runtime.md)，实际运行状态见 [CFserver Staging 部署状态](../deployment/cfserver-staging-status.md)，部署拓扑见 [Staging Debian 部署](../deployment/staging-debian.md)，运维步骤见 [Runtime 运维](../operations/runtime-operations.md)。
