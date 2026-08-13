@@ -1,55 +1,44 @@
 # agent-wechat 定位与职责
 
-> 状态日期：2026-08-04。`agent-wechat` 是微信消息入口层，不是 AI Agent 核心或业务执行引擎；其 Docker、VNC / noVNC 和入口部署细节归 `CF_agent-wechat` 仓库维护。
+> 状态日期：2026-08-13。`agent-wechat` 是企业 AI 微信客户端和协议入口，不是 Gateway、Access Control 或 Hermes。
 
-## 组件定位
+## 当前生产部署
 
-`agent-wechat` 位于员工微信会话与企业 AI 自动化系统之间，负责把微信侧可获取的消息、会话、联系人和附件事件交给后续系统，并将系统生成的回复发送回指定微信会话。
-
-生产部署位置计划为 Debian，使微信入口靠近权威消息与任务控制面。测试环境中的 V1 入口验证和 Gateway V1 Staging 微信文本 AI 闭环已经完成，包括 Hermes API 调用、原会话文本回复和 self message 防回环。图片 / 附件 / 文件、Skill 和完整业务流程仍未贯通。入口与 Gateway 记录分别见[agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)和[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+- 已部署在 CFserver，使用 `docker/compose.cfserver.yaml`。
+- 容器内部运行 Xvfb、fluxbox、dunst、WeChat 与 `agent-server`。
+- 设置 `ENABLE_VNC=0`。
+- 不使用 VNC、noVNC、x11vnc、websockify 或宿主桌面 X11。
+- 登录管理脚本和手机确认登录已实机通过。
+- 完全新设备经 SSH 展示二维码并扫码尚未实机验证。
+- 与 Gateway 通过 `cf-internal` 容器网络通信，并执行 Token 鉴权。
 
 ## 负责范围
 
-| 职责 | 当前状态 | 边界说明 |
-| --- | --- | --- |
-| 接收员工微信文本 | 私聊文本、群聊文本已验证 | 不代表持续运行稳定性或所有消息类型已经验收 |
-| 识别引用消息 | 已验证 | 只代表入口能够读取引用消息，不代表后续上下文关联已经完成 |
-| 识别入口标识 | `sender`、`chatId` 已验证 | 入口标识本身不授予权限；企业身份、权限和 AI Thread 由 Gateway 处理 |
-| 获取聊天信息 | 已验证聊天读取 | 只提供微信侧可获得的信息；权威上下文选择、线程隔离和快照由后续控制面负责 |
-| 获取联系人信息 | 已验证联系人读取 | 联系人信息不直接等同于企业身份、岗位或业务授权 |
-| 接收文件消息 | 文件消息和 ZIP 文件已验证 | 图片、Office、PDF、中文文件名、连续多附件、大小边界和下载失败场景仍待验证 |
-| 获取文件 | 已验证 | 仅代表入口能够获取文件，不代表内容解析、权限检查或正式归档已经完成 |
-| 识别合并转发消息 | 类型、发送人和外层标题已验证 | 尚不能展开内部聊天记录或自动提取内部文件 |
-| 通过 API 读取消息 | 已验证 | 这是当前已验证的读取方式 |
-| WebSocket 实时事件 | 待研究 | 接口可用性、事件范围、重连、去重和补偿机制均未完成研究与验证 |
-| 向 Gateway 发送事件 | V1 Staging 文本闭环已验证 | Polling / Checkpoint、持久化、身份、准入、Hermes 调用与回传已验证；不代表长期稳定性或生产验收完成 |
-| 接收 AI 回复并发送微信 | `chatId + text` 文本回传已验证 | 不代表图片、附件、文件或其他富媒体结果回传已完成 |
+| 能力 | 当前边界 |
+| --- | --- |
+| 微信登录状态 | 维护客户端会话，提供受控登录管理 |
+| 消息读取 | 向 `wechat-worker` 提供微信侧实际可得的会话、发送者、类型和内容 |
+| 消息发送 | 按 Gateway 指定的 Bot 账号、目标会话和内容发送 |
+| 文件入口 | 提供微信侧可得的附件与元数据；生产图片/文件/引用链路仍待验证 |
+| 接口鉴权 | 接受 Gateway 内网请求并验证 Token |
 
 ## 不负责范围
 
-`agent-wechat` 不负责：
+- 不判断 Enterprise Identity、User Access Policy 或 Gateway Access Policy。
+- 不决定 Admission、Agent Profile、V2 Routing 或 Skill 权限。
+- 不直接调用 Hermes，不生成业务答案。
+- 不保存 Message Store、Checkpoint、Workspace、AI Thread、Response 或 Delivery Outbox 的权威状态。
+- 不直接访问正式企业文件存储。
 
-- AI 思考、任务规划或答案生成。
-- 业务规则判断、数据口径判断或高风险动作确认。
-- 旺店通 ERP、旺店通 WMS、S6 等企业系统操作。
-- Skill 选择、执行、重试或结果判定。
-- 权威上下文、任务状态、权限、日志和审计数据的保存。
-- 正式文件的任意读写、归档或权限判定。
+## 与 Gateway 的边界
 
-## 与 CF Gateway 的边界
+```mermaid
+flowchart LR
+    W["微信客户端"] <--> AW["agent-wechat"]
+    AW <--> |"cf-internal + Token"| WW["wechat-worker / delivery-worker"]
+    WW <--> PG["Gateway + PostgreSQL 权威状态"]
+```
 
-`agent-wechat` 输出微信侧事件，CF Gateway 承接消息路由和安全隔离，并连接上下文、任务、权限与审计能力。V1 Staging 已验证从 `agent-wechat`、Gateway Polling / Checkpoint、消息与权限控制到 Hermes API 和原微信会话文本回复。`is_self=true` 的机器人自发消息由 Polling 过滤并推进 Checkpoint，不进入后续执行链。失败重试、长期稳定性、非文本结果和生产验收仍待验证。
+当前已验证 `agent-wechat` 与 Gateway 的内部网络、Token 鉴权、消息轮询和未授权拒绝路径。授权后的 Hermes 调用与微信 AI 回复尚未验证，不能归因于入口已完成。
 
-即使 `agent-wechat` 已经读到消息，也不能据此宣称任务已建立、Hermes 已处理或业务系统已执行；这些状态必须以后续权威控制中心记录为准。
-
-## 上下文边界
-
-`agent-wechat` 可以读取微信侧当前可获得的聊天和联系人信息，但“获取聊天上下文”仅指入口数据采集。用于 Hermes 的上下文应由控制面按会话、发信人、任务和权限筛选并形成快照，不能由入口层把全部聊天历史直接作为 AI 输入。
-
-## 文件边界
-
-文件消息和 ZIP 文件入口已经通过 V1 验证。该结论仅说明入口可接收这两类验证对象；`agent-wechat` 仍只负责获取附件及来源元数据，并把它们交给后续受控流程。图片、Office、PDF、中文文件名、连续多附件和失败重试等场景仍待验证，文件安全检查、自动解压、正式归档、内容解析、权限与审计也不属于 `agent-wechat`。
-
-合并转发消息当前仅支持识别类型、获取发送人和外层标题，未支持展开内部聊天记录或自动提取内部文件。它属于增强解析能力，后续可由 `forward parser` 承担；该增强待开发，不影响普通微信文件经 `agent-wechat` 进入 Hermes 后续处理的架构方向。Hermes 文件上下文适配和实时事件机制同样仍待开发。
-
-第一阶段不建设独立 OCR。任何 OCR、视觉解析或知识库处理只能作为明确标注的后续规划，不能写成 `agent-wechat` 的现有能力。
+底层部署和登录命令由 `CF_agent-wechat` 仓库维护；本仓库只保留总体职责和当前跨项目状态。

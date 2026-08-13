@@ -1,71 +1,110 @@
-# 电商业务全自动化系统文档
+# 电商业务全自动化系统
 
-> 状态标识：**已确定**表示当前有效基线；**待技术验证 / 待确认**表示尚不能作为稳定能力承诺；**后续规划**表示不属于当前阶段。
+本仓库是“电商业务全自动化系统”的总文档入口，维护总体架构、项目状态、跨仓库关系、运维索引、技术决策和路线图，不存放业务代码、凭证或真实业务文件。
 
-## 仓库用途
+## 总体目标
 
-本仓库集中维护“电商业务全自动化系统”的项目总纲、功能需求、系统设计、开发规范、部署运维和技术决策，不存放业务代码或真实业务文件。
+员工通过微信提交文字与附件任务；CFserver 先保存消息并执行身份、权限和路由控制，再由 Windows AI 主机上的 Hermes 调用模型与授权能力，最后把可追踪的结果返回原会话。正式文件访问统一经过 `CF_filebrowser-enterprise` 的 File Service、权限检查与审计。
 
-**一句话目标：** 让员工通过微信提交文字与附件任务，由受控的 AI 和自动化工具完成处理，并把可追踪的结果返回原会话。
+## 当前阶段
 
-## 当前固定技术方案
+当前仍处于**阶段 1**，已到“**微信入口和未授权安全链路完成，授权 AI 闭环待验证**”。截至 2026-08-13，准确结论是：
 
-- **已确定：** Debian 是消息、上下文、任务、文件、权限、日志和审计的权威控制中心。
-- **已确定：** 生产 Agent 使用 Hermes，模型计划使用 GPT-5.6 API，不使用 OpenClaw。
-- **已确定：** 微信接入采用 `agent-wechat`，计划运行在 Debian；它只负责微信收发和附件获取。
-- **已确定：** 新 Windows AI 电脑运行 Hermes、Worker Bridge、Skills 及文档、浏览器和 Windows 自动化工具。
-- **已确定：** `CF_filebrowser-enterprise` 是正式企业 File Service；FileBridge / `filebrowser-agentctl` 是受控客户端，Gateway、Hermes、Skills 和客户端均不得绕过其 API、文件权限、Token capability、Share capability 或 Audit。
-- **已确定：** 第一阶段不建设独立 OCR；自动化主线与 FileBrowser Enterprise 二次开发并行推进。
-- **已实现：** `CF_filebrowser-enterprise` 的 `feat/v1-integration` commit `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 为当前代码基线。V1 Beta 核心代码已实现并通过自动化测试。
-- **V2 CFserver Staging 已运行：** `CF_agent-gateway` 版本 `v2-enterprise-runtime-20260811`、commit `2ac4c86dbcbb3ac035c3688100e88c57407575b7` 已部署；PostgreSQL 与 Gateway 正在运行，数据挂载、Alembic `20260810_01 (head)` 和 Gateway readiness 已验证。
-- **待集成 / 待验证：** V2 的 Hermes API 尚未接入，WeChat runtime、`dispatch-worker`、`delivery-worker` 和完整链路尚未启用；FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 文件自动化接入，以及 FileBrowser Enterprise 的 Debian 部署验收、备份恢复、升级回滚、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线尚未完成。
-- **已验证：** `agent-wechat` V1 入口已完成微信登录、私聊文本、群聊文本、文件消息、ZIP 文件、引用消息、`sender` 识别、`chatId` 识别和文件获取验证；合并转发消息已验证类型识别、发送人获取和外层标题获取。
-- **已验证：** 微信群结构化 mention 实测中，只有从成员列表选择当前机器人时原始 `isMentioned=true`；`@` 其他成员或只复制 / 输入机器人名称时该字段缺失。Gateway 仅按 `raw.get("isMentioned") is True` 生成 `is_mentioned`，字段缺失按 `false`。
-- **已验证：** V1 Staging 微信文本消息 AI 闭环已完成：Polling、Message Store、Identity / Permission Admission、Employee Workspace / AI Thread、Hermes API 调用、Response Relay、原微信会话回复和 `is_self=true` 防回环均已通过验证。
-- **待技术验证 / 待开发：** 图片、Office、PDF、中文文件名、连续多附件、失败重试和长期运行稳定性等未覆盖场景，以及合并转发内部聊天记录展开和内部文件自动提取。
-- **未完成：** 图片理解、附件系统级传递、文件处理、OCR、压缩包解析、企业知识库、Skill 自动执行和生产环境自动部署；当前文本闭环不代表完整企业业务自动化或生产上线。
-- **已知实现偏差：** 群聊目标线程键仍为 `bot_account_id + group_chat_id + sender_id`；Gateway V1 当前 whole-room thread 行为待修复和复验，不代表设计变更。
+> 微信消息发现、持久化、Checkpoint、未授权拒绝和 Hermes 网络连通已实机验证；授权后的完整 AI 回复闭环仍待验证。
 
-## 文档入口
+较早的 V1 Staging 授权文本闭环是特定日期与测试环境的历史证据，不能替代当前 CFserver 生产链路验收。当前状态以[状态矩阵](./status/current-status.md)和[2026-08-13 阶段收口记录](./status/2026-08-13-wechat-runtime-closeout.md)为准。
+
+## 项目组成
+
+| 组件 | 职责 | 当前状态 |
+| --- | --- | --- |
+| `CF_agent-wechat` | 托管企业 AI 微信客户端，管理登录状态、读取和发送微信消息，并向 Gateway 提供接口 | **已部署并实机验证** |
+| `CF_agent-gateway` | 轮询、Checkpoint、Message Store、身份与权限 Admission、Workspace、AI Thread、V2 Routing、Hermes Dispatch、响应持久化与 Delivery Outbox | **已部署，部分链路待验证** |
+| Hermes Gateway | 执行 Agent、模型调用及后续 Skills/工具调用 | **已部署，部分链路待验证** |
+| PostgreSQL | 保存 Gateway 的权威消息、Checkpoint、身份、权限、路由、响应和投递状态 | **已部署并实机验证** |
+| `CF_filebrowser-enterprise` | 企业文件中心、用户权限、Token、分享、WebDAV、审计与 AI 文件访问基础设施 | **开发中**；本次不改变其既有状态 |
+| Skills、OCR、旺店通/S6 集成 | 后续文档、业务系统和确定性自动化能力 | **规划中** |
+
+完整字段、限制和下一步见[当前状态矩阵](./status/current-status.md)。
+
+## 当前生产拓扑
+
+```mermaid
+flowchart LR
+    E["员工个人微信"] --> B["企业 Bot 微信"]
+    subgraph CFS["CFserver / 权威控制中心"]
+        AW["agent-wechat"]
+        GW["gateway"]
+        WW["wechat-worker"]
+        DW["dispatch-worker"]
+        DLW["delivery-worker"]
+        DB["PostgreSQL"]
+        FB["CF_filebrowser-enterprise"]
+        FS["受控文件存储"]
+    end
+    subgraph AI["Windows AI 主机"]
+        H["Hermes Gateway 0.20.0"]
+        MA["模型与 Agent 能力"]
+    end
+
+    B <--> AW
+    AW --> WW --> DB
+    GW <--> DB
+    DB --> DW --> H --> MA
+    H --> DW --> DB --> DLW --> AW
+    GW -. "后续文件接入" .-> FB
+    FB --> FS
+```
+
+- `agent-wechat` 使用 `docker/compose.cfserver.yaml` 部署；容器内运行 Xvfb、fluxbox、dunst、WeChat 与 `agent-server`。
+- 生产配置为 `ENABLE_VNC=0`，不使用 VNC、noVNC、x11vnc、websockify 或宿主桌面 X11。
+- Gateway 栈的 PostgreSQL、`gateway`、`wechat-worker`、`dispatch-worker`、`delivery-worker` 五个服务均已部署并保持 healthy。
+- Gateway 与 `agent-wechat` 通过 `cf-internal` 容器网络通信。
+- Hermes Gateway 0.20.0 运行在 Windows AI 主机；CFserver 与 `dispatch-worker` 到它的网络已验证，但重启后的自动启动可靠性尚未收口。
+
+## 已验证范围
+
+- `agent-wechat` 登录管理脚本和手机确认登录已实机通过。
+- Gateway Token 鉴权以及与 `agent-wechat` 的内部网络已验证。
+- 微信每 3 秒轮询；17 个现有聊天已建立 Checkpoint。
+- 首次启用以 `bootstrap_mode=latest` 将 151 条历史消息作为基线跳过，没有重新触发历史任务。
+- 新私聊消息已进入 Message Store，发送者与会话识别正确，Checkpoint 正常推进。
+- 未授权账号已被安全拒绝，没有调用 Hermes，也没有产生机器人回复。
+- CFserver 与 `dispatch-worker` 均可访问 Windows AI 主机上的 Hermes Gateway。
+
+## 尚未验证范围
+
+- 测试发送者的 Enterprise Identity、Source Identity Mapping、两级访问策略、Agent Profile 和私聊会话绑定。
+- Admission Allowed、V2 Routing、Hermes 实际处理、Response Persistence、Delivery Outbox 和微信收到 AI 回复。
+- Hermes Gateway 在 Windows AI 主机重启后的可靠自启。
+- 完全新设备 SSH 二维码扫码登录、群聊明确 `@` 机器人、图片、文件和引用消息。
+- FileBrowser 与企业资料接入，以及 Skills、OCR、旺店通和 S6 业务自动化。
+
+严格的 18 步后续顺序见[当前状态矩阵](./status/current-status.md#下一阶段顺序)。
+
+## 文档目录
 
 | 文档 | 内容 |
 | --- | --- |
-| [项目总纲](./00_项目总纲.md) | 范围、总体模块、设备分工、建设阶段 |
-| [功能需求](./01_功能需求.md) | 系统要做什么及验收边界 |
-| [系统设计](./02_系统设计.md) | 架构、职责、数据流、状态与安全边界 |
-| [员工工作区与 AI 会话线程设计](./design/employee-workspace-design.md) | 企业身份、员工工作区、AI 线程隔离与 Hermes 运行时绑定 |
-| [开发规范](./03_开发规范.md) | 仓库、Git、数据与文档规则 |
-| [部署运维](./04_部署运维.md) | 测试环境基线、待部署服务与排障原则 |
-| [V2 Enterprise Runtime 文档](./docs/README.md) | V2 架构、部署、运维、Context、Admin API 与当前限制 |
-| [CFserver V2 Staging 部署状态](./docs/deployment/cfserver-staging-status.md) | 实际版本、运行服务、migration、验证结果与下一阶段计划 |
-| [技术决策记录](./05_技术决策记录.md) | 当前有效决定及其原因和影响 |
-| [AI 系统总体架构](./architecture/ai-system-overview.md) | 面向企业业务的分层架构和当前实现边界 |
-| [企业 AI Gateway 架构](./architecture/gateway-architecture.md) | Gateway 目标架构、实际实现边界和线程隔离规则 |
-| [微信入口与 Hermes 集成](./architecture/wechat-hermes-integration.md) | 微信文本闭环、Hermes 集成和后续目标链路 |
-| [agent-wechat 定位](./architecture/wechat-agent.md) | 微信入口层职责、非职责和接口边界 |
-| [消息与任务流程](./architecture/message-flow.md) | 普通问答、企业业务和规划中文件处理流程 |
-| [组件职责图谱](./architecture/component-map.md) | 核心组件职责、状态和系统关系 |
-| [当前开发进度](./status/current-progress.md) | 已验证事实、待完成工作和规划能力 |
-| [agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md) | 验证时间、范围、已完成和未完成能力 |
-| [Gateway V1 Staging 微信文本闭环验证记录](./status/gateway-wechat-staging-validation.md) | 当前环境、完整文本链路、Hermes、回传、自回环及质量检查结果 |
-| [AI 协作入口](./AGENTS.md) | 后续 Codex 和其他代码 AI 的约束 |
+| [项目总纲](./00_项目总纲.md) | 总体目标、范围、组件定位、设备职责和建设阶段 |
+| [功能需求](./01_功能需求.md) | 用户场景、系统行为、异常和验收边界 |
+| [系统设计](./02_系统设计.md) | 当前生产链路、目标边界、数据流、状态与安全规则 |
+| [开发规范](./03_开发规范.md) | 仓库、Git、数据和文档协作规则 |
+| [部署运维](./04_部署运维.md) | 跨仓库生产运维索引、健康检查、备份和排障边界 |
+| [技术决策记录](./05_技术决策记录.md) | 当前有效技术决定、原因和影响 |
+| [当前状态矩阵](./status/current-status.md) | 组件部署、实机验证、限制和下一步 |
+| [微信运行时阶段收口](./status/2026-08-13-wechat-runtime-closeout.md) | 当天完成、生产拓扑、验证证据、阻塞项和交接顺序 |
+| [架构专题](./architecture/ai-system-overview.md) | 总体架构及 Gateway、微信、Hermes、消息流专题导航 |
+| [历史 V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md) | 2026-08-04 特定 Staging 环境的历史验证证据 |
+| [AI 协作入口](./AGENTS.md) | 本仓库对 Codex 和其他代码 AI 的固定约束 |
 
-## 相关仓库
+## 项目仓库
 
-| 仓库 | 状态 |
+| 仓库 | 职责 |
 | --- | --- |
-| `CF_ecommerce-automation-docs` | **已确定：** 当前文档仓库 |
-| `CF_agent-gateway` | **V2 CFserver Staging 基础服务已运行 / V1 文本闭环已验证：** V2 当前运行 PostgreSQL 与 Gateway，Hermes API 尚未接入，Workers 和 WeChat runtime 尚未启用；V1 群聊 whole-room thread 与既定 `group + sender` 设计的偏差待修复 |
-| `CF_agent-wechat` | **V1 Staging 微信入口已验证：** 负责 `agent-wechat` Docker 部署、登录与微信接入、VNC / noVNC 和入口验证；不承载 Gateway 权威状态或 Hermes 业务调度 |
-| `CF_filebrowser-enterprise` | **V1 Beta 核心代码冻结候选：** `feat/v1-integration` 的 `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 已完成权限、API Token、Share 与 Share capability UI、Persistent Audit、WebDAV / OnlyOffice Audit 代码和自动化测试；自动化对接与 Debian / 发布验收仍为**待集成 / 待验证**，当前不代表正式生产上线；本仓库任务不得修改其实现 |
-| 其他 `CF_` 前缀代码仓库 | **后续规划：** 名称与边界须另行确认 |
+| [`CF_ecommerce-automation-docs`](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs) | 总体架构、状态、跨项目关系、运维索引和路线图 |
+| [`CF_agent-wechat`](https://github.com/Tangbohu09527/CF_agent-wechat) | 微信客户端、登录管理、消息读取和发送 |
+| [`CF_agent-gateway`](https://github.com/Tangbohu09527/CF_agent-gateway) | 企业消息、身份、权限、路由、执行派发、响应持久化与投递控制 |
+| [`CF_filebrowser-enterprise`](https://github.com/Tangbohu09527/CF_filebrowser-enterprise) | 正式企业 File Service 和 AI 文件访问基础设施 |
 
-## 当前状态
-
-当前仍处于**阶段 1**。在 V1 Staging 历史链路中，Windows AI 节点、Debian 13 Staging、`agent-wechat` Docker 和 Gateway Worker 已完成微信文本消息 AI 闭环：获准文本消息进入 Employee Workspace / AI Thread 后调用 Windows Hermes API，并把响应返回原微信会话；Hermes Client、Dispatch、Response Relay、Runtime Thread Binding 和 self message 防回环均已验证。Context Builder、Task Queue、完整 Worker Bridge、Skills 和文件主链路仍待建设。微信群同群不同员工的目标隔离尚因 Gateway V1 whole-room thread 实现偏差而待修复 / 待复验。完整证据与 `393 passed`、`ruff`、`git diff --check` 结果见[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)。
-
-CFserver 的 V2 Enterprise Runtime Staging 已完成部署准备并运行基础服务：代码版本为 `v2-enterprise-runtime-20260811`，PostgreSQL 与 Gateway 已启动，数据目录挂载、Alembic `20260810_01 (head)` 和 Gateway readiness 已验证。Hermes API 接入、WeChat runtime 与 Workers 启用、微信真实联调和 Context Runtime 运行验证仍待完成。详见 [CFserver V2 Staging 部署状态](./docs/deployment/cfserver-staging-status.md)。
-
-`CF_filebrowser-enterprise` 是唯一正式企业 File Service。当前代码基线 `f329de2fc6e9296ca949acab4873c30a83d5f5e7` 已实现 Browse / Preview / Download 三权、Create / Modify / Delete / Replace、Upload、Range Download、Preview / Thumbnail / Media、Archive Create / Extract、API Token hash-only 与 migration、Share capability 前端 UI、Browse / Preview 派生规则、Upload Share 强制 Create、Share 密码三态和 credential-active hash 绑定。Persistent Audit 已覆盖 Pending / Finalize / Recovery、RequestID、查询与签名 Cursor，以及 Token、登录、用户、权限、Share、核心文件、Archive、WebDAV 和 OnlyOffice Action。V1 Beta 核心代码已实现并通过自动化测试；前端 17 个文件共 109 项测试、typecheck、lint、i18n、production build、`go vet`、`go test ./http` 和 `go test ./...` 均已通过。
-
-`CF_filebrowser-enterprise` 的 FileBridge / `filebrowser-agentctl`、Gateway / Hermes / Skills 自动化接入，以及 Debian、migration、备份恢复、升级回滚、Docker / Compose、Nginx / TLS / systemd、真实 WebDAV / OnlyOffice 联调、V1 Beta Candidate、Git tag、GitHub Release 和正式生产上线仍待完成。Gateway 文本闭环和 FileBrowser 代码测试均不表示文件业务端到端运行或正式生产上线。详见[当前开发进度](./status/current-progress.md)、[Gateway V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md)、[agent-wechat V1 入口验证记录](./status/agent-wechat-validation.md)和[部署运维](./04_部署运维.md)。
+所有项目仓库使用 `CF_` 前缀。业务跑通前使用 GitHub 私密仓库做中央版本管理；生产运行不得持续依赖 GitHub 在线。

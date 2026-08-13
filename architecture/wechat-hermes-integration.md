@@ -1,229 +1,117 @@
 # 微信入口与 Hermes 集成架构
 
-> 状态日期：2026-08-04。本文同时描述目标架构和当前 V1 运行边界。V1 Staging 已完成真实微信文本从 Polling、身份与权限准入、Employee Workspace / AI Thread 到 Hermes API 和原会话回复的闭环，并验证 Runtime Thread Binding 与 self message 防回环。Context Builder、Task Queue、完整 Worker Bridge、Skill、文件链路和生产部署均未完成。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+> 状态日期：2026-08-13。本文描述 `agent-wechat`、Gateway 三个 Worker、PostgreSQL 与 Hermes Gateway 0.20.0 的当前集成边界。
 
 ## 目标与范围
 
-本方案用于把员工微信中的文本、文件和可获得的引用上下文，转换为企业 AI 自动化系统可追踪、可去重、可授权的任务输入，再由 Hermes 选择获授权的 Skill 处理，并将结果返回原微信会话。
+员工通过企业 Bot 微信提交请求。`agent-wechat` 维持微信客户端并提供消息接口；Gateway 先持久化消息，再执行身份、权限、会话和 V2 Routing；Hermes 处理获准请求；响应持久化后由 Delivery Outbox 返回原会话。
 
-本文只定义微信入口到 Hermes 的组件关系和职责边界。消息事件字段、Polling 和文件处理细节见 [wechat-adapter 设计](../design/wechat-adapter-design.md)；员工工作区与线程隔离见[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md)；Debian 权威控制面、任务中心、File Service 和 Worker Bridge 的完整边界以[系统设计](../02_系统设计.md)为准。
-
-## 当前验证与实现结论
-
-`agent-wechat` V1 已完成以下入口能力验证：
-
-- 微信登录。
-- 私聊文本收发和群聊文本读取。
-- 文件消息读取，以及 TXT、ZIP 和群文件获取。
-- `sender` 和 `chatId` 识别。
-- 引用消息和引用文件读取。
-- 合并转发消息的外层类型、发送人和标题识别。
-- 群内从成员列表选择脱敏记作 `机器人示例名` 的当前机器人时，原始 `isMentioned=true`。
-- 群内从成员列表选择其他成员 T，或只复制 / 输入 `@机器人示例名 手工文字对照` 时，`isMentioned` 字段缺失。
-- `/api/ws/events` 可以建立连接，但尚未确认微信消息事件推送。
-
-结构化 mention 的固定标准化规则为 `is_mentioned = raw.get("isMentioned") is True`，字段缺失按 `false`；不得根据正文 `@`、当前脱敏示例名 `机器人示例名`、旧脱敏示例名 `机器人旧示例名`、引用消息或上一条 mention 推断或继承。
-
-合并转发的内部聊天记录展开和内部文件自动提取尚未支持。V1 运行链路不依赖 WebSocket 实时事件；当前已使用 Polling / Checkpoint 获取并处理新增消息。入口能力边界见 [agent-wechat V1 入口验证记录](../status/agent-wechat-validation.md)，Gateway 的 Debian Staging 真实链路边界见[联调验证记录](../status/gateway-wechat-staging-validation.md)。
-
-V1 Staging 已在 Debian 13 的 `agent-wechat` Docker 与 Gateway Worker、Windows AI 主机 Hermes API 之间完成真实微信文本联调。已验证 Polling、Checkpoint、Message Store、Identity / Permission Admission、Employee Workspace / AI Thread、Hermes Dispatch / Response Relay、Runtime Thread Binding、`chatId + text` 回复和 `is_self=true` 防回环。
-
-## 总体架构
-
-面向业务的简化关系如下：
-
-```mermaid
-flowchart TB
-    E["员工微信"] --> A["agent-wechat<br/>V1 入口已验证"]
-    A --> W["Gateway Runtime / wechat-adapter<br/>V1 Staging 文本闭环已验证"]
-    W --> H["Hermes Agent<br/>文本 API 调用已验证"]
-    H --> S["Skills<br/>规划建设"]
-    S --> B["企业系统<br/>接口待逐项对接"]
-```
-
-`wechat-adapter` 是现有 CF Gateway 逻辑边界中的微信入口适配组件，对应系统设计中的 `wechat-relay / 入口适配` 职责。上图省略了控制组件，不表示 Adapter 可以绕过 Debian 权威控制面直接触发 Hermes 或企业系统。
-
-目标控制链路如下：
+## 当前生产部署
 
 ```mermaid
 flowchart LR
-    E["员工微信"] --> A["agent-wechat"]
-
-    subgraph D["Debian 权威控制中心"]
-        A --> W["wechat-adapter"]
-        W --> M["Message Store"]
-        M --> I["Identity Mapping"]
-        I --> AC["Access Control"]
-        AC -->|"允许"| C["Employee Conversation Manager<br/>上下文 / 任务 / 审计"]
-        AC -->|"拒绝"| R["仅保存消息与权限决策"]
-        W --> T["受控临时文件 / File Service"]
-        T --> C
-    end
-
-    C --> B["Hermes Worker Bridge"]
-
-    subgraph N["Windows AI 执行节点"]
-        B --> H["Hermes Agent"]
-        H --> S["授权 Skills"]
-    end
-
-    S --> X["ERP / S6 / 平台接口 / File Service"]
-    X --> S --> H --> B --> C --> W --> A --> E
+    E["员工微信"] <--> AW["CFserver: agent-wechat"]
+    AW --> WW["wechat-worker"]
+    WW --> PG["PostgreSQL"]
+    G["gateway"] <--> PG
+    PG --> DW["dispatch-worker"]
+    DW <--> H["Windows AI 主机<br/>Hermes Gateway 0.20.0"]
+    DW --> PG
+    PG --> DLW["delivery-worker"]
+    DLW --> AW
 ```
 
-生产部署位置仍以现有技术决定为准：`agent-wechat` 计划运行在 Debian；Debian 保存消息、上下文、任务、文件、权限、日志和审计的权威状态；Windows AI 节点已完成 Staging Hermes API 调用，完整 Worker Bridge 和 Skills 仍按目标架构建设。
+Gateway 五服务均已部署并保持 healthy。`agent-wechat` 与 Gateway 通过 `cf-internal` 容器网络通信，并执行 Token 鉴权。
 
-## 统一 Hermes 与员工逻辑隔离
+## `agent-wechat` 边界
 
-企业内目标是运行一套或少量统一 Hermes 服务，不为每个员工部署独立 Hermes 进程。Gateway 为每个 Enterprise Identity / 企业身份维护独立 Employee Workspace / 员工工作区，每个工作区可以包含多个 AI Thread / AI 会话线程：
+`agent-wechat` 使用 `docker/compose.cfserver.yaml` 部署。容器内部运行 Xvfb、fluxbox、dunst、WeChat 和 `agent-server`；生产配置 `ENABLE_VNC=0`，不使用 VNC、noVNC、x11vnc、websockify 或宿主桌面 X11。
 
-- 微信私聊线程键保持为 `bot_account_id + private_chat_id`。
-- 微信群聊线程键保持为 `bot_account_id + group_chat_id + sender_id`。
-- 同一群内不同员工发起的任务进入不同员工工作区和不同 AI Thread / AI 会话线程，不共享个人上下文。
-- 企业知识、授权 Skills、文件资料和企业系统能力可以按权限共享，但其他员工的个人消息和任务历史不得混入当前上下文。
+登录管理脚本与手机确认登录已实机通过。完全新设备 SSH 二维码扫码尚未实机验证。
 
-Gateway 生成稳定的 `workspace_id` 和 `ai_thread_id`。Hermes Runtime Thread / Hermes 运行时线程的 `hermes_thread_id` 可在恢复期间暂时解绑或重新绑定，不是系统权威主键。Windows AI 节点未来可以按员工显示独立工作区与任务状态，但这属于目标界面，尚未实现；Gateway / Debian 控制面仍是权威状态源。
+它负责：
 
-V1 Staging 已验证获准真实微信文本创建 Employee Workspace / AI Thread、建立 `hermes_thread_id` 运行时绑定并返回响应；拒绝样本不得进入 Hermes。`hermes_thread_id` 可重建且不替代权威 `ai_thread_id`。
+- 微信登录状态。
+- 消息读取和发送。
+- 提供微信侧会话、发送者、类型、正文和可得附件元数据。
+- 接受 Gateway 指定的目标会话与回复内容。
 
-已知实现偏差：Gateway V1 当前 `thread_keys` 忽略群聊 `sender_id`，同群不同员工可能复用 AI Thread。这和上面的目标线程键及员工隔离规则不一致。目标设计保持不变；在修复并通过同群多员工隔离测试前，不得宣称群聊线程隔离已经验收。
+它不负责身份映射、Admission、Agent Profile、V2 Routing、Hermes 调度或权威状态。
 
-## 组件职责
-
-### agent-wechat
-
-**负责：**
-
-- 微信协议接入和登录态下的消息收发。
-- 读取私聊、群聊及可获得的微信消息元数据。
-- 获取普通文件、群文件及其他已经验证可获取的附件。
-- 提供群聊、`sender`、`chatId` 和引用上下文等入口信息。
-- 将 Adapter 指定的结果发送回目标微信会话。
-
-**不负责：**
-
-- 业务意图判断、任务规划或业务结果判定。
-- Hermes 的 Skill 选择、调用和执行控制。
-- ERP、S6、平台后台或文件中心的业务逻辑。
-- 企业身份授权、权威任务状态、正式文件归档或审计闭环。
-
-### wechat-adapter
-
-当前已实现的适配基础包括 `agent-wechat` HTTP Client、微信消息标准化、`is_mentioned` / `is_self`、媒体 JSON / Base64 解码、`chatId + text` 出站字段和微信系统消息解析。常驻 Worker / 串行轮询已实现并用于 V1 Staging；真实微信文本消息经 Polling / Checkpoint、Message Store、Admission、AI Thread、Hermes API 和 Response Relay 返回原微信会话，`is_self=true` 在 Polling 层不进入 sink / admission / Hermes，但推进 Checkpoint。附件正式处理、重启恢复、服务管理、长期稳定性和生产可靠性仍待验证。
-
-**负责：**
-
-- 封装 `agent-wechat` 的消息读取、文件获取和结果发送 API。
-- 按 V1 Polling 方案同步消息，并维护按账号、会话隔离的同步检查点。
-- 将原始消息转换为版本化的统一事件，完成类型映射、来源标识和幂等去重。
-- 登记附件来源和获取状态，把文件放入 Debian 受控临时区，并向后续环节提供文件引用。
-- 将标准事件交给 Debian 控制面，由任务中心和 Worker Bridge 与 Hermes 通信。
-- 接收受控的结果回传指令，调用 `agent-wechat` 返回原 `chatId`。
-
-**不负责：**
-
-- 理解业务意图、生成业务方案或选择 Skill。
-- 把微信联系人直接认定为企业身份或业务权限主体。
-- 绕过任务中心、权限检查、File Service 或审计直接调用 Hermes 和企业系统。
-- 解析尚未支持的合并转发内部聊天记录或内部文件；该能力需要后续单独设计和验证。
-
-### Hermes Agent
-
-**负责：**
-
-- 在 Gateway 下发的 Employee Workspace / 员工工作区和 AI Thread / AI 会话线程范围内处理任务。
-- 在控制面提供的受控上下文内理解用户意图。
-- 将请求规划为可执行步骤。
-- 从当前任务允许的 Skills 中选择合适能力。
-- 汇总 Skill 的结构化结果，生成回复、澄清请求或人工确认请求。
-
-**不负责：**
-
-- 根据微信昵称、来源账号或 Hermes Runtime Thread / Hermes 运行时线程自行创建、合并或改变员工工作区归属。
-- 维护微信登录和消息同步检查点。
-- 直接解析 `agent-wechat` 私有响应结构。
-- 绕过 Skill、权限、高风险确认或 File Service 直接操作企业系统和正式文件。
-- 用自由文本替代权威任务状态、文件记录或审计事件。
-
-### Skills
-
-Skills 封装确定性的企业能力，例如库存查询、订单处理、文档处理或平台操作。每个 Skill 必须声明输入、输出、所需权限、幂等规则、失败分类和人工确认点。具体 Skills 尚未完成定义、实现和验收。
-
-### 企业系统
-
-企业系统包括旺店通 ERP、旺店通 WMS、S6、各平台后台及正式文件服务。现有系统并不等于自动化接口已经可用；接口、字段、数据口径、账号权限和错误语义仍需逐项验证。正式文件访问必须经过 File Service、权限检查和审计。
-
-## 入站与回传流程
-
-### 目标入站消息流程
-
-1. 员工在私聊或允许的群聊中发送文本、文件或引用消息。
-2. `agent-wechat` 读取微信侧消息和当前可获得的元数据。
-3. `wechat-adapter` 轮询新增消息，生成 `message_received` 标准事件；Message Store 在来源账号隔离范围内执行 `event_id` 与来源物理消息双重幂等并保存 Physical Conversation / 物理会话消息。
-4. Identity Mapping 把稳定来源账号映射到 Enterprise Identity / 企业身份；映射失败时保留消息但不创建 Task。
-5. Access Control 检查准入与权限；群聊必须同时满足 `group_allowed AND user_allowed AND is_mentioned`。
-6. Employee Conversation Manager 为获准消息定位 Employee Workspace / 员工工作区及私聊或“群 + 员工”AI Thread / AI 会话线程。
-7. Context Builder 关联有限上下文与附件，形成任务批次和不可变上下文快照，再由 Task Queue 持久化排队。
-8. Worker Bridge 把受控任务、工作区、线程、文件引用和允许的 Skills 交给统一 Hermes 服务。
-9. Hermes 理解意图、规划步骤并调用获授权的 Skill。
-10. Skill 通过明确接口访问企业系统，并返回结构化结果或错误。
-
-Adapter 不把全部群聊历史直接提交给 Hermes。上下文必须按 Employee Workspace / 员工工作区、AI Thread / AI 会话线程、Task 和权限筛选，群内不同员工的任务不得串线。
-
-以上是目标流程。当前 V1 Staging 文本链路已完成步骤 1 至 6，并通过有限 Hermes Dispatch / API / Response Relay 返回原会话；目标 Context Builder、Task Queue、完整 Worker Bridge 和 Skill 对应的步骤 7 至 10 尚未实现。V1 文本闭环不等于目标任务与业务执行链全部完成。
-
-### 目标结果回传流程
-
-1. Hermes 返回完成、需要澄清、等待确认、可重试失败或最终失败等结构化结果。
-2. Debian 控制面先更新权威任务状态和审计记录。
-3. 控制面根据 Task 中保留的原平台、原账号、原 Physical Conversation / 物理会话、Employee Workspace / 员工工作区和 AI Thread / AI 会话线程生成回传指令。
-4. `wechat-adapter` 调用 `agent-wechat` 发送接口，将结果返回原 `chatId`。
-5. 发送结果和失败原因写回权威状态；发送失败不得被记录为任务回传成功。
-
-结果显示在 Hermes 员工工作区中不能替代原微信路由。Task 完成与微信发送成功必须分别记录；前者表示结果已经由 Debian 持久化，后者才表示结果到达原微信窗口。
-
-V1 Staging 已按 `chatId + text` 真实请求字段完成 Hermes 文本响应回传。通用 Task 结果持久化、图片 / 附件 / 文件结果和发送失败恢复仍未实现。
-
-## 文件边界
-
-目标文件流程为：
+## 入站流程
 
 ```mermaid
-flowchart LR
-    F["微信文件"] --> A["agent-wechat"]
-    A --> W["wechat-adapter"]
-    W --> T["Debian 受控临时存储"]
-    T --> H["Hermes<br/>仅接收引用和元数据"]
-    H --> S["授权 Skill"]
-    S --> X["File Service / 企业系统"]
+sequenceDiagram
+    participant AW as agent-wechat
+    participant WW as wechat-worker
+    participant PG as PostgreSQL
+    participant AD as Admission
+    participant DW as dispatch-worker
+    participant H as Hermes
+
+    WW->>AW: 每 3 秒轮询
+    AW-->>WW: 新微信消息
+    WW->>PG: Persist-first 写入 Message Store
+    PG-->>WW: 持久化成功
+    WW->>AD: 身份与权限判断
+    AD-->>WW: Denied（当前已验证）
+    Note over WW,H: 不调用 dispatch-worker / Hermes
+    WW->>PG: 保存决定并推进 Checkpoint
 ```
 
-当前只验证到 `agent-wechat` 文件消息读取和部分文件获取。Adapter 临时文件管理、文件安全检查、Hermes 文件引用、Skill 处理和正式归档均为规划能力。文件名不能作为唯一标识；大文件不得直接放入事件 JSON；Hermes 不获得正式存储的任意路径访问权。
+当前为 17 个现有聊天建立 Checkpoint，并通过 `bootstrap_mode=latest` 安全跳过 151 条历史基线。新私聊消息已持久化，发送者与会话识别正确，Checkpoint 已推进。
 
-## 可靠性与安全原则
+## 授权后链路
 
-以下是目标原则。当前已在 Debian Staging 验证常驻 Worker / 串行轮询、文本 Polling / Checkpoint、消息与准入、Hermes 调用、回复回传和 self message 防回环；重启恢复、服务管理、长期稳定性、通用任务、Skill、非文本回传和生产可靠性仍待验证或实现。
+Admission Allowed 后的目标顺序是：
 
-- **先持久化再派发：** 原始消息、标准事件、附件状态和同步检查点先写入 Debian 权威控制面，再进入 Hermes 任务链路。
-- **端到端幂等：** 消息同步去重不替代业务幂等；消息事件、任务执行、Skill 写操作和结果回传分别维护幂等标识。
-- **最小权限：** `sender` 和 `senderName` 只是微信入口身份信息，必须通过企业身份映射和权限检查后才能获得 Skill 或数据权限。
-- **文件受控：** 微信附件先进入受控临时区，经过大小、类型、哈希和安全限制检查后才可供后续任务引用。
-- **失败可见：** 微信离线、API 失败、文件获取失败、Hermes 失败和回传失败均保留明确状态，不伪造成功。
-- **规划不等于实现：** WebSocket、合并转发内部展开、图片 / 文件、Skill 和企业业务自动化在完成验证前均不得标记为生产可用。
+1. 解析 Employee Workspace 与 AI Thread。
+2. 应用私聊 Conversation-AgentProfile Binding。
+3. 执行 V2 Routing。
+4. `dispatch-worker` 调用 Hermes。
+5. 保存 Response Persistence。
+6. 创建 Delivery Outbox。
+7. `delivery-worker` 通过 `agent-wechat` 投递原会话。
 
-## 当前建设状态
+当前测试发送者尚未完成 Enterprise Identity、Source Identity Mapping、User Access Policy、Gateway Access Policy、Agent Profile 和会话绑定，因此以上授权链路尚未实机触发。
 
-| 项目 | 状态 | 说明 |
-| --- | --- | --- |
-| 微信入口验证 | **已完成** | 已完成本文件所列 `agent-wechat` V1 与三组结构化 mention 样本验证，不等于生产验收 |
-| Gateway 微信 Polling Runtime | **Debian Staging 已验证** | Polling / Checkpoint 与真实微信文本消息闭环已验证；`is_self=true` 跳过 sink 并推进 Checkpoint；长期稳定性未验证 |
-| WebSocket Event 模式 | **后续研究** | `/api/ws/events` 可连接，但微信消息事件推送尚未确认 |
-| Message Store | **Debian Staging 已验证** | 未配置身份的真实消息保存成功；附件正式处理和生产存储未验证 |
-| Identity Mapping 与 Admission | **Debian Staging 已验证** | 已验证未知身份拒绝路径和测试身份授权路径，不代表完整身份管理或权限矩阵已验收 |
-| Employee Workspace 与 AI Thread | **Debian Staging 已验证运行时绑定** | `hermes_thread_id` 已用于文本链路；群聊 whole-room thread 偏差待修复 |
-| Access Control 与策略 | **限定路径已验证** | 已验证 User Policy、Gateway Policy 和 `normal` 风险级别允许路径，以及未知身份拒绝路径 |
-| Context Builder / Task Queue | **未实现** | 仍停留在目标设计 |
-| Gateway Hermes Client / Dispatch / Response Relay | **V1 Staging 文本链路已验证** | 不代表完整 Worker Bridge、任务协议、文件或 Skill 已完成 |
-| AI 回复回传微信 | **文本已验证** | 图片、附件、文件、其他富媒体和通用失败恢复未完成 |
-| Skills 与企业系统 | **规划建设 / 待验证** | 具体 Skill 和企业接口待逐项设计、实现和验收 |
-| 生产部署与完整企业业务自动化 | **未完成** | 当前只完成 V1 Staging 微信文本 AI 闭环 |
+## Hermes 边界
+
+Hermes Gateway 0.20.0 运行在 Windows AI 主机。CFserver 与 `dispatch-worker` 到 Hermes 的网络连通已经验证，但本轮没有真实获准消息进入 Hermes。
+
+Windows 登录启动项存在，但 AI 主机重启后 Hermes Gateway 没有可靠自动启动；人工启动后恢复。网络连通、服务进程运行和真实 Agent 处理是不同验收项。
+
+Hermes 负责：
+
+- Agent 执行和模型调用。
+- 在授权范围内选择后续 Skills 和工具。
+- 返回可持久化的执行结果或明确失败。
+
+Hermes 不负责：
+
+- 绕过 Gateway 身份、策略、Agent Profile 或人工确认。
+- 直接决定微信投递成功。
+- 绕过 File Service 访问正式文件。
+
+## 群聊与附件
+
+- 群聊后续测试必须要求发送者明确 `@` 当前机器人，并以平台结构化 mention 事实为准。
+- 不得从纯文本机器人名称、引用或上一条消息推断 mention。
+- 图片、文件和引用消息在授权文本闭环通过后验证。
+- 未授权附件不得进入 Hermes 上下文。
+- 正式文件后续通过 `CF_filebrowser-enterprise` 的 File Service、权限和审计接入。
+
+## 可靠性原则
+
+- 消息先持久化，权限拒绝不删除消息历史。
+- 响应先持久化，再创建 Delivery Outbox。
+- AI 执行成功与微信投递成功分别记录。
+- Worker 进程 healthy 不等于端到端业务成功。
+- Token、API Key 和数据库密码不得写入普通 YAML。
+- PostgreSQL 和配置变更前必须备份并确认恢复路径。
+
+## 当前结论
+
+> 微信消息发现、持久化、Checkpoint、未授权拒绝和 Hermes 网络连通已实机验证；授权后的完整 AI 回复闭环仍待验证。
+
+下一阶段按[当前状态矩阵](../status/current-status.md#下一阶段顺序)执行，不得跳过身份、策略和 Agent Profile 直接宣称 AI 闭环通过。
