@@ -2,6 +2,8 @@
 
 > 日期：2026-08-13。本文面向项目管理与后续接手人员，仅记录跨仓库生产状态和验证边界，不复制各项目的底层部署命令。所有账号、地址、凭证与消息内容均使用脱敏描述。
 
+> 历史状态说明：本文只描述截至 2026-08-13 当日的入口与拒绝路径证据；后续生产结论见[2026-08-14 私聊、群聊及媒体验证记录](./2026-08-14-private-group-media-validation.md)。
+
 ## 当天完成
 
 - 在 CFserver 收口 `CF_agent-wechat` 生产 Compose，使用 `docker/compose.cfserver.yaml`。
@@ -53,7 +55,7 @@ CFserver 是消息、Checkpoint、身份、权限、路由、响应与投递状�
 
 Hermes Gateway 0.20.0 运行在 Windows AI 主机。CFserver 与 `dispatch-worker` 到 Hermes 的网络连通已经验证。Windows 登录启动项已经存在，但 AI 主机重启后 Hermes Gateway 没有可靠自动启动；人工启动后恢复。因此“网络可达”已验证，“开机自启可靠”仍未收口。
 
-## 当前阻塞项
+## 当日未完成项
 
 - 测试发送者尚无 Enterprise Identity。
 - Source Identity Mapping 尚未建立。
@@ -63,10 +65,12 @@ Hermes Gateway 0.20.0 运行在 Windows AI 主机。CFserver 与 `dispatch-worke
 - 完全新设备 SSH 二维码扫码、群聊 `@` 机器人、图片、文件与引用消息尚待生产实测。
 - Hermes Gateway 开机自启可靠性尚待收口。
 
-## 下一阶段顺序
+## 当日交接顺序
 
-下一阶段严格按[当前状态矩阵](./current-status.md#下一阶段顺序)中的 18 步执行。不得跳过身份、策略和 Agent Profile 配置直接测试 AI；不得在第 13 步完成前宣称授权后的完整 AI 回复闭环已验证。
+该日交接时要求先完成身份、策略和 Agent Profile 配置，再逐项验证 Allowed、Routing、Dispatch、Response、Outbox 与微信回复。以上步骤已在后续实测中推进；当前执行顺序以[当前状态矩阵](./current-status.md#下一阶段顺序)为准。
 
 ## 阶段结论
 
-> 微信消息发现、持久化、Checkpoint、未授权拒绝和 Hermes 网络连通已实机验证；授权后的完整 AI 回复闭环仍待验证。
+> 截至 2026-08-13 当日，本轮实测已覆盖微信消息发现、持久化、Checkpoint、未授权拒绝和 Hermes 网络连通；获准身份的执行与回复尚未进入当日验证。
+
+后续私聊、群聊、引用和图片发现结果见[2026-08-14 状态记录](./2026-08-14-private-group-media-validation.md)。

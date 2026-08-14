@@ -1,12 +1,12 @@
 # 企业 AI Gateway 架构
 
-> 状态日期：2026-08-13。本文描述 Gateway 当前生产拓扑和稳定逻辑边界。2026-08-04 的 V1 Staging 授权文本闭环是历史验证，不代表当前 CFserver 授权链路已完成。
+> 状态日期：2026-08-14。本文描述 Gateway 当前生产拓扑、已验证文本范围和待建设媒体边界。
 
 ## Gateway 定位
 
-CF Gateway 是企业消息、身份、权限、会话、Agent Profile、AI 路由、执行派发、响应持久化和结果投递的权威控制边界。消息进入并被保存，不代表发送者有权创建 AI 工作。
+CF Gateway 是企业消息、身份、权限、会话、Profile 外部引用、AI 路由、执行派发、响应持久化和结果投递的权威控制边界。消息进入并被保存，不代表发送者有权创建 AI 工作。
 
-Gateway 不是一个单进程服务。当前 CFserver 部署由以下五个服务组成：
+Gateway 不是单进程服务。当前 CFserver 部署包括：
 
 - PostgreSQL
 - `gateway`
@@ -16,126 +16,146 @@ Gateway 不是一个单进程服务。当前 CFserver 部署由以下五个服�
 
 五个服务均已部署并保持 healthy。`agent-wechat` 同样运行在 CFserver，通过 `cf-internal` 容器网络与 Gateway 通信。
 
-## 当前生产拓扑
+## 当前生产文本链路
 
 ```mermaid
 flowchart LR
-    AW["agent-wechat"] --> WW["wechat-worker"]
-    subgraph G["CF_agent-gateway / CFserver"]
-        API["gateway"]
-        WW
-        DW["dispatch-worker"]
-        DLW["delivery-worker"]
-        PG["PostgreSQL"]
-
-        API <--> PG
-        WW <--> PG
-        DW <--> PG
-        DLW <--> PG
-    end
-    DW <--> H["Windows AI 主机<br/>Hermes Gateway 0.20.0"]
-    DLW --> AW
-```
-
-Hermes 网络连通已验证。Windows 登录启动项存在，但主机重启后 Hermes Gateway 未可靠自动启动；人工启动后恢复。
-
-## 当前消息链路
-
-```mermaid
-flowchart LR
-    M["微信新消息"] --> P["Polling / Checkpoint"]
+    M["微信新消息"] --> P["Polling"]
     P --> S["Message Store"]
+    S -. "持久化后推进" .-> CP["Checkpoint"]
     S --> I["Identity Mapping"]
-    I --> A["Admission"]
-    A -->|"Denied：已验证"| D["保留消息与决定<br/>不调用 Hermes<br/>不产生回复"]
-    A -->|"Allowed：待验证"| W["Workspace / AI Thread"]
-    W --> B["Conversation-AgentProfile Binding"]
+    I --> A["User + Gateway Policy"]
+    A --> AD["Admission"]
+    AD -->|"Denied / bot_not_mentioned"| D["保存决定<br/>不调用 Hermes"]
+    AD -->|"Allowed: 已验证"| W["Workspace / AI Thread"]
+    W --> B["Profile 外部引用 + Thread Policy"]
     B --> R["V2 Routing"]
     R --> X["dispatch-worker"]
     X --> H["Hermes"]
     H --> RP["Response Persistence"]
     RP --> O["Delivery Outbox"]
     O --> DL["delivery-worker"]
+    DL --> AW["agent-wechat"]
+    AW --> WX["原微信会话"]
 ```
 
 当前生产已验证：
 
-- `agent-wechat` 内部网络与 Token 鉴权。
-- 每 3 秒微信轮询。
-- 17 个现有聊天建立 Checkpoint。
-- `bootstrap_mode=latest` 将 151 条历史消息作为基线跳过。
-- 新私聊进入 Message Store，发送者与会话识别正确，Checkpoint 推进。
-- 未授权账号 Admission Denied，未调用 Hermes，未产生机器人回复。
-- CFserver 与 `dispatch-worker` 到 Hermes Gateway 的网络连通。
-
-当前尚未配置或验证：Enterprise Identity、Source Identity Mapping、User Access Policy、Gateway Access Policy、Agent Profile、私聊 Conversation-AgentProfile Binding、Admission Allowed、V2 Routing、Hermes 实际处理、Response Persistence、Delivery Outbox 和微信真实回复。
+- 3 秒轮询、17 个 Checkpoint 和 `bootstrap_mode=latest` 跳过 151 条历史基线。
+- 新文本、引用和图片来源事实进入 Message Store，Checkpoint 正确推进。
+- 未授权账号安全拒绝；群聊未真实 `@` 时以 `bot_not_mentioned` 结束。
+- 测试身份的 Enterprise Identity、Source Identity Mapping、两级 Access Policy 和 Admission Allowed。
+- 私聊 `private_sender` 与群聊 `group_sender` 的 Workspace、AI Thread、V2 Routing、Hermes Dispatch、Response 和微信投递。
+- Bot 回复不回环。
+- CFserver Gateway 应用服务 restart 后复用原 AI Thread 与 Hermes 会话上下文。
 
 ## Persist-first
 
-除入口已经确认并按专门防回环规则处理的 Bot 自发消息外，进入 Gateway 的员工消息必须先写入 Message Store，再执行身份、权限和路由判断。
+除入口确认并按防回环规则处理的 Bot 自发消息外，员工消息必须先写入 Message Store，再执行身份、权限和路由判断。
 
 - 持久化失败不得进入 Admission 或执行链。
-- 授权和未授权员工消息都属于受控企业消息历史。
+- 授权和未授权消息都属于受控企业消息历史。
 - Admission 拒绝只阻止 AI 工作，不删除消息。
-- Checkpoint 必须与持久化和处理结果保持一致，不得提前跨过尚未保存的新消息。
-- `bootstrap_mode=latest` 的历史基线跳过是首次同步策略，不代表逐条持久化并执行历史消息。
+- 群聊 `bot_not_mentioned` 也是持久化后的可追踪安全结果。
+- `bootstrap_mode=latest` 只建立首次同步高水位，不执行历史消息。
+- 文本、引用和媒体来源事实都遵循这一顺序。
 
-## Identity Mapping
+## Identity Mapping 与 Admission
 
-Identity Mapping 以来源平台、Bot 账号和稳定发送者 ID 为输入，输出不可变的 `enterprise_identity_id` 及可选业务 `employee_id`。
+Identity Mapping 以来源平台、Bot 账号和稳定发送者 ID 为输入，输出不可变的 `enterprise_identity_id`。昵称、备注、头像、群名或消息正文不得用于授权或自动合并身份。
 
-- 昵称、备注、头像、群名或消息正文不得用于授权或自动合并身份。
-- Source Identity Mapping 缺失时，消息保留但 Admission 拒绝。
-- Identity Mapping 不创建 Workspace、AI Thread 或 Agent Profile。
+Admission 组合 Source Identity Mapping、User Access Policy、Gateway Access Policy、会话类型、能力、风险和群聊结构化 mention。测试允许与拒绝路径均已验证，但这不代表所有正式员工、群和能力策略已经配置完成。
 
-## Access Control 与 Admission
+群聊不得根据纯文本机器人名称、引用或上一条消息推断 `is_mentioned=true`。
 
-Admission 至少组合：
+## Workspace、AI Thread 与 Thread Policy
 
-- Source Identity Mapping 是否存在且有效。
-- User Access Policy 是否允许。
-- Gateway Access Policy 是否允许。
-- 会话类型、Bot 账号、能力和风险级别是否允许。
-- 群聊是否提供发送者明确 `@` 当前机器人的结构化事实。
+只有 Admission Allowed 后，Gateway 才解析 Employee Workspace、AI Thread、Thread Policy 与 Agent Profile 外部引用。
 
-规则保持拒绝默认。不得根据展示名称、正文 `@` 字样、引用或上一条消息推断权限或 mention。
+- Physical Conversation 与 AI Thread 分离；原会话只用于来源和投递路由。
+- 当前私聊采用 `private_sender`。
+- 当前企业群聊默认采用 `group_sender`，以群 Conversation 与发送者组合隔离。
+- 同一员工可复用 Workspace，但私聊与群聊 AI Thread 和 Hermes Thread 相互独立。
+- 同一发送者在同一群中复用原 `group_sender` 上下文。
+- `group_shared` 必须单独审批和验证，不能因物理群聊相同而隐式共享。
+- `ai_thread_id` 是 Gateway 权威标识；Hermes Runtime Thread 只是外部绑定。
 
-## Workspace、AI Thread 与会话绑定
+## Agent Profile 与 Hermes 配置档案
 
-只有 Admission Allowed 后，Gateway 才解析或创建 Employee Workspace 和 AI Thread，并应用 Conversation-AgentProfile Binding。
+Gateway 的 Agent Profile 保存路由所需元数据与 `external_profile_ref`。Hermes 配置档案由 Hermes 自身创建和管理，拥有独立配置、技能和 `SOUL.md`。
 
-- `enterprise_identity_id` 是工作区所有者的权威身份主键。
-- Physical Conversation 与 AI Thread 分离；消息仍保留原微信会话用于结果路由。
-- 私聊必须显式绑定 Agent Profile。
-- 同群不同员工的个人消息、任务、附件和结果不得串线。
-- Hermes Runtime Thread 是可重建运行时绑定，不得反向覆盖企业身份或 AI Thread。
+- Gateway 不自动创建 Hermes 配置档案。
+- Conversation 或 Group Type 选择 Agent Profile，再由 `external_profile_ref` 指向 Hermes 档案。
+- Agent Profile 决定调用哪个配置档案；Thread Policy 决定上下文由谁共享。
+- 当前测试私聊和 AI 群都引用 `default`，但线程彼此隔离。
+- 外部引用缺失、冲突或不可用时必须停止派发并记录明确错误，不得隐式选择任意档案。
 
-## V2 Routing
+## V2 Routing、Dispatch 与投递
 
-V2 Routing 在 Admission Allowed 与 Agent Profile 绑定完成后，根据所需能力、模型、权限和 Provider 状态生成可追踪决定。
+V2 Routing 在 Admission Allowed 后，根据 Conversation、Group Type、Thread Policy、Profile 外部引用、权限、能力和 Provider 状态生成可追踪决定。
 
-- 无 Profile、绑定冲突或无可用 Provider 时不得隐式降级为任意 Agent。
-- 路由决定必须关联身份、会话、AI Thread、Agent Profile 和策略快照。
-- 当前组件已部署，但真实允许消息的 V2 Routing 尚未实机验证。
+文本链路已经验证：
 
-## Dispatch、响应与投递
+1. `dispatch-worker` 领取获准且完成路由的工作。
+2. Hermes 返回可持久化文本响应。
+3. Gateway 保存 Response Persistence。
+4. Gateway 创建 Delivery Outbox。
+5. `delivery-worker` 通过 `agent-wechat` 返回原会话。
+6. Gateway 分别记录执行和投递结果。
 
-- `dispatch-worker` 只领取获准且已完成路由的工作。
-- Hermes 结果先写 Response Persistence，再创建 Delivery Outbox。
-- `delivery-worker` 只从 Outbox 领取投递任务，并通过 `agent-wechat` 返回原 Bot 账号和原会话。
-- AI 执行成功、响应持久化成功和微信投递成功是三个独立状态。
-- 重试必须幂等；结果未知或高风险副作用需人工确认。
+“文本投递通过”不能外推为媒体投递通过。
 
-`dispatch-worker` 与 `delivery-worker` healthy 只证明服务运行，不证明真实授权消息的执行和投递已经通过。
+## uncertain Dispatch
+
+Hermes 不可达时曾出现连接超时、Dispatch 进入 `uncertain`，且微信没有 AI 回复。Hermes 人工启动后恢复健康；一次带备份、证据核对和 Guard 的受控恢复使原 Dispatch 第二次执行成功。
+
+`uncertain` 不能自动视为失败或未执行。正式能力必须：
+
+- 查询 Gateway、Hermes、Response 和 Delivery 侧证据。
+- 使用幂等 Guard 约束恢复。
+- 通过受控命令/API记录决定和结果。
+- 禁止无证据盲重试。
+- 禁止把人工直接修改数据库作为常规运维。
+
+## 引用消息
+
+Gateway 已保存 `reply_context`，引用类型消息也能完成文本回复。群聊引用若没有真实 `@`，仍以 `bot_not_mentioned` 结束。
+
+当前没有把被引用内容自动加入 Hermes 输入；因此引用类型回复成功不代表模型理解了引用正文。
+
+## Media Runtime 边界
+
+当前图片发现已验证到：`image/raw_type=3`、Message Store、Raw Payload、媒体 API JPEG 字节和签名/大小/SHA-256 校验。Attachment 与 Artifact 链路尚未接入。
+
+```mermaid
+flowchart LR
+    IN["入站媒体"] --> API["agent-wechat media API"]
+    API --> V["完整性与安全校验"]
+    V --> PS["私有临时存储"]
+    PS --> ATT["Attachment"]
+    ATT --> AC["Admission + 上下文选择"]
+    AC --> HI["受控 Hermes 输入"]
+    HO["Hermes artifact_ref"] --> DL["受认证下载"]
+    DL --> AR["ArtifactRepository 原子持久化"]
+    AR --> IV["完整性验证"]
+    IV --> READY["READY"]
+    READY --> O["Delivery Outbox"]
+    O --> DW2["delivery-worker"]
+    DW2 --> SM["agent-wechat send_media"]
+```
+
+上图是目标设计。二进制保存在 CFserver 私有存储，PostgreSQL 只保存元数据和状态；不长期存大文件 Base64。普通聊天媒体自动过期，需要归档的文件再经 `CF_filebrowser-enterprise` 转存。
+
+完整设计见[系统设计的 Media Runtime V2](../02_系统设计.md#media-runtime-v2)。
 
 ## 文件与 Skills 边界
 
-Gateway、Hermes、Skills、FileBridge 和 `filebrowser-agentctl` 不得直接访问正式文件存储。后续文件能力统一经过 `CF_filebrowser-enterprise` 的 File Service API、用户权限、最小 Token capability、Share effective capability 和审计。
+Gateway 私有媒体存储用于可靠中转，不是正式企业文件中心。`CF_filebrowser-enterprise` 是唯一正式 File Service；Gateway、Hermes、Skills 和受控客户端不得绕过用户权限、最小 capability 与审计。
 
-未授权消息的附件元数据可以作为受控消息历史保留，但不得进入 AI 工作区或发送给 Hermes。第一阶段不建设独立 OCR。
+第一阶段不建设独立 OCR。Skills 和业务系统接入在媒体、恢复和文件基础链路稳定后推进。
 
 ## 当前结论
 
-> 微信消息发现、持久化、Checkpoint、未授权拒绝和 Hermes 网络连通已实机验证；授权后的完整 AI 回复闭环仍待验证。
+> 私聊和 group_sender 群聊的授权文本闭环已实机验证；媒体链路、引用上下文注入和完整宿主恢复仍待完成。
 
-严格的下一阶段顺序见[当前状态矩阵](../status/current-status.md#下一阶段顺序)，生产证据见[微信运行时阶段收口记录](../status/2026-08-13-wechat-runtime-closeout.md)。
+下一阶段顺序见[当前状态矩阵](../status/current-status.md#下一阶段顺序)，生产证据见[2026-08-14 私聊、群聊及媒体验证记录](../status/2026-08-14-private-group-media-validation.md)。
