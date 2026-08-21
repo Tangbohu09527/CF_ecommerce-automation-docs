@@ -1,5 +1,9 @@
 # wechat-adapter 设计
 
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
 > 状态日期：2026-08-04。本文同时标记目标设计与当前代码边界。V1 Staging 已完成真实微信文本从 Polling、消息与权限控制、Employee Workspace / AI Thread 到 Hermes API 和原会话回复的闭环；`chatId + text` 出站和 `is_self=true` 防回环已验证。附件正式处理、Context Builder、Task Queue、完整 Worker Bridge、Skill 和生产部署仍未完成。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
 
 ## 设计定位

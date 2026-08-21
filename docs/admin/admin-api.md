@@ -1,5 +1,9 @@
 # Admin Archive API
 
+> [!WARNING]
+> **文档状态：2026-08-11 V2 Enterprise Runtime 历史快照。**
+> 本文保留该版本当日的架构与实现边界，不代表当前生产状态；正文中的“当前”“已发布”“已启用”等表述均按该版本和原 Staging 环境理解。当前生产事实以[当前状态矩阵](../../status/current-status.md)为准，正式系统架构以[System Architecture](../../architecture/system-architecture.md)为准。
+
 > 适用版本：`v2-enterprise-runtime-20260811`
 > 文档状态：与当前已发布版本一致
 > 范围：Admin Archive API 的只读查询能力、权限边界和使用约束

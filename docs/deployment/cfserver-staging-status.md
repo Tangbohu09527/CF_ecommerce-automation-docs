@@ -1,5 +1,11 @@
 # CFserver V2 Enterprise Runtime Staging 部署状态
 
+> **历史快照警告**
+>
+> 本文是 **2026-08-11 CFserver Staging 历史快照**，仅用于版本追溯。其服务状态、拓扑、参数和命令可能已被后续生产基线取代，**禁止直接作为当前生产部署或运维操作依据**。
+>
+> 当前操作请以[生产部署指南](../../deployment/deployment-guide.md)、[故障恢复手册](../../operations/recovery-runbook.md)和[当前状态矩阵](../../status/current-status.md)为准。
+
 > 状态日期：2026-08-11
 > 适用版本：`v2-enterprise-runtime-20260811`
 > 文档状态：实际部署记录

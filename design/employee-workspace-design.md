@@ -1,5 +1,9 @@
 # 员工工作区与 AI 会话线程设计
 
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
 > 状态日期：2026-08-04。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线。V1 Staging 已通过真实微信文本验证身份与准入、Employee Workspace / AI Thread、Hermes Runtime Thread Binding 和原会话回复；员工工作台、目标任务 / 文件 / Skill 链路和生产部署尚未实现。Gateway V1 群聊 whole-room thread 与本文既定隔离规则存在已知实现偏差。
 
 ## 1. 定位与术语

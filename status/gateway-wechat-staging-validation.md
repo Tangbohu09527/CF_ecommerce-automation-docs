@@ -1,5 +1,9 @@
 # CF_agent-gateway V1 Staging 微信文本闭环验证记录
 
+> **历史证据，已被后续状态取代**
+>
+> 本文仅保留 2026-08-04 V1 Staging 的历史验证事实，不代表当前生产基线。当前能力边界见[当前状态矩阵](./current-status.md)，后续生产证据见[2026-08-14 私聊、群聊及媒体验证记录](./2026-08-14-private-group-media-validation.md)，统一分类与阅读入口见[验证文档索引](../validation/README.md)。
+
 - **状态日期：** 2026-08-04
 - **验证对象：** `CF_agent-gateway` 微信文本消息、权限准入、Hermes 调度和结果回传链路
 - **验证基线：** V1 Staging 当前代码

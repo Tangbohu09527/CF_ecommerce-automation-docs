@@ -1,5 +1,9 @@
 # Task Queue 设计
 
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
 > 状态日期：2026-08-04。本文定义 CF Gateway 的目标 Task Queue / Task Store 设计基线。V1 Staging 已完成不经过本目标 Task Queue 的有限微信文本 Hermes 闭环；Task Queue、队列产品、数据库、调度参数、完整 Worker Bridge 和通用 AI Provider 路由尚未实现、选型或验证。文本闭环不得被解释为本设计已经落地。
 
 ## 1. 定位

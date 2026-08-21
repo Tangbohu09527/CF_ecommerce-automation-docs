@@ -1,5 +1,9 @@
 # Hermes 事件协议
 
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
 > 状态日期：2026-08-04。本文是 Gateway、AI Provider、完整 Hermes Worker Bridge 与 Hermes Agent 之间的目标事件协议设计基线，不等于全部协议已实现。V1 Staging 已验证微信文本 Polling、消息与准入、Employee Workspace / AI Thread、Hermes API Client / Dispatch / Response Relay、Runtime Thread Binding 和原会话回复；完整事件协议、Task / Provider 路由、文件和 Skill 链路仍待实现。
 
 ## 1. 目标与边界

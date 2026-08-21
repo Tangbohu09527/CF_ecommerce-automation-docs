@@ -1,8 +1,19 @@
 # 电商业务全自动化系统
 
-> 状态日期：2026-08-14
+> 状态证据截止：2026-08-14
+>
+> 文档复核日期：2026-08-21
 
 本仓库是“电商业务全自动化系统”的总文档入口，维护总体架构、项目状态、跨仓库关系、运维索引、技术决策和路线图，不存放业务代码、生产配置、凭证或真实业务文件。
+
+## 新成员阅读顺序
+
+1. [System Architecture](./architecture/system-architecture.md)：先建立企业自动化总体架构和职责边界。
+2. [当前状态矩阵](./status/current-status.md)：确认哪些能力已有证据、哪些仍未验证。
+3. [Deployment Guide](./deployment/deployment-guide.md)：按目标发布版本准备新机器、Docker 和配置。
+4. [Recovery Runbook](./operations/recovery-runbook.md)：掌握 Docker、微信、Hermes 和消息无回复的恢复路径。
+5. [Production Validation Checklist](./validation/production-validation-checklist.md)：部署、升级和恢复后逐项验收并留证。
+6. [技术决策记录](./05_技术决策记录.md)：核对当前固定技术决定及取代关系。
 
 ## 总体目标
 
@@ -12,7 +23,7 @@
 
 > 员工微信 → `CF_agent-wechat` 微信通道 → Gateway → AI 执行节点 → Hermes → 获准的 Skills / 企业系统 / 企业文件服务
 
-该链路描述职责关系，不表示所有节点都已完成。AI 执行节点是承载 Hermes 和后续执行能力的部署边界；当前完成范围见[系统级整体架构](./docs/architecture/overall-architecture.md)与[当前状态摘要](./docs/status/v1-current-status.md)。
+该链路描述职责关系，不表示所有节点都已完成。AI 执行节点是承载 Hermes 和后续执行能力的部署边界；现行职责见[System Architecture](./architecture/system-architecture.md)，当前完成范围见[当前状态矩阵](./status/current-status.md)。
 
 ## 当前阶段
 
@@ -110,6 +121,11 @@ flowchart LR
 
 | 文档 | 内容 |
 | --- | --- |
+| [Architecture 正式入口](./architecture/README.md) | System Architecture、微信 Runtime、Gateway、消息流和组件职责 |
+| [Deployment 正式入口](./deployment/README.md) | 新机器部署、Docker、配置、时区、升级和回滚 |
+| [Operations 正式入口](./operations/README.md) | 故障恢复、运行检查和排障入口 |
+| [Validation 正式入口](./validation/README.md) | 生产验证清单、执行记录规范、历史证据和未关闭门禁 |
+| [ADR 正式入口](./adr/README.md) | 技术决定主题索引；决定正文仍以 `05_技术决策记录.md` 为唯一权威 |
 | [项目总纲](./00_项目总纲.md) | 总体目标、范围、组件定位、设备职责和建设阶段 |
 | [功能需求](./01_功能需求.md) | 用户场景、系统行为、异常和验收边界 |
 | [系统设计](./02_系统设计.md) | 当前文本链路、Profile/Thread Policy、媒体桥、状态与安全规则 |
@@ -120,11 +136,11 @@ flowchart LR
 | [当前开发进度](./status/current-progress.md) | 当前阶段、已完成范围和阻塞项 |
 | [2026-08-14 私聊、群聊及媒体验证](./status/2026-08-14-private-group-media-validation.md) | 最新文本闭环、引用、图片发现、恢复风险和交接顺序 |
 | [2026-08-13 微信运行时收口](./status/2026-08-13-wechat-runtime-closeout.md) | 上一阶段入口、Checkpoint 和未授权拒绝历史证据 |
-| [架构专题](./architecture/ai-system-overview.md) | 总体架构及 Gateway、微信、Hermes、消息流和媒体专题导航 |
-| [系统级整体架构](./docs/architecture/overall-architecture.md) | 员工微信、Gateway、AI 执行节点、Hermes 与企业能力的统一逻辑链路 |
-| [核心职责边界](./docs/architecture/project-boundaries.md) | 微信入口、Gateway、Hermes 和企业文件系统的负责与不负责范围 |
-| [V1 当前状态摘要](./docs/status/v1-current-status.md) | 当前已完成、当前验证、当前未完成和下一阶段计划 |
-| [生产部署拓扑](./docs/deployment/production-topology.md) | 当前部署事实、CFserver 目标职责与未来多 AI 节点规划 |
+| [兼容架构专题](./architecture/ai-system-overview.md) | 旧专题导航；正式企业级入口以 System Architecture 为准 |
+| [兼容系统级架构摘要](./docs/architecture/overall-architecture.md) | 2026-08-20 系统级摘要，不取代正式架构和当前状态矩阵 |
+| [兼容职责边界摘要](./docs/architecture/project-boundaries.md) | 旧系统级职责摘要，供既有链接继续访问 |
+| [兼容 V1 状态摘要](./docs/status/v1-current-status.md) | 证据截止 2026-08-14 的兼容摘要，不是新的运行证据 |
+| [兼容生产拓扑摘要](./docs/deployment/production-topology.md) | 当前部署事实与未来规划摘要，不是部署操作手册 |
 | [历史 V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md) | 2026-08-04 特定 Staging 环境的历史验证证据 |
 | [AI 协作入口](./AGENTS.md) | 本仓库对 Codex 和其他代码 AI 的固定约束 |
 
