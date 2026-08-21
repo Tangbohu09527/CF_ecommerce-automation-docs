@@ -8,6 +8,12 @@
 
 员工通过微信提交文字与附件任务；CFserver 先保存消息并执行身份、权限、上下文和路由控制，再由 Windows AI 主机上的 Hermes 调用模型与获准能力，最后把可追踪的结果返回原会话。正式企业文件访问统一经过 `CF_filebrowser-enterprise` 的 File Service、权限检查与审计。
 
+系统级逻辑链路为：
+
+> 员工微信 → `CF_agent-wechat` 微信通道 → Gateway → AI 执行节点 → Hermes → 获准的 Skills / 企业系统 / 企业文件服务
+
+该链路描述职责关系，不表示所有节点都已完成。AI 执行节点是承载 Hermes 和后续执行能力的部署边界；当前完成范围见[系统级整体架构](./docs/architecture/overall-architecture.md)与[当前状态摘要](./docs/status/v1-current-status.md)。
+
 ## 当前阶段
 
 项目仍处于**阶段 1**，当前结论是：
@@ -20,7 +26,7 @@
 
 | 组件 | 职责 | 当前状态 |
 | --- | --- | --- |
-| `CF_agent-wechat` | 托管企业 AI 微信客户端，管理登录状态，读取和发送微信消息，并向 Gateway 提供接口 | **已部署并实机验证** |
+| `CF_agent-wechat` | 托管企业 AI 微信客户端，管理登录状态，读取和发送微信消息，并向 Gateway 提供接口 | **已部署；授权文本入口与回复已实机验证**，完整媒体收发待验证 |
 | `CF_agent-gateway` | 轮询、Checkpoint、Message Store、身份与权限 Admission、Workspace、AI Thread、V2 Routing、Hermes Dispatch、响应持久化与 Delivery Outbox | **已部署，部分链路待验证** |
 | Hermes Gateway | 执行 Agent、模型调用及后续 Skills/工具调用；管理 Hermes 配置档案 | **已部署，部分链路待验证** |
 | PostgreSQL | 保存 Gateway 的权威消息、Checkpoint、身份、权限、路由、响应和投递状态 | **已部署，部分链路待验证** |
@@ -29,7 +35,9 @@
 
 详细状态、验证证据和限制见[当前状态矩阵](./status/current-status.md)。
 
-## 当前生产拓扑
+## 当前生产拓扑与待接入边界
+
+下图以实线表示当前授权文本链路，以虚线和节点内状态标识目标设计或规划能力；虚线节点不属于当前完成范围。
 
 ```mermaid
 flowchart LR
@@ -42,13 +50,14 @@ flowchart LR
         DLW["delivery-worker"]
         PG["PostgreSQL"]
         MR["Gateway Media Runtime<br/>目标设计，待接入"]
-        PS["Gateway 私有媒体存储"]
+        PS["Gateway 私有媒体存储<br/>目标设计，待建设"]
     end
     subgraph AI["Windows AI 主机"]
         H["Hermes Gateway 0.20.0"]
-        MA["模型、Agent 与后续 Skills"]
+        MA["模型与 Agent"]
+        SK["Skills / Windows 执行能力<br/>规划中"]
     end
-    FB["CF_filebrowser-enterprise<br/>运行位置以其项目文档为准"]
+    FB["CF_filebrowser-enterprise<br/>物理位置未在本仓库确认"]
 
     E <--> AW
     AW <--> WW
@@ -57,6 +66,7 @@ flowchart LR
     PG <--> DW
     DW <--> H
     H --> MA
+    H -. "后续受控调用" .-> SK
     PG <--> DLW
     DLW --> AW
     WW -. "入站媒体" .-> MR
@@ -111,6 +121,10 @@ flowchart LR
 | [2026-08-14 私聊、群聊及媒体验证](./status/2026-08-14-private-group-media-validation.md) | 最新文本闭环、引用、图片发现、恢复风险和交接顺序 |
 | [2026-08-13 微信运行时收口](./status/2026-08-13-wechat-runtime-closeout.md) | 上一阶段入口、Checkpoint 和未授权拒绝历史证据 |
 | [架构专题](./architecture/ai-system-overview.md) | 总体架构及 Gateway、微信、Hermes、消息流和媒体专题导航 |
+| [系统级整体架构](./docs/architecture/overall-architecture.md) | 员工微信、Gateway、AI 执行节点、Hermes 与企业能力的统一逻辑链路 |
+| [核心职责边界](./docs/architecture/project-boundaries.md) | 微信入口、Gateway、Hermes 和企业文件系统的负责与不负责范围 |
+| [V1 当前状态摘要](./docs/status/v1-current-status.md) | 当前已完成、当前验证、当前未完成和下一阶段计划 |
+| [生产部署拓扑](./docs/deployment/production-topology.md) | 当前部署事实、CFserver 目标职责与未来多 AI 节点规划 |
 | [历史 V1 Staging 验证记录](./status/gateway-wechat-staging-validation.md) | 2026-08-04 特定 Staging 环境的历史验证证据 |
 | [AI 协作入口](./AGENTS.md) | 本仓库对 Codex 和其他代码 AI 的固定约束 |
 
