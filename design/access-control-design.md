@@ -1,10 +1,22 @@
 # Access Control 设计
 
+> **Status:** Historical design with current implementation notes
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`
+>
+> **Production validation:** private/group Admission allow/deny and `bot_not_mentioned` validated; full employee/role/Skill permission matrix not validated
+>
+> **Remaining design-only scope:** Skill grants, full RBAC, approval and production authorization rollout
+>
+> **Current replacement/authority:** [功能需求](../01_功能需求.md), [系统设计](../02_系统设计.md), [当前状态矩阵](../status/current-status.md)
+
 > [!WARNING]
 > **文档状态：2026-08-04 历史设计快照 / 目标设计。**
 > 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
 
-> 状态日期：2026-08-04。本文定义 Gateway 内部的企业访问控制模块，并标记实际实现边界。V1 Staging 已通过真实微信文本验证 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace / AI Thread、Hermes API 和原会话回复。Context Builder、Task Queue、完整 Worker Bridge、Skill、文件链路和生产部署仍未完成；管理员跨员工查看和完整审计闭环也未宣称完成。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+> 状态日期：2026-08-04。正文保留当时设计语境；2026-09-03 当前能力以顶部权威入口为准。
 
 ## 1. 模块定位
 

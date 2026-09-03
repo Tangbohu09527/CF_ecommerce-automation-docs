@@ -1,10 +1,22 @@
 # 员工工作区与 AI 会话线程设计
 
+> **Status:** Historical design with current V2 implementation notes
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`
+>
+> **Production validation:** private and mentioned-group text paths validated; same-group multi-sender isolation not separately production validated
+>
+> **Remaining design-only scope:** cross-employee collaboration, workbench UI, `group_shared` rollout and full business permission model
+>
+> **Current replacement/authority:** [系统设计](../02_系统设计.md), [Gateway 架构](../architecture/gateway-architecture.md), [当前状态矩阵](../status/current-status.md)
+
 > [!WARNING]
 > **文档状态：2026-08-04 历史设计快照 / 目标设计。**
 > 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
 
-> 状态日期：2026-08-04。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线。V1 Staging 已通过真实微信文本验证身份与准入、Employee Workspace / AI Thread、Hermes Runtime Thread Binding 和原会话回复；员工工作台、目标任务 / 文件 / Skill 链路和生产部署尚未实现。Gateway V1 群聊 whole-room thread 与本文既定隔离规则存在已知实现偏差。
+> 状态日期：2026-08-04。正文保留 V1 设计与历史偏差；当前 V2 实现和生产证据边界以顶部权威入口为准。
 
 ## 1. 定位与术语
 
@@ -153,7 +165,7 @@ bot_account_id + group_chat_id + sender_id
 
 因此，同一个群里员工甲与员工乙分别 `@` 机器人时，默认进入各自 Employee Workspace / 员工工作区中的两个不同 AI Thread / AI 会话线程。整个群不得共用一个 Hermes 个人上下文。
 
-**已知实现偏差：** Gateway V1 当前 `thread_keys` 忽略 `sender_id`，现有测试允许同群不同员工复用 AI Thread。该行为不符合上述已确定规则，不构成设计变更。在代码修正并补充同群多员工隔离测试前，群聊线程隔离不得标记为验收通过；若未来确需整群共享，必须先更新技术决策记录并说明安全、权限、上下文和迁移影响。
+**当前实现说明：** Gateway V1 compatibility path 的 `thread_keys` 仍忽略 `sender_id`，形成 whole-room thread；Gateway V2 `ThreadResolver` 已将 sender identity 纳入 `group_sender` key，自动化测试覆盖同群不同发送者隔离。生产使用 V2 代码线，但现有生产证据没有同群两个发送者的专门对照验收，因此不能把该隔离行为写成已生产验证。
 
 ### 多入口扩展
 
@@ -401,8 +413,8 @@ AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。�
 - `hermes_thread_id` 的故障恢复、失效重绑和生产运维闭环。
 - 工作区恢复流程。
 - 从微信、Gateway、Task Queue、完整 Worker Bridge、Skills 到原会话回传的目标任务链路；当前仅完成不含这些目标组件的 V1 文本闭环。
-- Gateway 群聊 whole-room thread 偏差修复及同群不同员工隔离复验。
+- 同群不同员工 V2 `group_sender` 的生产对照复验；V1 whole-room compatibility path 继续保持显式边界。
 
-下一阶段优先修复群聊线程隔离偏差，并继续建设 Context Builder、Task Queue、完整 Worker Bridge、文件和 Skill 链路。本次 Staging 文本闭环不代表生产上线或完整企业业务自动化；详细证据见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+当前 V2 隔离实现已经进入 Gateway main；下一步是补齐生产对照复验，并继续建设文件和 Skill 链路。历史 Staging 结论仍只按其日期使用。
 
 相关边界见[系统设计](../02_系统设计.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)、[Hermes 事件协议](./hermes-event-schema.md)、[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)和[Access Control 设计](./access-control-design.md)。

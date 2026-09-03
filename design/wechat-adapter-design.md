@@ -1,10 +1,22 @@
 # wechat-adapter 设计
 
+> **Status:** Historical adapter design with current forced-QR/Polling notes
+>
+> **Implementation repository:** `CF_agent-wechat` and `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`; WeChat forced-QR R2 remains on open PR stack
+>
+> **Production validation:** forced QR, Polling/Checkpoint continuity and text read/send validated; full file/media pipeline not validated
+>
+> **Remaining design-only scope:** Event mode, complete Attachment/Artifact bridge, multi-file compatibility and long-term retention
+>
+> **Current replacement/authority:** [WeChat Runtime Design](../architecture/wechat-runtime-design.md), [agent-wechat 职责](../architecture/wechat-agent.md), [当前状态矩阵](../status/current-status.md)
+
 > [!WARNING]
 > **文档状态：2026-08-04 历史设计快照 / 目标设计。**
 > 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
 
-> 状态日期：2026-08-04。本文同时标记目标设计与当前代码边界。V1 Staging 已完成真实微信文本从 Polling、消息与权限控制、Employee Workspace / AI Thread 到 Hermes API 和原会话回复的闭环；`chatId + text` 出站和 `is_self=true` 防回环已验证。附件正式处理、Context Builder、Task Queue、完整 Worker Bridge、Skill 和生产部署仍未完成。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+> 状态日期：2026-08-04。正文保留早期 Adapter 目标；当前 forced fresh QR、generation Checkpoint、独立 Worker 和重启边界以顶部权威入口为准。
 
 ## 设计定位
 

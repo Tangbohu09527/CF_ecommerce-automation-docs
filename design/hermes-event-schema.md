@@ -1,5 +1,17 @@
 # Hermes 事件协议
 
+> **Status:** Historical event-contract design; only selected Gateway runtime contracts are implemented
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`
+>
+> **Production validation:** current text Dispatch/Response/Delivery validated; full generic event schema, media and Skills not validated
+>
+> **Remaining design-only scope:** generic Task/Provider/Skill/media event contract and cross-system event transport
+>
+> **Current replacement/authority:** [系统设计](../02_系统设计.md), [消息与任务流程](../architecture/message-flow.md), [当前状态矩阵](../status/current-status.md)
+
 > [!WARNING]
 > **文档状态：2026-08-04 历史设计快照 / 目标设计。**
 > 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
