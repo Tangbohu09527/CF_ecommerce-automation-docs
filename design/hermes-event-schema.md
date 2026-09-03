@@ -147,7 +147,7 @@
 | `type` | 是 | `private` 或 `group`；无法可靠识别时不得猜测，应产生 `invalid_message` |
 | `thread_id` | 否 | Gateway 生成的 AI Thread / AI 会话线程标识，即 `ai_thread_id`；身份映射和线程建立前为 `null` |
 
-`conversation.id` 表示 Physical Conversation / 物理会话，`conversation.thread_id` 表示 AI Thread / AI 会话线程，二者不能互换。标准事件不再用 `conversation.thread_id` 承载平台原生线程标识；平台私有字段保存在受控原始载荷或 Adapter 专属映射中。群聊仍须由控制面按机器人账号、群会话和发信人隔离上下文，具体规则以[系统设计](../02_系统设计.md#物理微信会话与-ai-线程)为准。
+`conversation.id` 表示 Physical Conversation / 物理会话，`conversation.thread_id` 表示 AI Thread / AI 会话线程，二者不能互换。标准事件不再用 `conversation.thread_id` 承载平台原生线程标识；平台私有字段保存在受控原始载荷或 Adapter 专属映射中。群聊仍须由控制面按机器人账号、群会话和发信人隔离上下文，当前规则以[系统设计](../02_系统设计.md)为准。
 
 ### 3.4 `sender`
 
@@ -159,7 +159,7 @@
 | `employee_id` | 否 | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键 |
 | `type` | 是 | `human` 或 `system` |
 
-`sender.id` 只是入口身份，不自动获得企业权限。Gateway Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，只输出 `enterprise_identity_id` 和可选 `employee_id`；Adapter 不得依据显示名或消息正文填充这些字段，Identity Mapping 也不创建或返回 `workspace_id`。微信 `wxid` 等平台标识保留在 `sender.id` 的来源作用域内，不得当作 `employee_id`。
+`sender.id` 只是入口身份，不自动获得企业权限。Gateway Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，只输出 `enterprise_identity_id` 和可选 `employee_id`；Adapter 不得依据显示名或消息正文填充这些字段，Identity Mapping 也不创建或返回 `workspace_id`。平台来源标识保留在 `sender.id` 的来源作用域内，不得当作 `employee_id`。
 
 ### 3.5 `authorization`
 

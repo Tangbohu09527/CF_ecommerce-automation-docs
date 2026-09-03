@@ -8,6 +8,6 @@
 | 2026-08-13 | [微信运行时收口](../../status/2026-08-13-wechat-runtime-closeout.md) | Polling、Checkpoint、历史基线、未授权拒绝和 Hermes 网络阶段 |
 | 2026-08-04 | [Gateway 微信 Staging 验证](../../status/gateway-wechat-staging-validation.md) | V1 Staging 文本范围，已被后续生产状态取代 |
 | 历史 | [agent-wechat 验证](../../status/agent-wechat-validation.md) | agent-wechat/Staging 过程证据，按正文日期阅读 |
-| 2026-08-11 | [docs 历史快照索引](../../docs/README.md#v2-enterprise-runtime-历史快照) | V2 Enterprise Runtime 架构、部署、运维和限制快照 |
+| 2026-08-11 | [docs 历史快照索引](../../docs/README.md) | V2 Enterprise Runtime 架构、部署、运维和限制快照 |
 
 当前能力判断以[当前状态矩阵](../../status/current-status.md)为准。未来验证必须在 `validation/records/` 新增记录，不把历史叙述补写成当时不存在的精确证据。

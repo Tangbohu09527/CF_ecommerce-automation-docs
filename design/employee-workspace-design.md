@@ -37,7 +37,7 @@ Physical Conversation / 物理会话由 `source.platform + source.account_id + p
 
 企业内部稳定的员工身份。`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、Employee Workspace / 员工工作区和权限关联的权威主键。一个 Enterprise Identity / 企业身份未来可以显式绑定一个或多个微信账号、飞书账号、钉钉账号和 Web 账号。
 
-`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键。来源平台的 `sender.id`、微信 `wxid`、昵称或群名片都不能代替 `employee_id`；平台稳定标识只用于查找权威身份映射，展示名称只用于显示和辅助审计。
+`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键。来源平台的 `sender.id`、来源账号标识、昵称或群名片都不能代替 `employee_id`；平台稳定标识只用于查找权威身份映射，展示名称只用于显示和辅助审计。
 
 ### Employee Workspace / 员工工作区
 
@@ -106,7 +106,7 @@ Identity Mapping 不创建或返回 `workspace_id`。`sender.display_name` 可�
 固定原则如下：
 
 - 展示名称不能作为授权、合并或身份主键。
-- 微信 `wxid` 等平台稳定标识用于查找映射，但不得直接当作 `employee_id`。
+- 平台稳定来源标识用于查找映射，但不得直接当作 `employee_id`。
 - 映射成功、失败、冲突或已失效的解析结果都必须记录并关联原消息。
 - 映射失败时消息及可得附件元数据仍保存在 Message Store，不创建 Task、执行上下文或新的 AI Thread / AI 会话线程执行关系。
 - 非白名单用户消息仍保存在 Message Store；身份映射成功不等于 Access Control 允许创建 Task。
@@ -118,7 +118,7 @@ Identity Mapping 回答“这个来源账号对应哪个企业员工？”。Acc
 
 Employee Conversation Manager 在两者之后运行：只有身份映射成功且 Access Control 允许创建 Task，才解析或创建 `workspace_id` 和 `ai_thread_id`。
 
-Identity Management V1 属于后续规划。微信 ID 将作为微信来源身份记录的稳定主键和映射键，但不取代 Gateway 内部权威的 `enterprise_identity_id`，也不取代可空业务编号 `employee_id`。微信昵称、备注和头像只作为管理员展示信息，最近活跃时间作为管理视图状态；这些展示字段不得参与授权或自动合并身份。完整需求见[功能需求](../01_功能需求.md#11-identity-management-v1)。
+Identity Management V1 属于后续规划。微信来源稳定 ID 将作为来源身份记录的映射键，但不取代 Gateway 内部权威的 `enterprise_identity_id`，也不取代可空业务编号 `employee_id`。微信昵称、备注和头像只作为管理员展示信息，最近活跃时间作为管理视图状态；这些展示字段不得参与授权或自动合并身份。当前需求边界见[功能需求](../01_功能需求.md)。
 
 ## 4. 工作区模型
 

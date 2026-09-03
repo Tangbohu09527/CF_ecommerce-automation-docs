@@ -1,105 +1,127 @@
 # 文档审计与收口报告
 
-> 文档编号：VAL-AUDIT-20260821
-> 审计日期：2026-08-21
-> 审计基线：`c75a5b0` 及本次收口改动
-> 审计范围：本仓库全部已跟踪 Markdown、README、架构、设计、部署、运维、状态与验证材料
+> 文档编号：VAL-AUDIT-20260903
+>
+> 审计日期：2026-09-03
+>
+> 审计范围：本仓库全部 54 个 Markdown 文件
 
 ## 1. 审计边界
 
-本仓库只包含项目文档，不包含 `CF_agent-gateway`、`CF_agent-wechat`、Hermes 或 `CF_filebrowser-enterprise` 的业务代码。仓库规则同时禁止读取或影响其他仓库。因此本次可以完成：
+本次只修改 `CF_ecommerce-automation-docs` Markdown。通过用户明确授权的 GitHub API 只读查询核对组件分支、PR、提交、代码、测试、CI 和文档；未 clone、checkout、修改或访问三个组件仓库的本地工作区，也未连接 CFserver、AI 主机、Docker、数据库或生产文件。
 
-- 文档之间的当前/历史状态一致性检查。
-- 现有验证记录与架构、部署声明的一致性检查。
-- 权威入口、相对链接、命令边界、时区和证据字段检查。
-- 找出无法追溯到精确代码/镜像的文档声明。
+## 2. 跨仓库事实
 
-本次不能独立确认外部组件代码是否与文档逐行一致。旧验证记录缺少精确 commit、镜像 digest、Compose hash 和 schema，是明确的可追溯性缺口；不是可以猜测补齐的数据。后续由组件 owner 在新验证记录中提供精确发布输入。
+| 组件 | 核对结果 |
+| --- | --- |
+| Gateway | `main=b488cf452584e73bc9b752564bf90ea153aa8d18`；组件 PR #7 merged；main CI success；docs PR #8 OPEN，head `75287d57c2ffa4fad7e3cd7b5ce0c175ee23cd8a` 且 checks green |
+| WeChat | `main=92393bc2ae1d89dae9449fc131413979aa2fa2f2`；PR #1 和 #4 OPEN；docs PR #5 OPEN，head `ddaa7d466b6dfae6a4df8f95e11dea5a4be13b02`；PR #4/#5 当前 checks 部分失败 |
+| FileBrowser | `main=4750a97cfdf5bd067e04b6b36bf9616f5ada836d`；`feat/v1-integration=48380c3f31cb37b01d0c05b8db0cfa49680a17f9`；无开放 PR/Release；对应 branch CI success |
 
-## 2. 盘点结果
+未合并组件 PR 只作为 companion work，不作为 `main` 权威。
 
-| 区域 | 审计结论 | 收口方式 |
-| --- | --- | --- |
-| 根 README / `00`-`05` | 当前范围和决定基本一致，但缺正式生产文档入口 | README 与 `04` 更新为正式体系导航；`05` 保持决定权威 |
-| `architecture/` | 有多个主题页，但总体入口重复、缺 WeChat Runtime 单一设计 | 新增 System Architecture、WeChat Runtime 和目录索引 |
-| `design/` | 主要是 2026-08-04 设计/验证快照，部分状态已被后续证据取代 | 保留历史设计，在首屏标明日期和现行状态入口 |
-| `docs/architecture/` | 同时含当前摘要和 2026-08-11 快照，直接进入旧页易误读 | `docs/README` 重新分类；旧页增加历史警告；总体摘要改兼容入口 |
-| `docs/deployment/operations/status` | Staging 命令和旧“current limitations”与当前五服务/Hermes 状态冲突 | 全部按历史快照隔离，禁止作为生产操作依据 |
-| `status/` | 保存关键事实，但“当前摘要”和历史记录重复 | `status/current-status.md` 保持当前能力权威；旧记录加取代提示 |
-| 验证体系 | 缺统一 Checklist、执行证据字段和正式目录 | 新建 `validation/`、Checklist、records/history 规则 |
-| ADR | 决定集中在 `05_技术决策记录.md`，无正式目录导航 | 新建 `adr/README.md`，不重复复制决定正文 |
+## 3. 关键事实纠正
 
-## 3. 主要发现
+- 状态日期从 2026-08-14 更新到 2026-09-03。
+- Gateway V2/P1 从“部分链路待验证”更新为生产已交付，并记录 merged main、source SHA、image digest、revision 和 Release。
+- forced-QR R2 从“完全新设备 QR 未验证”更新为生产行为已验证，同时保留 WeChat PR 栈尚未 main promotion 和 CI 失败。
+- CFserver reboot 更新为核心恢复、agent-wechat 保持停止、显式 stop Gate + fresh QR 后恢复；automatic boot stop gate 仍未验证。
+- AI host reboot 更新为 Hermes reachability 恢复一次，微信 Session 保持；不外推为 watchdog/HA 完成。
+- Gateway-only deployment 更新为不重建 agent-wechat、不需要 fresh QR。
+- `uncertain` 正式 Admin inspection/recovery API 从“缺少能力”更新为 implemented/tested/deployed，生产动作覆盖继续分层。
+- FileBrowser 从笼统“开发中”更新为 V1 Beta implementation/automated validation completed，production deployment pending。
+- Hermes 当前文档不再硬编码无法由本次部署证据确认的版本；历史版本仅保留在带日期记录。
+- 动态 Message、Checkpoint、Queue、container、heartbeat 和 Archive 数量移出长期当前状态。
 
-| ID | 严重度 | 发现 | 处理结果 |
-| --- | --- | --- | --- |
-| DOC-001 | P0 | 缺 System Architecture、Deployment Guide、Recovery Runbook、WeChat Runtime、Production Checklist 和时区规范 | 已新增正式文档 |
-| DOC-002 | P0 | 2026-08-11 历史文件自身使用“当前”措辞，直接访问可能误导生产操作 | 保留正文并增加首屏历史警告与现行链接 |
-| DOC-003 | P1 | `architecture/ai-system-overview.md`、`docs/architecture/overall-architecture.md` 和 `02_系统设计.md` 形成多重总体入口 | System Architecture 成为企业级入口，旧总体页改为兼容导航，`02` 保留详细设计职责 |
-| DOC-004 | P1 | 旧运行手册遗漏当前独立 `wechat-worker`，并可能让人把两套 Compose 当一套操作 | Deployment Guide 强制区分 Gateway/WeChat 两套 Compose 和发布清单 |
-| DOC-005 | P1 | 旧 Staging 写 Hermes/WeChat/Workers 未启用，与 2026-08-14 生产证据冲突 | 旧文档按日期隔离；当前能力只看状态矩阵 |
-| DOC-006 | P1 | 缺 Host/Container/Database/Application 四层时区基线 | 新增 Timezone Policy 和验证项 |
-| DOC-007 | P1 | `localId` 排序/单调性未验证，at-least-once 边界容易被过度承诺 | 正式 Runtime 把 `localId` 定义为 opaque，并把保证限定到入站 Message Store |
-| DOC-008 | P1 | 2026-08-14 验证记录缺 commit/digest/config/schema/逐项证据与签核 | 历史记录保持原样；新 records 规范强制补齐 |
-| DOC-009 | P1 | 缺 restart/recreate/数据库/Docker/宿主分层恢复操作 | Recovery Runbook 和 Checklist 分层处理，未验证层级保持 BLOCKED |
-| DOC-010 | P2 | Task Queue、完整 Context Snapshot 和媒体目标设计可能被总体描述误读为上线 | 正式架构明确使用 Routing/Dispatch 当前链路，目标能力以虚线和状态标注 |
+## 4. group thread 核对
 
-## 4. 缺失、过期和代码一致性结论
+GitHub 只读代码/测试核对结果：
 
-### 4.1 已补齐的缺失
+- V1 compatibility `build_group_thread_key` 忽略 sender，按 source account + physical group conversation 形成 whole-room thread。
+- V2 `ThreadResolver` 的 `group_sender` key 包含 sender identity、Profile revision 和 policy。
+- Gateway 自动化测试覆盖同群不同发送者获得不同 V2 Thread。
+- 生产 Runtime 使用 V2 代码线，但现有生产证据只证明群聊真实 `@` 文本闭环，没有同群两个发送者的专门对照。
 
-- 企业总体架构和组件信任边界。
-- 新机器、Docker、配置、Hermes 和微信登录部署流程。
-- Docker、微信掉线、QR、Hermes 和消息不回复恢复手册。
-- Polling、Checkpoint、`localId`、恢复和 at-least-once 设计。
-- restart、消息、Hermes、回复和数据验证清单。
-- 四层时区规范。
-- ADR、部署、运维、验证正式目录入口。
+最终分类为 Repository implemented / automated tests passed / deployed / same-group multi-sender production validation pending。
 
-### 4.2 过期材料
+## 5. Context、Admin、媒体和业务能力
 
-以下材料保留但不是当前生产依据：
+| 能力 | 分类 |
+| --- | --- |
+| Context Timeline/Snapshot/search | implemented、tested、main CI passed、deployed code；full production exercise pending |
+| Admin `uncertain` recovery | implemented、tested、deployed；one controlled production recovery，all actions not fully exercised |
+| media discovery | production validated to image bytes/integrity |
+| full media pipeline | not production validated |
+| FileBrowser | V1 Beta implementation and automated validation completed; deployment pending |
+| Skills / 旺店通 / S6 | not integrated / not verified |
 
-- 2026-08-11 `docs/` V2 Enterprise Runtime 架构/部署/运维/限制快照。
-- 2026-08-04 `design/` 和 Gateway Staging 验证。
-- 早期 `status/agent-wechat-validation.md`。
+## 6. 文档权威层级
 
-历史结论不删除、不改写成新事实；首屏警告和索引负责阻止误用。
+唯一入口已经明确：
 
-### 4.3 与代码一致性
+1. `status/current-status.md`
+2. `status/current-progress.md`
+3. `architecture/system-architecture.md`
+4. `deployment/deployment-guide.md`
+5. `operations/recovery-runbook.md`
+6. `validation/production-validation-checklist.md`
+7. `05_技术决策记录.md`
+8. `validation/records/2026-09-03-enterprise-runtime-production-closeout.md`
 
-本仓库无业务代码，因此没有足够证据宣布“所有命令与当前实现完全一致”。已确认的问题是**发布追溯缺失**：旧记录无法从叙述映射到精确组件 commit、镜像和配置。
+`docs/` 只保留兼容入口和历史快照；`design/` 顶部增加 implementation/validation/remaining scope/authority 状态头。
 
-正式体系采用以下控制：
+## 7. 历史隔离
 
-1. 组件实现细节和命令由目标版本组件仓库维护。
-2. 本仓库只规定跨组件顺序、不变量和占位符结构。
-3. 发布前把组件 commit/tag、image digest、Compose 路径/项目、config hash、migration/schema 和 Hermes 控制命令写入发布清单。
-4. 未解析占位符阻断部署；不从历史 Staging 或 `main` 猜测。
-5. 新 Checklist 记录目标版本的期望、实际与证据，组件 owner 复核后才可宣称一致。
+2026-08-04、2026-08-11、2026-08-13、2026-08-14、V1、Staging 和 Bootstrap 材料保留原日期、SHA、当时限制和历史命令，并增加 Historical/Archived 或 compatibility 说明。
 
-## 5. 仍未关闭的产品/运行缺口
+历史材料不能外推：
 
-文档收口不会改变以下能力状态：
+- 旧 Hermes 版本为当前版本；
+- 旧 Checkpoint/消息数量为当前动态状态；
+- V1 whole-room thread 为当前 V2 策略；
+- 旧“未启用/未部署”覆盖当前 Gateway 生产状态；
+- 旧媒体发现等于当前完整媒体能力。
 
-- Hermes 自启、守护、告警、正式 `uncertain` 管理和 AI 主机恢复。
-- 引用正文注入。
-- Attachment、媒体私有存储、Hermes 多模态、Artifact 与微信媒体投递。
-- 完全新设备 QR。
-- Gateway 容器 recreate、PostgreSQL、Docker daemon、CFserver 宿主恢复。
-- `group_shared`、File Service 主链、Skills 和企业系统接入。
+## 8. stale statement audit
 
-这些项目必须通过新验证记录后再更新[当前状态矩阵](../status/current-status.md)；不能因为文档现已完整而提升状态。
+按任务正则执行后保留 201 个命中，分布在 39 个文件。分类如下：
 
-## 6. 质量检查
+| 分类 | 关键保留原因 |
+| --- | --- |
+| Current and correct | `group_sender/private_sender`、两类日志策略、WeChat PR 状态、automatic boot stop gate 限制、FileBrowser 尚未部署 |
+| Historical and intentionally retained | 2026-08 日期、Hermes historical version、V1 Worker 状态、17 Checkpoint/151 历史等 dated counts |
+| Current limitation | same-group multi-sender production validation、FileBrowser deployment、PostgreSQL restore、Hermes HA、完整媒体/Skills |
+| Dated evidence | Gateway/WeChat PR/SHA、Release、log capacity、Closeout 证据 |
+| Stale and removed | 8 月当前状态、QR/Host/AI reboot 全未验证、Gateway 部分链路、uncertain 无 API、FileBrowser 仅普通开发中 |
+| Requires component follow-up | WeChat PR #4/#1 promotion 与 PR #4/#5 CI；Gateway PR #8、WeChat PR #5 最终合并状态 |
 
-| 检查 | 结果 | 说明 |
-| --- | --- | --- |
-| Markdown 格式 / `git diff --check` | **PASS** | 全仓 53 份 Markdown 的 H1 与围栏检查通过；`git diff --cached --check` PASS |
-| 仓库内相对链接与图片路径 | **PASS** | 348 个本地链接/图片路径，0 断链；外部私密 GitHub 链接未联网验证 |
-| UTF-8 解码 | **PASS** | 53 个文件严格解码，0 错误 |
-| 命令占位符与危险命令 | **PASS** | 占位符必须在发布时解析；WeChat Compose/network create 无硬编码；危险命令仅出现在禁止操作上下文 |
-| 敏感信息模式 | **PASS** | Token/私钥模式 0 命中，无真实环境端点；历史文件中的 `0.0.0.0` 仅为禁止公开绑定的泛化示例 |
-| Git 状态与变更范围 | **PASS** | 37 个文档文件，仅涉及本仓库 `architecture/`、`deployment/`、`operations/`、`validation/`、`adr/` 及入口/历史警告；无业务代码和其他仓库变更 |
+## 9. 自动检查
 
-最终检查结果在提交前更新本节。
+临时 Python 检查器从标准输入运行，未写入或提交仓库。
+
+| 检查 | 结果 |
+| --- | --- |
+| 严格 UTF-8 | PASS，54/54 |
+| 每文件单一 H1 | PASS |
+| Markdown code fence | PASS |
+| Mermaid fence | PASS |
+| 仓库内相对链接/目录/图片 | PASS，300 links，1 image |
+| Anchor | PASS，2 anchors |
+| 空链接 | PASS |
+| Windows 绝对路径 | PASS |
+| 内网 IP | PASS |
+| 微信 ID / chatroom 模式 | PASS |
+| Secret / Authorization value 模式 | PASS |
+| 冲突标记 | PASS |
+| 行尾空格 | PASS |
+
+Git `diff --check` 在每组提交前通过。最终提交后还需重新运行总 diff、commit 和 PR 检查。
+
+## 10. 未修改范围
+
+- 未修改 `.github/`、Workflow、代码、配置、Compose、脚本、Token、数据库或生产数据。
+- 未修改 PNG、XMind 或其他二进制附件。
+- 未修改、提交或推送其他仓库。
+- 未连接或修改 CFserver/AI 主机。
+
+总体规划 XMind/PNG 仍是早期蓝图；如需视觉内容与当前架构完全同步，应作为未来单独文档任务处理。

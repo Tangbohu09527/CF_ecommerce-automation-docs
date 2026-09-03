@@ -21,7 +21,7 @@ It does not declare the complete ecommerce automation program finished. File Ser
 | `CF_filebrowser-enterprise` | `main`=`4750a97cfdf5bd067e04b6b36bf9616f5ada836d`; `feat/v1-integration`=`48380c3f31cb37b01d0c05b8db0cfa49680a17f9` | V1 Beta implementation line; no production deployment authority |
 | `CF_ecommerce-automation-docs` | start `main`=`c75a5b097da9687140289fba0f718ad2281e8710`; PR #7 start head=`aeac5f8905de35eca5398a8182dfce28b8a6210b` | Documentation closeout only |
 
-Companion documentation work was OPEN at evidence time: Gateway PR #8 and WeChat PR #5. Neither is treated as merged component authority.
+Companion documentation work was OPEN at final recheck: Gateway PR #8 head `75287d57c2ffa4fad7e3cd7b5ce0c175ee23cd8a` with green checks, and WeChat PR #5 head `ddaa7d466b6dfae6a4df8f95e11dea5a4be13b02` with partial check failures. Neither is treated as merged component authority.
 
 ## Gateway production Release
 

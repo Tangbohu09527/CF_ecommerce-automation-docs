@@ -94,7 +94,7 @@ V1 Staging 已将真实微信文本从 Polling / Checkpoint 串入 Message Store
 
 Message Store、Employee Workspace / 员工工作区和 AI Thread / AI 会话线程保持不同的数据职责：
 
-`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、工作区和权限关联的权威主键。`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信 `wxid` 代替。
+`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、工作区和权限关联的权威主键。`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用平台来源账号 ID 代替。
 
 - `messages` 记录 Physical Conversation / 物理会话中的来源事实。
 - `source_identity_mapping` 记录 `source.platform + source.account_id + sender.id` 到 `enterprise_identity_id` 及可选 `employee_id` 的显式映射；不创建或返回 `workspace_id`。

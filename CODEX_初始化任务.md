@@ -1,5 +1,12 @@
 # Codex任务：初始化 CF_ecommerce-automation-docs 私密文档仓库
 
+> [!WARNING]
+> **Historical / Bootstrap-only**
+>
+> 本文是仓库首次创建时的初始化任务，不是当前 Roadmap、生产状态或操作入口。当前协作规则见[AGENTS.md](./AGENTS.md)，当前状态见[状态矩阵](./status/current-status.md)，最新生产证据见[2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
+>
+> 下文关于建仓、创建 Issue、旧仓库名、早期线程和部署状态的内容只保留历史价值，不得重新执行或外推。
+
 ## 一、任务目标
 
 在当前目录创建“电商业务全自动化系统”的独立文档仓库第一版，并在检查无误后创建 GitHub 私密仓库：

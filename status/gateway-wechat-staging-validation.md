@@ -2,7 +2,7 @@
 
 > **历史证据，已被后续状态取代**
 >
-> 本文仅保留 2026-08-04 V1 Staging 的历史验证事实，不代表当前生产基线。当前能力边界见[当前状态矩阵](./current-status.md)，后续生产证据见[2026-08-14 私聊、群聊及媒体验证记录](./2026-08-14-private-group-media-validation.md)，统一分类与阅读入口见[验证文档索引](../validation/README.md)。
+> 本文仅保留 2026-08-04 V1 Staging 的历史验证事实，不代表当前生产基线。当前能力边界见[当前状态矩阵](./current-status.md)，当前生产证据见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)，统一分类与阅读入口见[验证文档索引](../validation/README.md)。
 
 - **状态日期：** 2026-08-04
 - **验证对象：** `CF_agent-gateway` 微信文本消息、权限准入、Hermes 调度和结果回传链路
@@ -113,9 +113,9 @@ POST /api/messages/send
 bot_account_id + group_chat_id + sender_id
 ```
 
-审计发现 Gateway V1 当前 `thread_keys` 行为忽略 `sender_id`，现有测试也表明同群不同员工可能复用同一 AI Thread。这和[系统设计](../02_系统设计.md#物理微信会话与-ai-线程)及[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md#5-ai-thread-映射规则)不一致。
+审计发现 Gateway V1 当时的 `thread_keys` 行为忽略 `sender_id`，现有测试也表明同群不同员工可能复用同一 AI Thread。这和[系统设计](../02_系统设计.md)及[员工工作区与 AI 会话线程设计](../design/employee-workspace-design.md#5-ai-thread-映射规则)不一致。
 
-该差异是已知实现偏差，不是设计变更，也不能作为群聊员工上下文隔离已经验收的依据。在 Gateway 修正并补充“同群不同员工不复用 AI Thread”的测试前，群聊多员工线程隔离保持待修复 / 待复验。若未来确需改为整群共享，必须先更新[技术决策记录](../05_技术决策记录.md)，说明安全、权限、上下文和迁移影响。
+该差异是当时 V1 的已知实现偏差，不是设计变更，也不能作为群聊员工上下文隔离已经验收的依据。当前 V2 实现和生产证据边界见[系统设计](../02_系统设计.md)；若未来确需改为整群共享，必须先更新[技术决策记录](../05_技术决策记录.md)，说明安全、权限、上下文和迁移影响。
 
 ## 质量检查
 

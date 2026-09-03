@@ -91,7 +91,7 @@ stateDiagram-v2
 | --- | --- |
 | `task_id` | Debian Task Store 生成的稳定任务 ID |
 | `enterprise_identity_id` | Task 所属 Gateway 企业身份的不可变权威主键，也是身份、工作区和权限关联依据 |
-| `employee_id` | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键，不使用微信 `wxid` 等来源标识代替 |
+| `employee_id` | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键，不使用平台来源标识代替 |
 | `workspace_id` | Gateway 生成的 Employee Workspace / 员工工作区稳定 ID |
 | `ai_thread_id` | Gateway 生成的 AI Thread / AI 会话线程稳定 ID，是任务顺序与上下文隔离依据 |
 | `hermes_thread_id` | 可选的 Hermes Runtime Thread / Hermes 运行时线程绑定；可为 `null`、可重建，不是权威主键 |
