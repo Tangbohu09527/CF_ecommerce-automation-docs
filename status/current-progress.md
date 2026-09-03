@@ -1,42 +1,51 @@
-# 当前开发进度
+# 当前进度与下一步
 
-> 状态日期：2026-08-14。当前能力级事实以[当前状态矩阵](./current-status.md)为准，本轮生产证据以[私聊、群聊及媒体验证记录](./2026-08-14-private-group-media-validation.md)为准。
+> 状态日期：2026-09-03
+>
+> 能力分层以[当前状态矩阵](./current-status.md)为准，生产证据以[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)为准。
 
-## 当前阶段
+## 当前工作流
 
-项目仍处于阶段 1，当前结论是：
+企业消息与 AI 文本闭环基础已完成生产交付。六阶段规划仍处于阶段 1，因为原阶段定义还包含文件基础链路；当前实际工作已经从消息 Runtime 交付转向文件服务、可靠性、Skills 和业务系统集成准备。
 
-> 私聊和 group_sender 群聊的授权文本闭环已实机验证；媒体链路、引用上下文注入和完整宿主恢复仍待完成。
+## 已完成里程碑
 
-## 已完成
+- Gateway V2 production runtime 与 P1 observability。
+- 私聊与真正 `@` 的群聊文本链路，以及未 `@` 安全结束。
+- forced fresh QR 生产行为。
+- Checkpoint regression/rebase、历史前缀与实时后缀、self skip 和无重复回复。
+- CFserver 核心重启恢复与 fresh QR 重新放行。
+- AI 主机重启后的 Hermes reachability 恢复。
+- Gateway-only cutover、回滚 Release、离线镜像与生产证据留存。
+- `uncertain` Admin recovery、Context Runtime 等 Gateway 能力的仓库实现和自动化验证。
 
-- `CF_agent-wechat` 登录管理、手机确认登录、文本读取与发送已完成实机验证；生产不使用 VNC/noVNC。
-- Gateway 五服务保持 healthy；Persist-first、Checkpoint、历史基线跳过和未授权拒绝继续有效。
-- 测试身份、来源映射、两级策略、Conversation/Profile 绑定、Admission Allowed 和 V2 Routing 已用于真实私聊与群聊文本验证。
-- 私聊 `private_sender` 与群聊 `group_sender` 均完成 Hermes Dispatch、Response Persistence、Delivery Outbox 和微信实际回复。
-- 群聊没有真实 `@` 时持久化后以 `bot_not_mentioned` 结束；机器人回复不回环。
-- 同一员工 Workspace 复用，私聊与群聊 AI/Hermes Thread 隔离；CFserver Gateway 应用服务 restart 后原线程和 Hermes 上下文继续复用。
-- 引用识别、`reply_context` 持久化及引用类型消息的文本回复已验证。
-- 微信图片消息、Raw Payload、真实 JPEG 字节读取及签名、大小、SHA-256 校验已验证。
-- Hermes 不可达故障已复现，并完成一次带备份、证据核对和 Guard 的受控人工恢复。
+## 正在进行
 
-## 当前阻塞
+- Gateway component docs closeout：PR #8，OPEN，未合并。
+- WeChat R2 component docs closeout：PR #5，OPEN，堆叠在 PR #4 之上，未合并。
+- Enterprise docs closeout：本仓库 PR #7。
+- WeChat PR #4 / PR #1 的 promotion 顺序、CI 失败和 main 权威收口。
 
-- Hermes Gateway 开机自启仍不可靠，缺少正式守护、健康告警和自动恢复。
-- `uncertain` Dispatch 缺少正式查询与恢复命令/API；人工直接修改数据库不能成为常规路径。
-- `reply_context` 尚未注入 Hermes，不能声称 AI 已理解被引用内容。
-- Attachment、Gateway 私有媒体存储、Hermes 媒体协议、READY Artifact 和微信媒体投递尚未完成。
-- 完全新设备扫码、容器 recreate、PostgreSQL、CFserver、AI 主机重启恢复及 `group_shared` 尚未验证。
-- FileBrowser、Skills 和业务系统接入尚未开始生产验收。
+未合并的组件文档 PR 只能作为 companion work，不得当作组件 `main` 的当前权威。
 
-## 下一阶段
+## 建议优先级
 
-严格按[当前状态矩阵中的 18 步](./current-status.md#下一阶段顺序)执行：先处理 Hermes 可靠性与 `uncertain`，再完成引用和媒体双桥，随后逐级验证恢复，最后接入 FileBrowser、Skills、旺店通/S6 并分批授权。
+以下为当前建议，不是不可变承诺；技术决定变化仍以[技术决策记录](../05_技术决策记录.md)为准。
 
-## 历史记录说明
+1. 完成三个仓库文档 PR 的人工复核。
+2. 收口 `CF_agent-wechat` PR #4 -> PR #1 的正确提升顺序及 CI。
+3. 完成 FileBrowser CFserver 部署、迁移和恢复验收。
+4. 收口 Hermes watchdog、开机自启和生产监控。
+5. 生产验证同群多发送者的 `group_sender` 隔离。
+6. 完成引用正文上下文。
+7. 完成媒体和文件双向桥。
+8. 建设 Skills Runtime。
+9. 接入旺店通和 S6。
+10. 分批授权正式业务身份与群。
 
-- [2026-08-13 微信运行时收口记录](./2026-08-13-wechat-runtime-closeout.md)记录入口、Checkpoint、历史基线和未授权拒绝阶段。
-- [Gateway V1 Staging 微信文本闭环验证记录](./gateway-wechat-staging-validation.md)记录 2026-08-04 特定 Staging 环境的历史结果。
-- [agent-wechat V1 入口验证记录](./agent-wechat-validation.md)记录较早入口能力验证。
+## 持续限制
 
-历史记录只说明其标注日期和环境，不能覆盖 2026-08-14 当前状态。
+- automatic boot stop gate 未完成，CFserver reboot 后 fresh QR 前必须显式检查并关闭 Gate。
+- agent-wechat 自身重启、重建或 Host reboot 都需要 fresh QR；Archive 不可自动复用。
+- AI 主机 reboot 与 Gateway-only deploy 通常不需要 fresh QR，但仍要完成各自健康验证。
+- FileBrowser、Skills、完整媒体、RAG、旺店通和 S6 均不属于当前生产交付。
