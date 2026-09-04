@@ -102,7 +102,8 @@ Message、Admission、Dispatch、Response 和 Delivery 是分离状态。入口�
 
 ## 7. 运行与恢复
 
-- Gateway Git authority：`b488cf452584e73bc9b752564bf90ea153aa8d18`。
+- Gateway repository branch authority：`main`，live tip 动态查询；2026-09-04 verified snapshot 为 `4f13039b86c60bc94340edb5468f0102d62d2dff`。
+- Gateway Production Release Git authority：`b488cf452584e73bc9b752564bf90ea153aa8d18`；docs-only main 前进不表示生产重新部署。
 - Database revision：`20260823_04`。
 - Gateway P1 Release 使用 immutable image 和 Gateway 专属 `64m x 10` 日志策略。
 - agent-wechat 使用 `restart: "no"`、fresh QR 和 `20m x 3` 日志策略。

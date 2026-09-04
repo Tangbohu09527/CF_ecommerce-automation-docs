@@ -4,7 +4,7 @@
 >
 > **Implementation repository:** `CF_agent-gateway`
 >
-> **Implemented baseline:** durable Admission/Dispatch/FIFO/recovery on Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`
+> **Implemented baseline:** durable Admission/Dispatch/FIFO/recovery on Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; repository branch authority is `main`, with 2026-09-04 verified repository snapshot `4f13039b86c60bc94340edb5468f0102d62d2dff`
 >
 > **Production validation:** text durable Dispatch/Response/Delivery validated; general Task Queue and Provider routing not validated
 >

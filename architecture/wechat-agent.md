@@ -27,14 +27,16 @@
 - CFserver reboot 后保持停止，fresh QR 后重新上线。
 - Gateway-only deployment 不重建容器并保持 Session。
 
-## Git 边界
+## Git 与镜像边界
 
-- `main`：`92393bc2ae1d89dae9449fc131413979aa2fa2f2`。
-- PR #1：`feat/forced-qr-login`，OPEN。
-- PR #4：`codex/forced-qr-production-hardening-r2`，OPEN，堆叠在 PR #1。
-- PR #5：未合并的组件文档工作。
+- Repository branch authority：`main`；live tip 动态查询。
+- PR #1/#4/#5/#6：全部 MERGED。
+- 2026-09-04 promotion merge baseline：`02583fe76220916019ca961bb37dfa015640384e`。
+- 2026-09-04 documentation post-promotion snapshot：`69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`。
+- main CI Run `33863104399` completed/success，全部 Job 成功。
+- observed production image ID：`sha256:7ee0309980b7d03b747b40c6c04cbaeafe2d8fc01fc9429810cbc7571ebbf720`。
 
-生产行为已验证不等于实现已经进入 `main`。现场 Image ID 也不得在缺少构建证据时绑定到 PR #4 exact SHA。PR #4/#5 的 GitHub checks 当前部分失败。
+Repository promotion 和 component documentation closeout 已完成，但这些合并没有重新构建或部署生产镜像。现场 Image ID 与选定 Release Commit、构建输入之间的 exact mapping 仍未证明；forced-QR 生产行为仍以 2026-09-03 验收为准。
 
 ## 不负责
 

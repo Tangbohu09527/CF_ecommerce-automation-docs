@@ -4,7 +4,7 @@
 >
 > **Implementation repository:** `CF_agent-wechat` and `CF_agent-gateway`
 >
-> **Implemented baseline:** Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`; WeChat forced-QR R2 remains on open PR stack
+> **Implemented baseline:** Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; WeChat branch authority is `main`, with 2026-09-04 post-promotion snapshot `69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`; forced-QR R2 promotion is complete
 >
 > **Production validation:** forced QR, Polling/Checkpoint continuity and text read/send validated; full file/media pipeline not validated
 >

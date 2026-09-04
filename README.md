@@ -16,14 +16,16 @@ CFserver 是部署宿主；`CF_agent-gateway` 与 PostgreSQL 是消息和控制�
 
 | 组件或能力 | 当前结论 |
 | --- | --- |
-| `CF_agent-gateway` | repository main 与 production Release Git authority 均仍为 `b488cf452584e73bc9b752564bf90ea153aa8d18`；docs PR #8 仍 OPEN，不代表新部署 |
-| `CF_agent-wechat` | forced-QR R2 行为已在生产验证；PR #4 基线 CI 未全绿，PR #5 继承门禁，PR #1 为 dirty conflict，尚未提升到 `main` |
+| `CF_agent-gateway` | branch authority 为 `main`；2026-09-04 verified snapshot 为 `4f13039b86c60bc94340edb5468f0102d62d2dff`，PR #8/#9 docs-only closeout 已合并且 main CI 通过；production Release authority 仍为 `b488cf452584e73bc9b752564bf90ea153aa8d18` |
+| `CF_agent-wechat` | branch authority 为 `main`；2026-09-04 post-promotion snapshot 为 `69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`，PR #1/#4/#5/#6 与 main CI 已完成；forced-QR 生产行为仍以 2026-09-03 验收为准 |
 | PostgreSQL | Gateway 权威状态已在线，revision `20260823_04`；真实 restore 演练仍未完成 |
 | Hermes | 当前文本链路真实调用成功，AI 主机重启后 reachability 曾恢复；长期 watchdog、告警和高可用未收口 |
 | `CF_filebrowser-enterprise` | V1 Beta implementation and automated validation completed; CFserver deployment and production acceptance pending |
 | Skills、旺店通、S6 | 尚未接入生产任务链 |
 
 详细分层状态见[当前状态矩阵](./status/current-status.md)，本次生产事实见[2026-09-03 Enterprise Runtime Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
+
+2026-09-04 repository/documentation closeout 已完成；当前只剩本仓库 PR #7 最终人工复核。组件 `main` 的 live tip 必须动态查询，上表 SHA 只表示本次 dated snapshot，不是永久 current main。
 
 ## 当前生产文本链路
 

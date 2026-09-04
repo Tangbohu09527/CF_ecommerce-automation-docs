@@ -10,7 +10,7 @@
 
 本节只摘要已经完成的真实生产行为。详细版本、digest、回滚和证据边界见[Enterprise Runtime Production Closeout](./records/2026-09-03-enterprise-runtime-production-closeout.md)。
 
-- [x] Gateway Git authority 为 merged main `b488cf452584e73bc9b752564bf90ea153aa8d18`；P1 未创建新 Tag。
+- [x] 2026-09-03 Gateway Production Release Git authority 为 `b488cf452584e73bc9b752564bf90ea153aa8d18`；P1 未创建新 Tag。
 - [x] Production image digest、Release label、database revision `20260823_04` 和 rollback Release 已记录。
 - [x] PostgreSQL、Gateway API、Poll/Dispatch/Delivery Worker、external agent-wechat healthy。
 - [x] Controller `ready=true` 且 `token_contract_valid=true`。

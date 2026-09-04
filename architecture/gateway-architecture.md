@@ -21,11 +21,13 @@ Gateway 是企业消息、身份、权限、线程、Context、Dispatch、Respon
 
 ## Git 与发布权威
 
-- Gateway `main`：`b488cf452584e73bc9b752564bf90ea153aa8d18`。
+- Repository branch authority：`main`；live tip 动态查询。
+- 2026-09-04 verified repository snapshot：`4f13039b86c60bc94340edb5468f0102d62d2dff`；PR #8/#9 为 docs-only merge，不表示重新部署。
+- Production Release Git authority：`b488cf452584e73bc9b752564bf90ea153aa8d18`。
 - Production-validated source：`f36c798294368263433f6132366ac9a864d9482b`。
 - Database revision：`20260823_04`。
 - Release：`p1-observability-main-b488cf452584-20260903`。
-- Git authority 是 merged main SHA，不是历史 Tag。
+- Production Release authority 与 repository live tip 分开；P1 未创建新生产 Tag。
 
 ## V2 Thread
 

@@ -36,7 +36,7 @@ agent-wechat 与 Gateway 属于两个独立项目和 Compose ownership。两者�
 - API 6174 只绑定 loopback，并通过 `cf-internal` alias 提供给 Gateway。
 - fresh QR 后必须验证进程、auth、chats 和 messages，随后才能恢复 Gate。
 
-forced-QR R2 行为已经生产验证，但其实现仍位于开放的 WeChat PR #1 / PR #4 栈，尚未成为 `main` 权威。
+forced-QR R2 repository promotion 与 component documentation closeout 已于 2026-09-04 完成，branch authority 为 `main`，main CI 全部成功。仓库合并没有重新构建或部署生产镜像；forced-QR 真实生产行为仍以 2026-09-03 验收为准。
 
 ## 4. Polling 与 Persist-first
 

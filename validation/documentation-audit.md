@@ -14,17 +14,17 @@
 
 | 组件 | 核对结果 |
 | --- | --- |
-| Gateway | repository `main=b488cf452584e73bc9b752564bf90ea153aa8d18`；production Release Git authority 同为 `b488cf452584e73bc9b752564bf90ea153aa8d18`；docs PR #8 OPEN/clean，head `75287d57c2ffa4fad7e3cd7b5ce0c175ee23cd8a`，checks green，未形成新部署 |
-| WeChat | `main=92393bc2ae1d89dae9449fc131413979aa2fa2f2`；PR #1 OPEN/dirty；PR #4 OPEN/unstable，测试 Fixture/CI 漂移导致门禁失败；PR #5 OPEN/unstable，文档检查通过但继承 PR #4 失败门禁 |
+| Gateway | branch authority=`main`；2026-09-04 verified snapshot=`4f13039b86c60bc94340edb5468f0102d62d2dff`；PR #8/#9 MERGED，docs-only baselines 分别为 `c5518aed12b90235f118ed81bb3cef75d0463443` 与 `4f13039…`；main CI Run `33863057556` completed/success，3/3 Jobs 成功；production Release authority 仍为 `b488cf452584e73bc9b752564bf90ea153aa8d18` |
+| WeChat | branch authority=`main`；2026-09-04 promotion baseline=`02583fe76220916019ca961bb37dfa015640384e`，post-promotion docs snapshot=`69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`；PR #1/#4/#5/#6 MERGED；main CI Run `33863104399` completed/success，5/5 Jobs 成功；observed production image provenance 仍未精确映射到 Release Commit |
 | FileBrowser | `main=4750a97cfdf5bd067e04b6b36bf9616f5ada836d`；`feat/v1-integration=48380c3f31cb37b01d0c05b8db0cfa49680a17f9`；无开放 PR/Release；对应 branch CI success |
 
-未合并组件 PR 只作为 companion work，不作为 `main` 或 production authority。
+Gateway component documentation closeout、WeChat repository promotion 和 WeChat component documentation closeout 均已完成。Repository live tip 仍须动态查询；dated snapshot 和 production authority 不互相替代。
 
 ## 3. 关键事实纠正
 
 - 当前状态入口复核至 2026-09-04；2026-09-03 Production Closeout 继续保留原 Evidence date。
 - Gateway V2/P1 从“部分链路待验证”更新为生产已交付，并记录 merged main、source SHA、image digest、revision 和 Release。
-- forced-QR R2 从“完全新设备 QR 未验证”更新为生产行为已验证，同时保留 WeChat PR 栈尚未 main promotion 和 CI 失败。
+- forced-QR R2 repository promotion、Fixture/CI 修复、dirty conflict 解决和 component docs closeout 已完成；真实生产行为仍以 2026-09-03 验收为准。
 - CFserver reboot 更新为核心恢复、agent-wechat 保持停止、Controller `stop` 组合 Poll/Delivery Gate + fresh QR 后恢复；automatic boot stop gate 仍未验证。
 - AI host reboot 更新为 Hermes reachability 恢复一次，微信 Session 保持；不外推为 watchdog/HA 完成。
 - Gateway-only deployment 更新为不重建 agent-wechat、不需要 fresh QR。
@@ -84,32 +84,25 @@ GitHub 只读代码/测试核对结果：
 - 旧“未启用/未部署”覆盖当前 Gateway 生产状态；
 - 旧媒体发现等于当前完整媒体能力。
 
-## 8. stale statement audit
+## 8. 最终组件状态审计
 
-按任务正则执行后保留 201 个命中，分布在 39 个文件。分类如下：
-
-| 分类 | 关键保留原因 |
-| --- | --- |
-| Current and correct | `group_sender/private_sender`、两类日志策略、WeChat PR 状态、automatic boot stop gate 限制、FileBrowser 尚未部署 |
-| Historical and intentionally retained | 2026-08 日期、Hermes historical version、V1 Worker 状态、17 Checkpoint/151 历史等 dated counts |
-| Current limitation | same-group multi-sender production validation、FileBrowser deployment、PostgreSQL restore、Hermes HA、完整媒体/Skills |
-| Dated evidence | Gateway/WeChat PR/SHA、Release、log capacity、Closeout 证据 |
-| Stale and removed | 8 月当前状态、QR/Host/AI reboot 全未验证、Gateway 部分链路、uncertain 无 API、FileBrowser 仅普通开发中 |
-| Requires component follow-up | Gateway PR #8 仍 OPEN；WeChat PR #4 Fixture/CI 漂移、PR #5 继承门禁、PR #1 dirty conflict 和最终 main promotion |
+- Gateway PR #8/#9 已合并，component documentation closeout 标记为 COMPLETED。
+- WeChat PR #1/#4/#5/#6 已合并，repository promotion 与 component documentation closeout 标记为 COMPLETED。
+- 两个组件 main CI Run 均 completed/success，且每个 Job 成功。
+- 固定 Merge Commit 只作为 2026-09-04 dated repository snapshot 或 PR merge baseline，不标记为永久 live main。
+- Gateway 生产继续由 `b488cf… / f36c798… / b9341ca…` 证据组定义，docs-only merge 不表示重新部署。
+- WeChat 仓库合并未重建或部署现场镜像，observed image ID 与 Release Commit/构建输入的 exact mapping 仍未证明。
+- 2026-09-03 Production Closeout 中当时组件 PR 未完成的状态属于历史证据，保持原文。
+- Enterprise documentation PR #7 仅剩 final review pending。
 
 ## 9. 2026-09-04 定向语义审计
 
-| 审计主题 | 命中 | 结论 |
-| --- | ---: | --- |
-| Response-only 恢复措辞 | 0 | 已移除不受支持的单 Worker 恢复语义 |
-| Poll-only Controller 恢复措辞 | 0 | 已移除 Controller 单服务启动语义 |
-| Poll/Dispatch/Delivery 一并恢复措辞 | 0 | Dispatch 生命周期已与组合 Gate 拆开 |
-| Gate 名称关键词 | 31 | 全部属于正确的斜杠组合 Gate 名称；非组合命中为 0 |
-| Gateway docs PR 开放状态 | 5 | 该组件文档 PR 当前保持开放；命中来自当前入口和审计记录 |
-| Gateway docs 当前进度 | 1 | 当前进度中的正确 companion work 状态 |
-| WeChat PR #1 dirty merge state | 2 | 当前状态/进度准确记录 dirty conflict |
-
-Runtime Contract v1 当前没有 Poll-only、Delivery-only 或 Dispatch Worker 控制。需要单 Worker 控制时必须作为 future contract change 实现和验收。
+- 当前长期状态页不再包含组件 PR 未合并、合并冲突、失败门禁或文档收口进行中状态。
+- 2026-09-03 Production Closeout 继续保留当时尚未完成提升的 PR 快照；该命中属于 historical evidence。
+- `c5518aed…`、`4f13039…`、`02583fe…` 和 `69f0770…` 的全部当前命中均明确标记为 dated repository snapshot、PR merge baseline 或 promotion baseline，不标记为永久 live main。
+- Gateway/WeChat branch authority 均写为 `main`，live tip 要求通过 GitHub 动态查询。
+- Runtime Contract v1 没有 Poll-only、Delivery-only 或 Dispatch Worker 控制；需要单 Worker 控制时必须作为 future contract change 实现和验收。
+- 最终旧状态计数：Gateway 两个文档 PR 开放状态均为 0；WeChat promotion 的开放状态为 1，且仅位于 2026-09-03 dated evidence；dirty、unstable、PR #6 开放、提升待完成和文档进行中均为 0。
 
 ## 10. 自动检查
 

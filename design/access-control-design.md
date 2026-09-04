@@ -4,7 +4,7 @@
 >
 > **Implementation repository:** `CF_agent-gateway`
 >
-> **Implemented baseline:** Gateway main `b488cf452584e73bc9b752564bf90ea153aa8d18`
+> **Implemented baseline:** Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; repository branch authority is `main`, with 2026-09-04 verified repository snapshot `4f13039b86c60bc94340edb5468f0102d62d2dff`
 >
 > **Production validation:** private/group Admission allow/deny and `bot_not_mentioned` validated; full employee/role/Skill permission matrix not validated
 >
