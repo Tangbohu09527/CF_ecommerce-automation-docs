@@ -16,7 +16,7 @@
 - 项目名为“电商业务全自动化系统”，相关仓库统一使用 `CF_` 前缀。
 - 生产 Agent 使用 Hermes，不引入 OpenClaw。
 - 模型计划使用 GPT-5.6 API；不得把计划写成已经正式接入。
-- CFserver/PostgreSQL 是消息、上下文、任务、文件引用、权限、日志和审计关联的权威控制中心。
+- CFserver 是 Debian 部署宿主；`CF_agent-gateway` 与 PostgreSQL 是消息、上下文、任务、文件引用、权限、日志和审计关联的状态权威。
 - Windows AI 主机负责 Hermes、后续 Skills 和 Windows 侧执行。
 - 微信入口使用 external `agent-wechat`；生产行为为 forced fresh QR、`restart: "no"`，Archive 不自动复用。
 - Gateway Runtime Controller 管理 Poll/Delivery Gate；Host reboot 后 fresh QR 前必须显式检查并关闭 Gate。

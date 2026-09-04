@@ -100,8 +100,9 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 
 - automatic boot stop gate。
 - 上游长期消息保留窗口验证。
-- WeChat PR 栈 main promotion 与当前 CI 失败收口。
+- 选定 Release Commit、构建输入与现场 Image ID 的 provenance。
 - 文件/图片完整入站与出站链。
 - Archive 长期保留和容量策略。
+- 上游 API/schema 升级复验。
 
 生产证据见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。

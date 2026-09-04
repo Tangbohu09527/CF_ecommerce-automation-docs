@@ -93,7 +93,7 @@ GitHub 只读代码/测试核对结果：
 - Gateway 生产继续由 `b488cf… / f36c798… / b9341ca…` 证据组定义，docs-only merge 不表示重新部署。
 - WeChat 仓库合并未重建或部署现场镜像，observed image ID 与 Release Commit/构建输入的 exact mapping 仍未证明。
 - 2026-09-03 Production Closeout 中当时组件 PR 未完成的状态属于历史证据，保持原文。
-- Enterprise documentation PR #7 仅剩 final review pending。
+- Enterprise documentation closeout baseline completed on 2026-09-04.
 
 ## 9. 2026-09-04 定向语义审计
 

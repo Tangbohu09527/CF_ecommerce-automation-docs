@@ -24,8 +24,8 @@ flowchart LR
     API["Gateway API"] <--> PG
     PG --> DW["Dispatch Worker"] <--> H["Hermes external runtime"]
     H --> PG --> DLW["Delivery Worker"] --> AW
-    CTL["Runtime Controller"] --> PW
-    CTL --> DLW
+    CTL["Runtime Controller"]
+    CTL --> PW
     CTL --> DLW
     PG -.-> CTX["Context Runtime"]
     API -.-> ADM["Admin recovery"]

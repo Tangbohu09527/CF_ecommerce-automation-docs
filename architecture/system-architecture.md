@@ -18,7 +18,7 @@
 flowchart LR
     U["员工微信"]
 
-    subgraph CFS["CFserver / Debian 权威控制中心"]
+    subgraph CFS["CFserver / Debian 部署宿主"]
         AW["external agent-wechat"]
         PW["Gateway Poll Worker"]
         API["Gateway API"]
@@ -29,7 +29,6 @@ flowchart LR
         PW <--> PG
         API <--> PG
         CTL --> PW
-        CTL --> DLW
         CTL --> DLW
         DW <--> PG
         DLW <--> PG
@@ -58,8 +57,8 @@ flowchart LR
 
 | 边界 | 当前组件 | 权威职责 |
 | --- | --- | --- |
-| CFserver | PostgreSQL、Gateway API、Poll/Dispatch/Delivery Worker、Runtime Controller、external agent-wechat | 消息、Checkpoint、身份权限、线程、Context、Dispatch、Response、Delivery、日志和审计关联 |
-| Windows AI 主机 | Hermes external runtime | Agent 与模型执行；不覆盖 CFserver 权威状态 |
+| CFserver / Debian 部署宿主 | PostgreSQL、Gateway API、Poll/Dispatch/Delivery Worker、Runtime Controller、external agent-wechat | 提供物理运行环境；消息和控制状态权威属于 `CF_agent-gateway` 与 PostgreSQL |
+| Windows AI 主机 | Hermes external runtime | Agent 与模型执行；不覆盖 Gateway/PostgreSQL 权威状态 |
 | File Service | `CF_filebrowser-enterprise` | 正式文件权限、capability、WebDAV/OnlyOffice 和 Persistent Audit；当前未部署 |
 | Business integration | Skills、旺店通、S6 | 尚未接入 |
 

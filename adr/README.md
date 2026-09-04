@@ -10,7 +10,7 @@
 | 主题 | 决定编号 | 简要边界 |
 | --- | --- | --- |
 | Agent 与模型 | D001-D002 | 生产 Agent 使用 Hermes；模型计划使用 GPT-5.6 API，实际接入仍需实施 |
-| 微信与控制中心 | D003-D005 | `agent-wechat`、Debian 部署边界和 CFserver/PostgreSQL 权威状态 |
+| 微信与控制中心 | D003-D005 | `agent-wechat`、Debian 部署宿主边界和 Gateway/PostgreSQL 权威状态 |
 | 阶段与仓库 | D006-D010 | 第一阶段不建独立 OCR、FileBrowser 并行、`CF_` 命名和 GitHub 私密仓库 |
 | 身份与 File Service | D011-D018 | 企业身份主键、唯一正式 File Service、capability、Token 和 Persistent Audit |
 | 生产 Runtime | D019-D025 | 禁用 VNC、`cf-internal`、Persist-first、三个 Worker、首次 bootstrap、Secret 和闭环口径 |

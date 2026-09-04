@@ -25,7 +25,7 @@ CFserver 是部署宿主；`CF_agent-gateway` 与 PostgreSQL 是消息和控制�
 
 详细分层状态见[当前状态矩阵](./status/current-status.md)，本次生产事实见[2026-09-03 Enterprise Runtime Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
 
-2026-09-04 repository/documentation closeout 已完成；当前只剩本仓库 PR #7 最终人工复核。组件 `main` 的 live tip 必须动态查询，上表 SHA 只表示本次 dated snapshot，不是永久 current main。
+2026-09-04 enterprise repository/documentation closeout baseline 已完成。组件与本仓库的 branch authority 均为 `main`，live tip 必须通过 GitHub 或 `git rev-parse origin/main` 动态查询；上表 SHA 只表示本次 dated snapshot，不是永久 current main。文档收口不表示生产重新部署。
 
 ## 当前生产文本链路
 

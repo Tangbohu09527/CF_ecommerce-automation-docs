@@ -22,9 +22,9 @@
 - Gateway-only cutover、回滚 Release、离线镜像与生产证据留存。
 - `uncertain` Admin recovery、Context Runtime 等 Gateway 能力的仓库实现和自动化验证。
 
-## 正在进行
+## 当前工作面
 
-- Enterprise documentation PR #7：final review pending。
+- 2026-09-04 enterprise documentation closeout baseline 已完成；repository branch authority 为 `main`，live tip 动态查询。
 - FileBrowser CFserver deployment/production acceptance、Hermes reliability、媒体/文件、Skills 和业务系统集成。
 
 组件 repository/documentation closeout completed 不等于生产重新部署，也不等于整个企业自动化系统完成。
@@ -33,14 +33,13 @@
 
 以下为当前建议，不是不可变承诺；技术决定变化仍以[技术决策记录](../05_技术决策记录.md)为准。
 
-1. 完成本仓库 PR #7 最终人工复核。
-2. 完成 FileBrowser CFserver 部署、迁移和恢复验收。
-3. 收口 Hermes watchdog、开机自启和生产监控。
-4. 生产验证同群多发送者的 `group_sender` 隔离。
-5. 完成引用正文上下文。
-6. 完成媒体和文件双向桥。
-7. 建设 Skills Runtime。
-8. 接入旺店通和 S6，并分批授权正式业务身份与群。
+1. 完成 FileBrowser CFserver 部署、迁移和恢复验收。
+2. 收口 Hermes watchdog、开机自启和生产监控。
+3. 生产验证同群多发送者的 `group_sender` 隔离。
+4. 完成引用正文上下文。
+5. 完成媒体和文件双向桥。
+6. 建设 Skills Runtime。
+7. 接入旺店通和 S6，并分批授权正式业务身份与群。
 
 ## 持续限制
 
