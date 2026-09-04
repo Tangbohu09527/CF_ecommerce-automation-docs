@@ -1,5 +1,9 @@
 # agent-wechat V1 入口验证记录
 
+> **历史证据，已被后续状态取代**
+>
+> 本文仅保留 2026-07-30 至 2026-08-04 微信入口验证的历史事实，不代表当前生产基线。当前能力边界见[当前状态矩阵](./current-status.md)，当前生产证据见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)，统一分类与阅读入口见[验证文档索引](../validation/README.md)。
+
 - **验证时间：** 2026-07-30；合并转发消息补充验证记录于 2026-07-31；结构化 mention 结果于 2026-08-01 补充记录；Gateway 文本闭环引用于 2026-08-04 更新
 - **验证对象：** `agent-wechat` V1 微信消息入口层
 - **验证结论：** 微信消息入口层技术可行

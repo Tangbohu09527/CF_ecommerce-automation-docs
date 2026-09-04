@@ -1,5 +1,21 @@
 # Hermes 事件协议
 
+> **Status:** Historical event-contract design; only selected Gateway runtime contracts are implemented
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; repository branch authority is `main`, with 2026-09-04 verified repository snapshot `4f13039b86c60bc94340edb5468f0102d62d2dff`
+>
+> **Production validation:** current text Dispatch/Response/Delivery validated; full generic event schema, media and Skills not validated
+>
+> **Remaining design-only scope:** generic Task/Provider/Skill/media event contract and cross-system event transport
+>
+> **Current replacement/authority:** [系统设计](../02_系统设计.md), [消息与任务流程](../architecture/message-flow.md), [当前状态矩阵](../status/current-status.md)
+
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
 > 状态日期：2026-08-04。本文是 Gateway、AI Provider、完整 Hermes Worker Bridge 与 Hermes Agent 之间的目标事件协议设计基线，不等于全部协议已实现。V1 Staging 已验证微信文本 Polling、消息与准入、Employee Workspace / AI Thread、Hermes API Client / Dispatch / Response Relay、Runtime Thread Binding 和原会话回复；完整事件协议、Task / Provider 路由、文件和 Skill 链路仍待实现。
 
 ## 1. 目标与边界
@@ -131,7 +147,7 @@
 | `type` | 是 | `private` 或 `group`；无法可靠识别时不得猜测，应产生 `invalid_message` |
 | `thread_id` | 否 | Gateway 生成的 AI Thread / AI 会话线程标识，即 `ai_thread_id`；身份映射和线程建立前为 `null` |
 
-`conversation.id` 表示 Physical Conversation / 物理会话，`conversation.thread_id` 表示 AI Thread / AI 会话线程，二者不能互换。标准事件不再用 `conversation.thread_id` 承载平台原生线程标识；平台私有字段保存在受控原始载荷或 Adapter 专属映射中。群聊仍须由控制面按机器人账号、群会话和发信人隔离上下文，具体规则以[系统设计](../02_系统设计.md#物理微信会话与-ai-线程)为准。
+`conversation.id` 表示 Physical Conversation / 物理会话，`conversation.thread_id` 表示 AI Thread / AI 会话线程，二者不能互换。标准事件不再用 `conversation.thread_id` 承载平台原生线程标识；平台私有字段保存在受控原始载荷或 Adapter 专属映射中。群聊仍须由控制面按机器人账号、群会话和发信人隔离上下文，当前规则以[系统设计](../02_系统设计.md)为准。
 
 ### 3.4 `sender`
 
@@ -143,7 +159,7 @@
 | `employee_id` | 否 | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键 |
 | `type` | 是 | `human` 或 `system` |
 
-`sender.id` 只是入口身份，不自动获得企业权限。Gateway Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，只输出 `enterprise_identity_id` 和可选 `employee_id`；Adapter 不得依据显示名或消息正文填充这些字段，Identity Mapping 也不创建或返回 `workspace_id`。微信 `wxid` 等平台标识保留在 `sender.id` 的来源作用域内，不得当作 `employee_id`。
+`sender.id` 只是入口身份，不自动获得企业权限。Gateway Identity Mapping 以 `source.platform + source.account_id + sender.id` 为输入，只输出 `enterprise_identity_id` 和可选 `employee_id`；Adapter 不得依据显示名或消息正文填充这些字段，Identity Mapping 也不创建或返回 `workspace_id`。平台来源标识保留在 `sender.id` 的来源作用域内，不得当作 `employee_id`。
 
 ### 3.5 `authorization`
 

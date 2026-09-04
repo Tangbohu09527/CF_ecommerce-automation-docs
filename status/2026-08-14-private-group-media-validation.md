@@ -1,5 +1,10 @@
 # 私聊、群聊及媒体验证记录
 
+> [!WARNING]
+> **Historical / Archived**
+>
+> 本文只适用于 2026-08-14 当日证据，不是当前生产状态或 Runbook。当前入口见[状态矩阵](./current-status.md)和[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。其中 group_sender、恢复层级、Hermes 版本和动态计数不得外推到当前。
+
 > 日期：2026-08-14。本文面向项目管理和后续开发，记录跨项目生产事实、证据边界和交接顺序；不包含真实账号、会话、消息、地址、凭证、文件摘要或底层数据库操作。
 
 ## 阶段变化

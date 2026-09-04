@@ -1,6 +1,22 @@
 # Access Control 设计
 
-> 状态日期：2026-08-04。本文定义 Gateway 内部的企业访问控制模块，并标记实际实现边界。V1 Staging 已通过真实微信文本验证 Message Store、Identity Mapping、Access Control、Admission、Employee Workspace / AI Thread、Hermes API 和原会话回复。Context Builder、Task Queue、完整 Worker Bridge、Skill、文件链路和生产部署仍未完成；管理员跨员工查看和完整审计闭环也未宣称完成。详见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+> **Status:** Historical design with current implementation notes
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; repository branch authority is `main`, with 2026-09-04 verified repository snapshot `4f13039b86c60bc94340edb5468f0102d62d2dff`
+>
+> **Production validation:** private/group Admission allow/deny and `bot_not_mentioned` validated; full employee/role/Skill permission matrix not validated
+>
+> **Remaining design-only scope:** Skill grants, full RBAC, approval and production authorization rollout
+>
+> **Current replacement/authority:** [功能需求](../01_功能需求.md), [系统设计](../02_系统设计.md), [当前状态矩阵](../status/current-status.md)
+
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
+> 状态日期：2026-08-04。正文保留当时设计语境；2026-09-03 当前能力以顶部权威入口为准。
 
 ## 1. 模块定位
 
@@ -8,7 +24,7 @@ Access Control 是 CF Gateway 的内部模块，不是独立消息入口，也�
 
 上述 Message Store、Identity Mapping、Access Control 和 Admission 顺序已在 Debian Staging 以真实微信文本消息验证：未配置身份时，消息保存在 Message Store，且不创建 Employee Workspace 或 AI Thread；配置脱敏测试身份及已启用的用户策略、Gateway 策略和 `normal` 风险级别后，准入链路创建 `employee_workspaces`、`ai_threads` 和 `thread_source_bindings`，随后建立 Hermes Runtime Thread 绑定、调用 Hermes 并把文本响应返回原微信会话。该结果不包含 Context Builder、Task Queue、完整 Worker Bridge、Skill 执行、非文本处理或生产部署。
 
-`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是权限主体及工作区所有者关联的权威主键。`employee_id` 只是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信 `wxid` 代替。
+`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是权限主体及工作区所有者关联的权威主键。`employee_id` 只是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键，也不得使用微信来源账号 ID 代替。
 
 Access Control 只决定：
 
@@ -97,7 +113,7 @@ is_mentioned = raw.get("isMentioned") is True
 - `account_id`
 - `sender_id`
 
-该组合必须先由 Identity Mapping 显式映射到 `enterprise_identity_id` 和可选 `employee_id`，白名单才能产生 `user_allowed=true`。Identity Mapping 不创建或返回 `workspace_id`。企业身份尚未解析时，不得只凭 `sender_name`、手机号片段、群名片或相似昵称自动合并为已授权用户；微信 `wxid` 等平台稳定标识是来源映射键，不是 `employee_id`。
+该组合必须先由 Identity Mapping 显式映射到 `enterprise_identity_id` 和可选 `employee_id`，白名单才能产生 `user_allowed=true`。Identity Mapping 不创建或返回 `workspace_id`。企业身份尚未解析时，不得只凭 `sender_name`、手机号片段、群名片或相似昵称自动合并为已授权用户；平台稳定来源标识是映射键，不是 `employee_id`。
 
 白名单最终授权 Enterprise Identity / 企业身份，而不是孤立的平台昵称。一个员工可以绑定多个来源平台账号，但每个来源账号都必须有独立、可审计的映射；同一来源账号存在多个有效企业身份映射时拒绝创建 Task。
 

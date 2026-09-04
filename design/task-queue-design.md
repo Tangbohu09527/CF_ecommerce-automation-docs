@@ -1,10 +1,26 @@
 # Task Queue 设计
 
-> 状态日期：2026-08-04。本文定义 CF Gateway 的目标 Task Queue / Task Store 设计基线。V1 Staging 已完成不经过本目标 Task Queue 的有限微信文本 Hermes 闭环；Task Queue、队列产品、数据库、调度参数、完整 Worker Bridge 和通用 AI Provider 路由尚未实现、选型或验证。文本闭环不得被解释为本设计已经落地。
+> **Status:** Future general Task Queue design; current production uses durable Hermes Dispatch records
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** durable Admission/Dispatch/FIFO/recovery on Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; repository branch authority is `main`, with 2026-09-04 verified repository snapshot `4f13039b86c60bc94340edb5468f0102d62d2dff`
+>
+> **Production validation:** text durable Dispatch/Response/Delivery validated; general Task Queue and Provider routing not validated
+>
+> **Remaining design-only scope:** generic Task product, Provider Registry, priority scheduling, cancellation and business Skill execution
+>
+> **Current replacement/authority:** [Gateway 架构](../architecture/gateway-architecture.md), [系统设计](../02_系统设计.md), [当前状态矩阵](../status/current-status.md)
+
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
+> 状态日期：2026-08-04。本文仍是通用 Task Queue 目标设计。当前生产已经使用 durable Hermes Dispatch records、FIFO、lease、recovery 和独立 Worker，但这不等于本文定义的通用 Task/Provider 产品已经落地。
 
 ## 1. 定位
 
-Task Queue 是 Gateway 中已授权 AI 任务的持久化排队、调度和生命周期控制层。只有通过 Access Control 的消息才会在 Context Builder 形成不可变上下文快照后创建 Task。
+Task Queue 是未来通用 AI 任务的持久化排队、调度和生命周期控制层。当前生产文本 Runtime 使用 durable Admission + Hermes Dispatch records，而不是本文完整的通用 Task 对象。
 
 目标流程为：
 
@@ -75,7 +91,7 @@ stateDiagram-v2
 | --- | --- |
 | `task_id` | Debian Task Store 生成的稳定任务 ID |
 | `enterprise_identity_id` | Task 所属 Gateway 企业身份的不可变权威主键，也是身份、工作区和权限关联依据 |
-| `employee_id` | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键，不使用微信 `wxid` 等来源标识代替 |
+| `employee_id` | 可空的公司员工编号、HR 编号或业务人员编号；不是 Gateway 内部主键，不使用平台来源标识代替 |
 | `workspace_id` | Gateway 生成的 Employee Workspace / 员工工作区稳定 ID |
 | `ai_thread_id` | Gateway 生成的 AI Thread / AI 会话线程稳定 ID，是任务顺序与上下文隔离依据 |
 | `hermes_thread_id` | 可选的 Hermes Runtime Thread / Hermes 运行时线程绑定；可为 `null`、可重建，不是权威主键 |

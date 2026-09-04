@@ -1,6 +1,22 @@
 # 员工工作区与 AI 会话线程设计
 
-> 状态日期：2026-08-04。本文定义 Employee Workspace / 员工工作区与 AI Thread / AI 会话线程的设计基线。V1 Staging 已通过真实微信文本验证身份与准入、Employee Workspace / AI Thread、Hermes Runtime Thread Binding 和原会话回复；员工工作台、目标任务 / 文件 / Skill 链路和生产部署尚未实现。Gateway V1 群聊 whole-room thread 与本文既定隔离规则存在已知实现偏差。
+> **Status:** Historical design with current V2 implementation notes
+>
+> **Implementation repository:** `CF_agent-gateway`
+>
+> **Implemented baseline:** Gateway Production Release snapshot `b488cf452584e73bc9b752564bf90ea153aa8d18`; repository branch authority is `main`, with 2026-09-04 verified repository snapshot `4f13039b86c60bc94340edb5468f0102d62d2dff`
+>
+> **Production validation:** private and mentioned-group text paths validated; same-group multi-sender isolation not separately production validated
+>
+> **Remaining design-only scope:** cross-employee collaboration, workbench UI, `group_shared` rollout and full business permission model
+>
+> **Current replacement/authority:** [系统设计](../02_系统设计.md), [Gateway 架构](../architecture/gateway-architecture.md), [当前状态矩阵](../status/current-status.md)
+
+> [!WARNING]
+> **文档状态：2026-08-04 历史设计快照 / 目标设计。**
+> 本文保留当日实现边界与目标方案，不代表当前生产状态；正文中的“当前”“已验证”“未完成”等表述均按该日期和原验证环境理解。当前生产事实以[当前状态矩阵](../status/current-status.md)为准，正式系统架构以[System Architecture](../architecture/system-architecture.md)为准。
+
+> 状态日期：2026-08-04。正文保留 V1 设计与历史偏差；当前 V2 实现和生产证据边界以顶部权威入口为准。
 
 ## 1. 定位与术语
 
@@ -21,7 +37,7 @@ Physical Conversation / 物理会话由 `source.platform + source.account_id + p
 
 企业内部稳定的员工身份。`enterprise_identity_id` 是 Gateway 内部不可变的企业身份主键，也是身份、Employee Workspace / 员工工作区和权限关联的权威主键。一个 Enterprise Identity / 企业身份未来可以显式绑定一个或多个微信账号、飞书账号、钉钉账号和 Web 账号。
 
-`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键。来源平台的 `sender.id`、微信 `wxid`、昵称或群名片都不能代替 `employee_id`；平台稳定标识只用于查找权威身份映射，展示名称只用于显示和辅助审计。
+`employee_id` 是可空的公司员工编号、HR 编号或业务人员编号，不是 Gateway 内部主键。来源平台的 `sender.id`、来源账号标识、昵称或群名片都不能代替 `employee_id`；平台稳定标识只用于查找权威身份映射，展示名称只用于显示和辅助审计。
 
 ### Employee Workspace / 员工工作区
 
@@ -90,7 +106,7 @@ Identity Mapping 不创建或返回 `workspace_id`。`sender.display_name` 可�
 固定原则如下：
 
 - 展示名称不能作为授权、合并或身份主键。
-- 微信 `wxid` 等平台稳定标识用于查找映射，但不得直接当作 `employee_id`。
+- 平台稳定来源标识用于查找映射，但不得直接当作 `employee_id`。
 - 映射成功、失败、冲突或已失效的解析结果都必须记录并关联原消息。
 - 映射失败时消息及可得附件元数据仍保存在 Message Store，不创建 Task、执行上下文或新的 AI Thread / AI 会话线程执行关系。
 - 非白名单用户消息仍保存在 Message Store；身份映射成功不等于 Access Control 允许创建 Task。
@@ -102,7 +118,7 @@ Identity Mapping 回答“这个来源账号对应哪个企业员工？”。Acc
 
 Employee Conversation Manager 在两者之后运行：只有身份映射成功且 Access Control 允许创建 Task，才解析或创建 `workspace_id` 和 `ai_thread_id`。
 
-Identity Management V1 属于后续规划。微信 ID 将作为微信来源身份记录的稳定主键和映射键，但不取代 Gateway 内部权威的 `enterprise_identity_id`，也不取代可空业务编号 `employee_id`。微信昵称、备注和头像只作为管理员展示信息，最近活跃时间作为管理视图状态；这些展示字段不得参与授权或自动合并身份。完整需求见[功能需求](../01_功能需求.md#11-identity-management-v1)。
+Identity Management V1 属于后续规划。微信来源稳定 ID 将作为来源身份记录的映射键，但不取代 Gateway 内部权威的 `enterprise_identity_id`，也不取代可空业务编号 `employee_id`。微信昵称、备注和头像只作为管理员展示信息，最近活跃时间作为管理视图状态；这些展示字段不得参与授权或自动合并身份。当前需求边界见[功能需求](../01_功能需求.md)。
 
 ## 4. 工作区模型
 
@@ -149,7 +165,7 @@ bot_account_id + group_chat_id + sender_id
 
 因此，同一个群里员工甲与员工乙分别 `@` 机器人时，默认进入各自 Employee Workspace / 员工工作区中的两个不同 AI Thread / AI 会话线程。整个群不得共用一个 Hermes 个人上下文。
 
-**已知实现偏差：** Gateway V1 当前 `thread_keys` 忽略 `sender_id`，现有测试允许同群不同员工复用 AI Thread。该行为不符合上述已确定规则，不构成设计变更。在代码修正并补充同群多员工隔离测试前，群聊线程隔离不得标记为验收通过；若未来确需整群共享，必须先更新技术决策记录并说明安全、权限、上下文和迁移影响。
+**当前实现说明：** Gateway V1 compatibility path 的 `thread_keys` 仍忽略 `sender_id`，形成 whole-room thread；Gateway V2 `ThreadResolver` 已将 sender identity 纳入 `group_sender` key，自动化测试覆盖同群不同发送者隔离。生产使用 V2 代码线，但现有生产证据没有同群两个发送者的专门对照验收，因此不能把该隔离行为写成已生产验证。
 
 ### 多入口扩展
 
@@ -397,8 +413,8 @@ AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。�
 - `hermes_thread_id` 的故障恢复、失效重绑和生产运维闭环。
 - 工作区恢复流程。
 - 从微信、Gateway、Task Queue、完整 Worker Bridge、Skills 到原会话回传的目标任务链路；当前仅完成不含这些目标组件的 V1 文本闭环。
-- Gateway 群聊 whole-room thread 偏差修复及同群不同员工隔离复验。
+- 同群不同员工 V2 `group_sender` 的生产对照复验；V1 whole-room compatibility path 继续保持显式边界。
 
-下一阶段优先修复群聊线程隔离偏差，并继续建设 Context Builder、Task Queue、完整 Worker Bridge、文件和 Skill 链路。本次 Staging 文本闭环不代表生产上线或完整企业业务自动化；详细证据见[Gateway V1 Staging 验证记录](../status/gateway-wechat-staging-validation.md)。
+当前 V2 隔离实现已经进入 Gateway main；下一步是补齐生产对照复验，并继续建设文件和 Skill 链路。历史 Staging 结论仍只按其日期使用。
 
 相关边界见[系统设计](../02_系统设计.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)、[Hermes 事件协议](./hermes-event-schema.md)、[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)和[Access Control 设计](./access-control-design.md)。

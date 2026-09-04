@@ -1,8 +1,13 @@
 # 微信运行时阶段收口记录
 
+> [!WARNING]
+> **Historical / Archived**
+>
+> 本文只适用于 2026-08-13 当日入口与拒绝路径。当前入口见[状态矩阵](./current-status.md)和[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。旧 Hermes 版本、Checkpoint/历史数量和未完成项不得外推。
+
 > 日期：2026-08-13。本文面向项目管理与后续接手人员，仅记录跨仓库生产状态和验证边界，不复制各项目的底层部署命令。所有账号、地址、凭证与消息内容均使用脱敏描述。
 
-> 历史状态说明：本文只描述截至 2026-08-13 当日的入口与拒绝路径证据；后续生产结论见[2026-08-14 私聊、群聊及媒体验证记录](./2026-08-14-private-group-media-validation.md)。
+> 历史状态说明：本文只描述截至 2026-08-13 当日的入口与拒绝路径证据；后续历史证据见[2026-08-14 记录](./2026-08-14-private-group-media-validation.md)，当前证据见[2026-09-03 Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
 
 ## 当天完成
 
@@ -67,7 +72,7 @@ Hermes Gateway 0.20.0 运行在 Windows AI 主机。CFserver 与 `dispatch-worke
 
 ## 当日交接顺序
 
-该日交接时要求先完成身份、策略和 Agent Profile 配置，再逐项验证 Allowed、Routing、Dispatch、Response、Outbox 与微信回复。以上步骤已在后续实测中推进；当前执行顺序以[当前状态矩阵](./current-status.md#下一阶段顺序)为准。
+该日交接时要求先完成身份、策略和 Agent Profile 配置，再逐项验证 Allowed、Routing、Dispatch、Response、Outbox 与微信回复。以上步骤已在后续实测中推进；当前执行顺序以[当前进度与下一步](./current-progress.md)为准。
 
 ## 阶段结论
 
