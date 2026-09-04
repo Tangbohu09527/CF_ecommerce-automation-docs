@@ -1,6 +1,6 @@
 # 微信入口与 Hermes 集成架构
 
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 当前集成
 
@@ -42,7 +42,7 @@ Hermes 不可达时不得盲重试；已有一次受控恢复成功。AI host re
 - CFserver/agent-wechat restart 需要 fresh QR。
 - AI host reboot 通常不需要 fresh QR。
 - Gateway-only deployment 不重建 agent-wechat，也不需要 fresh QR。
-- fresh QR 前必须显式关闭 Poll/Delivery Gate；automatic boot stop gate 未验证。
+- fresh QR 前必须通过 Controller `stop` 关闭组合 Poll/Delivery Gate；验证后 `start` 同时恢复 Poll/Delivery。Dispatch Worker 由 Gateway Release/Compose 生命周期独立管理；automatic boot stop gate 未验证。
 
 ## 媒体与文件
 

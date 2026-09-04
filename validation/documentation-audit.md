@@ -1,8 +1,8 @@
 # 文档审计与收口报告
 
-> 文档编号：VAL-AUDIT-20260903
+> 文档编号：VAL-AUDIT-20260904
 >
-> 审计日期：2026-09-03
+> 审计日期：2026-09-04
 >
 > 审计范围：本仓库全部 54 个 Markdown 文件
 
@@ -14,20 +14,22 @@
 
 | 组件 | 核对结果 |
 | --- | --- |
-| Gateway | `main=b488cf452584e73bc9b752564bf90ea153aa8d18`；组件 PR #7 merged；main CI success；docs PR #8 OPEN，head `75287d57c2ffa4fad7e3cd7b5ce0c175ee23cd8a` 且 checks green |
-| WeChat | `main=92393bc2ae1d89dae9449fc131413979aa2fa2f2`；PR #1 和 #4 OPEN；docs PR #5 OPEN，head `ddaa7d466b6dfae6a4df8f95e11dea5a4be13b02`；PR #4/#5 当前 checks 部分失败 |
+| Gateway | repository `main=b488cf452584e73bc9b752564bf90ea153aa8d18`；production Release Git authority 同为 `b488cf452584e73bc9b752564bf90ea153aa8d18`；docs PR #8 OPEN/clean，head `75287d57c2ffa4fad7e3cd7b5ce0c175ee23cd8a`，checks green，未形成新部署 |
+| WeChat | `main=92393bc2ae1d89dae9449fc131413979aa2fa2f2`；PR #1 OPEN/dirty；PR #4 OPEN/unstable，测试 Fixture/CI 漂移导致门禁失败；PR #5 OPEN/unstable，文档检查通过但继承 PR #4 失败门禁 |
 | FileBrowser | `main=4750a97cfdf5bd067e04b6b36bf9616f5ada836d`；`feat/v1-integration=48380c3f31cb37b01d0c05b8db0cfa49680a17f9`；无开放 PR/Release；对应 branch CI success |
 
-未合并组件 PR 只作为 companion work，不作为 `main` 权威。
+未合并组件 PR 只作为 companion work，不作为 `main` 或 production authority。
 
 ## 3. 关键事实纠正
 
-- 状态日期从 2026-08-14 更新到 2026-09-03。
+- 当前状态入口复核至 2026-09-04；2026-09-03 Production Closeout 继续保留原 Evidence date。
 - Gateway V2/P1 从“部分链路待验证”更新为生产已交付，并记录 merged main、source SHA、image digest、revision 和 Release。
 - forced-QR R2 从“完全新设备 QR 未验证”更新为生产行为已验证，同时保留 WeChat PR 栈尚未 main promotion 和 CI 失败。
-- CFserver reboot 更新为核心恢复、agent-wechat 保持停止、显式 stop Gate + fresh QR 后恢复；automatic boot stop gate 仍未验证。
+- CFserver reboot 更新为核心恢复、agent-wechat 保持停止、Controller `stop` 组合 Poll/Delivery Gate + fresh QR 后恢复；automatic boot stop gate 仍未验证。
 - AI host reboot 更新为 Hermes reachability 恢复一次，微信 Session 保持；不外推为 watchdog/HA 完成。
 - Gateway-only deployment 更新为不重建 agent-wechat、不需要 fresh QR。
+- Runtime Controller v1 修正为组合 Poll/Delivery Gate：`stop/start` 始终同时作用于 `worker` 与 `delivery-worker`，不支持单 Worker 控制，也不管理 Dispatch Worker。
+- Dispatch Worker 明确由 Gateway Release/Compose 生命周期独立启动和验证；组合 Gate 关闭时 Gateway/Dispatch 可以保持在线。
 - `uncertain` 正式 Admin inspection/recovery API 从“缺少能力”更新为 implemented/tested/deployed，生产动作覆盖继续分层。
 - FileBrowser 从笼统“开发中”更新为 V1 Beta implementation/automated validation completed，production deployment pending。
 - Hermes 当前文档不再硬编码无法由本次部署证据确认的版本；历史版本仅保留在带日期记录。
@@ -93,9 +95,23 @@ GitHub 只读代码/测试核对结果：
 | Current limitation | same-group multi-sender production validation、FileBrowser deployment、PostgreSQL restore、Hermes HA、完整媒体/Skills |
 | Dated evidence | Gateway/WeChat PR/SHA、Release、log capacity、Closeout 证据 |
 | Stale and removed | 8 月当前状态、QR/Host/AI reboot 全未验证、Gateway 部分链路、uncertain 无 API、FileBrowser 仅普通开发中 |
-| Requires component follow-up | WeChat PR #4/#1 promotion 与 PR #4/#5 CI；Gateway PR #8、WeChat PR #5 最终合并状态 |
+| Requires component follow-up | Gateway PR #8 仍 OPEN；WeChat PR #4 Fixture/CI 漂移、PR #5 继承门禁、PR #1 dirty conflict 和最终 main promotion |
 
-## 9. 自动检查
+## 9. 2026-09-04 定向语义审计
+
+| 审计主题 | 命中 | 结论 |
+| --- | ---: | --- |
+| Response-only 恢复措辞 | 0 | 已移除不受支持的单 Worker 恢复语义 |
+| Poll-only Controller 恢复措辞 | 0 | 已移除 Controller 单服务启动语义 |
+| Poll/Dispatch/Delivery 一并恢复措辞 | 0 | Dispatch 生命周期已与组合 Gate 拆开 |
+| Gate 名称关键词 | 31 | 全部属于正确的斜杠组合 Gate 名称；非组合命中为 0 |
+| Gateway docs PR 开放状态 | 5 | 该组件文档 PR 当前保持开放；命中来自当前入口和审计记录 |
+| Gateway docs 当前进度 | 1 | 当前进度中的正确 companion work 状态 |
+| WeChat PR #1 dirty merge state | 2 | 当前状态/进度准确记录 dirty conflict |
+
+Runtime Contract v1 当前没有 Poll-only、Delivery-only 或 Dispatch Worker 控制。需要单 Worker 控制时必须作为 future contract change 实现和验收。
+
+## 10. 自动检查
 
 临时 Python 检查器从标准输入运行，未写入或提交仓库。
 
@@ -117,7 +133,7 @@ GitHub 只读代码/测试核对结果：
 
 Git `diff --check` 在每组提交前通过。最终提交后还需重新运行总 diff、commit 和 PR 检查。
 
-## 10. 未修改范围
+## 11. 未修改范围
 
 - 未修改 `.github/`、Workflow、代码、配置、Compose、脚本、Token、数据库或生产数据。
 - 未修改 PNG、XMind 或其他二进制附件。

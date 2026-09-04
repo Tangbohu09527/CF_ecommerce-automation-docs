@@ -1,6 +1,6 @@
 # 当前进度与下一步
 
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 >
 > 能力分层以[当前状态矩阵](./current-status.md)为准，生产证据以[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)为准。
 
@@ -21,10 +21,10 @@
 
 ## 正在进行
 
-- Gateway component docs closeout：PR #8，OPEN，未合并。
-- WeChat R2 component docs closeout：PR #5，OPEN，堆叠在 PR #4 之上，未合并。
+- Gateway component docs closeout：PR #8，OPEN、checks green，未合并；Gateway repository main 与 production authority 均仍为 `b488cf452584e73bc9b752564bf90ea153aa8d18`。
+- WeChat R2 component docs closeout：PR #5，OPEN；文档检查通过，但继承 PR #4 的失败门禁，PR #4 全绿前不得合并。
 - Enterprise docs closeout：本仓库 PR #7。
-- WeChat PR #4 / PR #1 的 promotion 顺序、CI 失败和 main 权威收口。
+- WeChat PR #4 的测试 Fixture/CI 漂移修复，以及 PR #1 `mergeable_state=dirty` 的冲突解决和 main promotion。
 
 未合并的组件文档 PR 只能作为 companion work，不得当作组件 `main` 的当前权威。
 
@@ -33,15 +33,15 @@
 以下为当前建议，不是不可变承诺；技术决定变化仍以[技术决策记录](../05_技术决策记录.md)为准。
 
 1. 完成三个仓库文档 PR 的人工复核。
-2. 收口 `CF_agent-wechat` PR #4 -> PR #1 的正确提升顺序及 CI。
-3. 完成 FileBrowser CFserver 部署、迁移和恢复验收。
-4. 收口 Hermes watchdog、开机自启和生产监控。
-5. 生产验证同群多发送者的 `group_sender` 隔离。
-6. 完成引用正文上下文。
-7. 完成媒体和文件双向桥。
-8. 建设 Skills Runtime。
-9. 接入旺店通和 S6。
-10. 分批授权正式业务身份与群。
+2. 修复 `CF_agent-wechat` PR #4 的测试 Fixture/CI 漂移并取得全绿。
+3. PR #4 全绿后复核/合并 PR #5，再解决 PR #1 dirty conflict 和 main promotion。
+4. 完成 FileBrowser CFserver 部署、迁移和恢复验收。
+5. 收口 Hermes watchdog、开机自启和生产监控。
+6. 生产验证同群多发送者的 `group_sender` 隔离。
+7. 完成引用正文上下文。
+8. 完成媒体和文件双向桥。
+9. 建设 Skills Runtime。
+10. 接入旺店通和 S6，并分批授权正式业务身份与群。
 
 ## 持续限制
 
@@ -49,3 +49,4 @@
 - agent-wechat 自身重启、重建或 Host reboot 都需要 fresh QR；Archive 不可自动复用。
 - AI 主机 reboot 与 Gateway-only deploy 通常不需要 fresh QR，但仍要完成各自健康验证。
 - FileBrowser、Skills、完整媒体、RAG、旺店通和 S6 均不属于当前生产交付。
+- forced-QR 生产行为通过不替代 PR #4 CI、PR #5 继承门禁、PR #1 dirty conflict 和最终 main promotion。

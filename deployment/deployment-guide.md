@@ -4,7 +4,7 @@
 >
 > 文档编号：DEP-001
 >
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 1. 适用范围
 
@@ -42,13 +42,13 @@
 
 恢复数据库 readiness，核对备份与目标 revision。只有 reviewed migration 可以改变 schema；普通 restart 不运行 migration。
 
-### 4.3 Gateway core
+### 4.3 Gateway core 与 Dispatch Worker
 
-启动 migration、Gateway API 和 readiness。生产长期应用进程以 `10001:10001` 运行，使用 immutable image 和 Gateway 专属 `64m x 10` 日志策略。
+启动 migration、Gateway API 和 Dispatch Worker，并分别验证 readiness/heartbeat。Dispatch Worker 由 Gateway Release/Compose 生命周期负责，不属于 Runtime Controller 的 controlled services；组合 Poll/Delivery Gate 关闭时，Gateway API 与 Dispatch Worker 可以保持在线。生产长期应用进程以 `10001:10001` 运行，使用 immutable image 和 Gateway 专属 `64m x 10` 日志策略。
 
 ### 4.4 Runtime Controller
 
-核对 `contract`、`status`、ready 和 Token contract。Controller 是 Poll/Delivery Gate 的唯一跨组件控制入口。
+核对 `contract`、`status`、ready 和 Token contract。Runtime Contract v1 的 controlled services 只有 Poll Worker（`worker`）和 Delivery Worker（`delivery-worker`）：Controller `stop` 同时停止二者，`start` 同时准备、重建并启动二者。当前没有 Poll-only、Delivery-only 或 Dispatch Worker 控制。
 
 ### 4.5 agent-wechat Bootstrap
 
@@ -65,7 +65,7 @@ Bootstrap 只检查 Docker/Compose/目录/权限/Token mount/网络，不登录�
 ### 4.6 fresh QR
 
 1. 检查 Controller status。
-2. 显式 stop Gate，不假设 Host boot 后已 stopped。
+2. 通过 Controller `stop` 显式关闭组合 Poll/Delivery Gate，不假设 Host boot 后已 stopped。
 3. 使用组件仓库批准的唯一 forced-QR 入口。
 4. 手机扫码。
 5. 验证 WeChat 进程、auth、chats、messages 和容器/API health。
@@ -77,9 +77,11 @@ QR、Cookie、Session、Token、账号和 Chat ID 不进入仓库或普通日志
 
 按批准方式启动或核对 Hermes external runtime，从 CFserver 验证 reachability。不要把 Worker liveness 当成 Hermes connectivity。
 
-### 4.8 Gateway Workers
+### 4.8 打开组合 Poll/Delivery Gate
 
-在前置门禁全部通过后恢复 Poll、Dispatch 和 Delivery Worker。Poll 只入队 durable Dispatch，Dispatch 调用 Hermes，Delivery 只处理持久化 Response/Outbox。
+Dispatch Worker 已在 Gateway Release/Compose 生命周期中独立启动并验证。fresh QR 与 Hermes 门禁全部通过后，通过 Controller `start` 同时准备、重建并启动 Poll Worker 与 Delivery Worker。Poll 只入队 durable Dispatch，Dispatch Worker 独立调用 Hermes，Delivery 只处理持久化 Response/Outbox。
+
+当前如需单独启动或停止 Poll/Delivery 中任一服务，必须作为 Runtime Contract future change 实现和验收，不能从本指南推断已经支持。
 
 ### 4.9 status
 
@@ -87,7 +89,7 @@ QR、Cookie、Session、Token、账号和 Chat ID 不进入仓库或普通日志
 
 - database/revision；
 - Gateway readiness；
-- 三个 Worker heartbeat；
+- Dispatch Worker heartbeat，以及组合 Gate 内 Poll/Delivery 两个 Worker 的 heartbeat；
 - WeChat auth/API；
 - Hermes connectivity；
 - Controller ready 与 Token contract；
@@ -102,9 +104,9 @@ QR、Cookie、Session、Token、账号和 Chat ID 不进入仓库或普通日志
 
 | 场景 | fresh QR | 核心动作 |
 | --- | --- | --- |
-| CFserver reboot | 必须 | agent-wechat 保持停止；检查并显式 stop Gate，再 fresh QR |
+| CFserver reboot | 必须 | agent-wechat 保持停止；Controller stop 组合 Gate，核对独立 Dispatch，再 fresh QR 和 Controller start |
 | Gateway-only deploy | 不需要 | 不重建 agent-wechat，保持 Session |
-| agent-wechat restart/recreate | 必须 | stop Gate、Archive、fresh Runtime、QR、API 验证 |
+| agent-wechat restart/recreate | 必须 | Controller stop 组合 Gate、Archive、fresh Runtime、QR、API 验证、Controller start |
 | AI host restart | 通常不需要 | Session 保持；验证 Hermes reachability 与 Queue |
 
 ## 6. 升级与回滚

@@ -1,6 +1,6 @@
 # 企业 AI Gateway 架构
 
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 定位
 
@@ -15,7 +15,7 @@ Gateway 是企业消息、身份、权限、线程、Context、Dispatch、Respon
 | Dispatch Worker | durable Dispatch、Hermes 调用、Response 持久化 |
 | Delivery Worker | Outbox、Attempt/Receipt、微信投递、reconciliation |
 | PostgreSQL | 全链路权威状态与 audit |
-| Runtime Controller | Poll/Delivery Gate 的 stop/start/status |
+| Runtime Controller | v1 对 Poll Worker 与 Delivery Worker 执行组合 stop/start/status；不控制 Dispatch Worker |
 
 以上是四个应用进程加 PostgreSQL。external agent-wechat 不属于 Gateway Compose 的应用进程。
 

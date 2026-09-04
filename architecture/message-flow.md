@@ -1,6 +1,6 @@
 # 消息与任务流程
 
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 当前生产文本流程
 
@@ -83,7 +83,7 @@ flowchart LR
 - Message 未持久化：不执行、不推进。
 - `uncertain` Dispatch：使用 Admin inspection 和审计恢复，不盲重试。
 - 已有 Response、缺 Delivery：只做 reconciliation，不再次调用 Hermes。
-- agent-wechat stopped/logged_out：先关闭 Gate，执行 fresh QR，验证 API 后再恢复 Workers。
+- agent-wechat stopped/logged_out：先关闭组合 Poll/Delivery Gate，执行 fresh QR；验证 API 后用 Controller `start` 同时恢复两个受控 Worker。Dispatch Worker 独立管理。
 - Gateway-only deployment：不重建 agent-wechat，不需要 fresh QR。
 - AI host reboot：不重启微信 Session，恢复后核对 Hermes reachability。
 

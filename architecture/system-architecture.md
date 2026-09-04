@@ -6,7 +6,7 @@
 >
 > 文档状态：当前基线
 >
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 1. 当前结论
 
@@ -29,6 +29,7 @@ flowchart LR
         PW <--> PG
         API <--> PG
         CTL --> PW
+        CTL --> DLW
         CTL --> DLW
         DW <--> PG
         DLW <--> PG
@@ -89,7 +90,7 @@ Message、Admission、Dispatch、Response 和 Delivery 是分离状态。入口�
 | 身份/策略拒绝 | 保留消息与 Admission，不调用 Hermes |
 | 群聊未结构化 `@` | `bot_not_mentioned`，不调用 Hermes |
 | Dispatch `uncertain` | 停止自动重试，使用 Admin inspection 和受控恢复 |
-| agent-wechat 未登录 | Gate 保持关闭，不恢复 Workers |
+| agent-wechat 未登录 | 组合 Poll/Delivery Gate 保持关闭，不执行 Controller `start` |
 
 ## 6. Thread 与 Context
 
@@ -105,7 +106,8 @@ Message、Admission、Dispatch、Response 和 Delivery 是分离状态。入口�
 - Database revision：`20260823_04`。
 - Gateway P1 Release 使用 immutable image 和 Gateway 专属 `64m x 10` 日志策略。
 - agent-wechat 使用 `restart: "no"`、fresh QR 和 `20m x 3` 日志策略。
-- CFserver reboot 后 agent-wechat 保持停止，但 automatic boot stop gate 尚未验证；fresh QR 前必须显式 stop Gate。
+- CFserver reboot 后 agent-wechat 保持停止，但 automatic boot stop gate 尚未验证；fresh QR 前必须通过 Controller `stop` 关闭组合 Poll/Delivery Gate，验证后再用 `start` 同时启动二者。
+- Dispatch Worker 由 Gateway Release/Compose 生命周期独立管理，不属于 Controller v1 controlled services。
 - AI host reboot 不重启 agent-wechat 时不需要 fresh QR；必须重新核对 Hermes reachability。
 - Gateway-only deployment 不重建 agent-wechat，不需要 fresh QR。
 
@@ -120,7 +122,7 @@ Message、Admission、Dispatch、Response 和 Delivery 是分离状态。入口�
 1. 非 self 消息先持久化。
 2. 拒绝不删除历史。
 3. `uncertain` 不盲重试。
-4. 已有 Response 时只恢复 Delivery。
+4. 已有 Response 时不得重跑 Hermes；Delivery 诊断与受控 Worker 恢复必须遵守组合 Poll/Delivery Gate。
 5. fresh QR 前关闭 Gate。
 6. Archive 不能恢复为 active Session。
 7. 不跨项目运行 Compose 清理命令。

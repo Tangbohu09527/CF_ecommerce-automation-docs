@@ -1,12 +1,12 @@
 # 电商业务全自动化系统
 
-> 当前状态日期：2026-09-03
+> 当前状态日期：2026-09-04
 >
 > 本仓库只维护企业自动化总体架构、跨仓库状态、部署恢复边界、验证记录和技术决定，不包含业务代码、生产配置、凭证或真实业务数据。
 
 ## 项目定位
 
-系统以 CFserver/PostgreSQL 为消息与控制权威，以 Windows AI 主机上的 Hermes external runtime 为执行边界。员工从微信发起请求，Gateway 完成持久化、身份权限、线程、路由、响应和投递控制；正式企业文件访问未来统一经过 `CF_filebrowser-enterprise` 的 File Service、权限检查和审计。
+CFserver 是部署宿主；`CF_agent-gateway` 与 PostgreSQL 是消息和控制状态权威。Windows AI 主机上的 Hermes external runtime 是执行边界。员工从微信发起请求，Gateway 完成持久化、身份权限、线程、路由、响应和投递控制；正式企业文件访问未来统一经过 `CF_filebrowser-enterprise` 的 File Service、权限检查和审计。
 
 ## 当前总状态
 
@@ -16,8 +16,8 @@
 
 | 组件或能力 | 当前结论 |
 | --- | --- |
-| `CF_agent-gateway` | V2 Runtime 与 P1 observability 已完成生产交付；Git 权威为 `b488cf452584e73bc9b752564bf90ea153aa8d18` |
-| `CF_agent-wechat` | forced-QR R2 行为已在生产验证；实现仍位于开放的 PR #1 / PR #4 栈，尚未提升到 `main` |
+| `CF_agent-gateway` | repository main 与 production Release Git authority 均仍为 `b488cf452584e73bc9b752564bf90ea153aa8d18`；docs PR #8 仍 OPEN，不代表新部署 |
+| `CF_agent-wechat` | forced-QR R2 行为已在生产验证；PR #4 基线 CI 未全绿，PR #5 继承门禁，PR #1 为 dirty conflict，尚未提升到 `main` |
 | PostgreSQL | Gateway 权威状态已在线，revision `20260823_04`；真实 restore 演练仍未完成 |
 | Hermes | 当前文本链路真实调用成功，AI 主机重启后 reachability 曾恢复；长期 watchdog、告警和高可用未收口 |
 | `CF_filebrowser-enterprise` | V1 Beta implementation and automated validation completed; CFserver deployment and production acceptance pending |

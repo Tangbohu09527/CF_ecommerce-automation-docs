@@ -6,7 +6,7 @@
 >
 > 文档状态：当前基线
 >
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 1. 目标
 
@@ -22,6 +22,7 @@ flowchart LR
     PW --> CP[("Checkpoint generation")]
     MS --> AD["Admission / V2 Dispatch"]
     CTL["Runtime Controller"] --> PW
+    CTL --> DLW["Gateway Delivery Worker"]
 ```
 
 agent-wechat 与 Gateway 属于两个独立项目和 Compose ownership。两者通过 `cf-internal` 与 Token contract 通信。
@@ -80,7 +81,7 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 - 旧 Session 未恢复；
 - Poll/Delivery 曾被观察为 running/healthy。
 
-因此 automatic boot stop gate 未验证。Operator 必须先检查状态并通过 Runtime Controller 显式 stop，再运行 forced-QR 入口；不得假设开机后 Gate 已关闭。
+因此 automatic boot stop gate 未验证。Operator 必须先检查状态并通过 Runtime Controller `stop` 同时停止 Poll Worker 与 Delivery Worker，再运行 forced-QR 入口；验证完成后只能用 `start` 同时恢复二者。Dispatch Worker 由 Gateway Release/Compose 生命周期独立管理。
 
 ## 8. AI host 与 Gateway-only 变更
 

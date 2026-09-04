@@ -4,7 +4,7 @@
 >
 > 文档编号：VAL-001
 >
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## A. 2026-09-03 已完成的生产验收摘要
 
@@ -23,7 +23,7 @@
 - [x] 私聊普通前进和空窗口实时后缀通过。
 - [x] 无重复回复，Queue 与业务链一致，outstanding work 为零。
 - [x] fresh QR、手机扫码、auth/chats/messages 和 Worker 重新放行通过。
-- [x] CFserver reboot 后 Docker/存储/Gateway core 恢复，agent-wechat 保持停止；显式 stop Gate + fresh QR 后恢复在线。
+- [x] CFserver reboot 后 Docker/存储/Gateway core 恢复，agent-wechat 保持停止；Controller `stop` 组合 Poll/Delivery Gate + fresh QR 后恢复在线。
 - [x] AI host reboot 后 WeChat Session 保持，Hermes reachability 恢复，不需要 fresh QR。
 - [x] Gateway-only cutover 未重建 agent-wechat，authenticated Session preserved。
 - [x] P1 启动摘要和稳态日志降噪通过，未观察到目标重复日志或 ERROR/violation。
@@ -60,23 +60,24 @@
 - [ ] 未使用跨项目 `down` 或 `--remove-orphans`。
 - [ ] PostgreSQL readiness 与 migration head 正确。
 - [ ] Gateway API 和三个 Worker 使用批准 immutable image。
-- [ ] Runtime Controller contract、status 和 Token contract 通过。
+- [ ] Runtime Controller v1 contract 确认 controlled services 仅为 `worker` 与 `delivery-worker`，`stop/start` 始终组合控制二者。
+- [ ] Controller status、Token contract 和 `ready=true` 通过；未假设 Poll-only、Delivery-only 或 Dispatch 控制。
 
 ### B4. agent-wechat 与 forced QR
 
 - [ ] `restart: "no"`、loopback 6174、`cf-internal`、`ENABLE_VNC=0` 和只读 Token mount。
-- [ ] fresh QR 前显式 stop Gate。
+- [ ] fresh QR 前通过 Controller `stop` 显式关闭组合 Poll/Delivery Gate。
 - [ ] 旧 Runtime 归档但未复用。
 - [ ] SSH TTY 实际显示 fresh QR；证据不保存 QR。
 - [ ] WeChat process、container/API health、auth、chats、messages 全部通过。
-- [ ] 所有门禁通过后才恢复 Workers。
+- [ ] 所有门禁通过后，才通过 Controller `start` 同时准备、重建并启动 Poll Worker 与 Delivery Worker。
 - [ ] Host boot 到人工登录前的 automatic boot stop gate 已单独验证；否则记录 BLOCKED。
 
 ### B5. Gateway Runtime
 
 - [ ] Poll Worker 从已有 Checkpoint/generation 继续，不重新 bootstrap。
-- [ ] Dispatch Worker heartbeat fresh，Hermes reachability 真实检查通过。
-- [ ] Delivery Worker heartbeat fresh，agent-wechat auth/API 可用。
+- [ ] Dispatch Worker 由 Gateway Release/Compose 生命周期独立启动，heartbeat fresh，Hermes reachability 真实检查通过。
+- [ ] Controller `start` 后 Poll Worker 与 Delivery Worker 均 healthy、heartbeat fresh，agent-wechat auth/API 可用。
 - [ ] Runtime health 无未归属的 `uncertain`、stale lease、blocked thread、missing delivery 或 poison candidate。
 - [ ] Queue backlog 和 oldest age 在批准阈值内。
 

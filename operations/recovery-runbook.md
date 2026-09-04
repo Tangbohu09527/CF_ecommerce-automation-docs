@@ -4,7 +4,7 @@
 >
 > 文档编号：OPS-001
 >
-> 状态日期：2026-09-03
+> 状态日期：2026-09-04
 
 ## 1. 固定流程
 
@@ -22,7 +22,7 @@
 | 所有者 | 负责范围 |
 | --- | --- |
 | Operator | 事故记录、Gate、变更顺序、验证和证据 |
-| `CF_agent-gateway` | API、Poll/Dispatch/Delivery、Controller、Context、Admin recovery |
+| `CF_agent-gateway` | API、Poll/Dispatch/Delivery、Controller、Context、Admin recovery；Controller v1 只组合控制 Poll/Delivery，Dispatch 属于 Release/Compose 生命周期 |
 | PostgreSQL | revision、权威状态、备份与 restore |
 | `CF_agent-wechat` | container、WeChat process、fresh QR、auth/chats/messages |
 | Hermes / AI host | external runtime、reachability、watchdog、capacity |
@@ -55,8 +55,8 @@
 
 - **检查：** database/revision、Controller contract、Token contract、目标 Worker health。
 - **分类：** schema、配置、Token contract、Worker 或外部 WeChat。
-- **操作：** 保持 Gate 关闭，修复明确前置条件后重新 status。
-- **验证：** `ready=true`、`token_contract_valid=true`，无异常 backlog。
+- **操作：** 保持组合 Poll/Delivery Gate 关闭，修复明确前置条件后重新 status。
+- **验证：** Poll Worker 与 Delivery Worker 均 healthy、heartbeat fresh，且 `ready=true`、`token_contract_valid=true`，无异常 backlog。
 - **回滚：** 回到 previous immutable Gateway Release。
 - **证据：** 保存 Controller 脱敏输出、revision 和 Release。
 
@@ -65,22 +65,26 @@
 **Owner:** `CF_agent-gateway`。
 
 - **检查：** heartbeat、容器状态、Checkpoint continuity、agent-wechat auth。
-- **分类：** 正常 Gate stop、进程失败、heartbeat 写失败或依赖失败。
-- **操作：** 只有 WeChat/API/DB 正常且 Gate 允许时，按 Controller 恢复 Poll Worker。
-- **验证：** heartbeat fresh；从原 Checkpoint 继续；不重新 bootstrap。
-- **回滚：** 再次 stop Gate。
+- **分类：** 正常组合 Gate stop、Poll 进程失败、heartbeat 写失败或依赖失败。
+- **操作：** 先通过 Controller `stop` 关闭组合 Poll/Delivery Gate。单独诊断 Poll 根因；修复后只能通过 Controller `start` 同时准备、重建并启动 Poll Worker 与 Delivery Worker。
+- **验证：** 两个受控 Worker 均 healthy、heartbeat fresh，`token_contract_valid=true`、`ready=true`；Poll 从原 Checkpoint 继续且不重新 bootstrap。
+- **回滚：** 再次通过 Controller `stop` 关闭组合 Poll/Delivery Gate。
 - **证据：** 保存前后 Checkpoint generation、heartbeat 和日志。
+
+当前没有 Poll-only start/stop。若未来需要单独控制 Poll Worker，必须作为新的 Runtime Contract 版本实现和验收。
 
 ## 7. Delivery Worker stopped
 
 **Owner:** `CF_agent-gateway`。
 
 - **检查：** Response、Outbox、Attempt/Receipt、agent-wechat auth 和 heartbeat。
-- **分类：** 正常 Gate stop、进程失败、通道不可用或 ambiguous send。
-- **操作：** 已有 Response 时只恢复 Delivery；ambiguous send 不盲重发。
-- **验证：** backlog 下降且没有第二次 Hermes Dispatch 或重复可见回复。
-- **回滚：** stop Delivery Gate。
+- **分类：** 正常组合 Gate stop、Delivery 进程失败、通道不可用或 ambiguous send。
+- **操作：** 先通过 Controller `stop` 关闭组合 Poll/Delivery Gate。已有 Response 时不得重跑 Hermes；先诊断 Delivery/Outbox/Attempt，ambiguous send 不盲重发。修复后通过 Controller `start` 同时准备、重建并启动 Poll Worker 与 Delivery Worker。
+- **验证：** 两个受控 Worker 均 healthy、heartbeat fresh，`token_contract_valid=true`、`ready=true`；Delivery backlog 下降且没有第二次 Hermes Dispatch 或重复可见回复。
+- **回滚：** 再次通过 Controller `stop` 关闭组合 Poll/Delivery Gate。
 - **证据：** 保存 Outbox/Attempt 状态和实际接收结果。
+
+当前没有 Delivery-only start/stop，也没有独立的 Delivery-only control surface。若未来需要单独控制 Delivery Worker，必须修改 Runtime Contract 并重新验收。
 
 ## 8. Dispatch pending/running/uncertain
 
@@ -110,9 +114,9 @@
 
 - **检查：** 容器、`restart: "no"`、Gate、Runtime/Archive 目录元数据和批准 image。
 - **分类：** Host/container/Runtime restart，或受控停止。
-- **操作：** 显式 stop Gate，使用唯一 forced-QR 启动入口；不得直接 Compose `up`/restart 复用 Session。
-- **验证：** process、container/API health、auth/chats/messages、Controller。
-- **回滚：** 保持 Gate 关闭并停止 agent-wechat。
+- **操作：** 显式关闭组合 Poll/Delivery Gate，使用唯一 forced-QR 启动入口；不得直接 Compose `up`/restart 复用 Session。
+- **验证：** process、container/API health、auth/chats/messages；Controller `start` 后两个受控 Worker 均 healthy、heartbeat fresh，Token Contract valid、`ready=true`。
+- **回滚：** 保持组合 Poll/Delivery Gate 关闭并停止 agent-wechat。
 - **证据：** 保存阶段和 aggregate pass/fail，不保存 QR/Session payload。
 
 ## 11. agent-wechat `logged_out`
@@ -121,8 +125,8 @@
 
 - **检查：** WeChat process、auth、chats/messages、Gate 和上游可读窗口。
 - **分类：** Session 失效，不按网络故障处理。
-- **操作：** stop Gate，归档旧 Runtime，fresh QR。
-- **验证：** auth/chats/messages 全部通过后才 start Gate。
+- **操作：** 关闭组合 Poll/Delivery Gate，归档旧 Runtime，fresh QR。
+- **验证：** auth/chats/messages 全部通过后，才通过 Controller `start` 同时启动并验证两个受控 Worker。
 - **回滚：** 登录失败时 agent-wechat 与 Workers保持停止。
 - **证据：** 保存时间、image、流程阶段和 API aggregate 结果。
 
@@ -132,9 +136,9 @@
 
 - **检查：** Docker、storage、PostgreSQL、Gateway、Controller、agent-wechat 和 Worker 实际状态。
 - **分类：** 核心恢复、agent-wechat 预期停止、Gate 是否意外运行。
-- **操作：** 不假设 automatic boot stop；先显式 stop Gate，再 fresh QR，最后恢复 Workers。
-- **验证：** revision、Controller、auth/chats/messages、Hermes reachability、Queue 和文本闭环。
-- **回滚：** 任一门禁失败时保持 Gate 关闭。
+- **操作：** 不假设 automatic boot stop；先通过 Controller `stop` 显式关闭组合 Poll/Delivery Gate，再 fresh QR。Dispatch Worker 按 Gateway Release/Compose 生命周期独立核对；最后通过 Controller `start` 同时启动 Poll/Delivery。
+- **验证：** revision、Dispatch Worker、auth/chats/messages、Hermes reachability、Queue；两个受控 Worker 均 healthy、heartbeat fresh，Token Contract valid、`ready=true`。
+- **回滚：** 任一门禁失败时保持组合 Poll/Delivery Gate 关闭。
 - **证据：** 保存 boot 时间、服务状态、Gate 纠正动作和最终验证。
 
 ## 13. AI host reboot
@@ -154,8 +158,8 @@
 
 - **检查：** new/previous SHA、digest、revision、migration、agent-wechat container identity 和 Session。
 - **分类：** application、schema、Controller、Worker 或 health failure。
-- **操作：** 不重建 agent-wechat；停止受影响 Gateway Worker，回退 previous immutable Release。
-- **验证：** local Release、revision compatibility、Controller、Session preserved 和文本闭环。
+- **操作：** 不重建 agent-wechat。Poll/Delivery 异常时用 Controller `stop` 关闭组合 Gate；Dispatch Worker 由 Gateway Release/Compose 生命周期停止或回退，不通过 Controller 管理。
+- **验证：** local Release、revision compatibility、Dispatch Worker、Session preserved；Controller `start` 后两个受控 Worker 均 healthy、heartbeat fresh，Token Contract valid、`ready=true`。
 - **回滚：** 使用已记录 rollback Release；数据库另行判断。
 - **证据：** 保存前后 digest、rollback result 和 agent-wechat 未重建证明。
 
@@ -176,7 +180,7 @@
 
 - **检查：** source identity、Message uniqueness、Admission outcome、Dispatch idempotency、Response 和 Delivery receipt。
 - **分类：** 重读被幂等吸收、重复 Dispatch、重复 Delivery 或仅重复日志。
-- **操作：** 立即停止相关 Gate/Worker，保留所有事实；不删除重复记录。
+- **操作：** 立即关闭组合 Poll/Delivery Gate；如涉及 Dispatch，按 Gateway Release/Compose 生命周期单独停止该进程。保留所有事实，不删除重复记录。
 - **验证：** 一个来源事实只对应一个逻辑 Dispatch 和一个可见回复。
 - **回滚：** 回退引入重复的 Release，保留数据库用于调查。
 - **证据：** 保存关联链和重复发生层级。
