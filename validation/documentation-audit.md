@@ -124,7 +124,7 @@ GitHub 只读代码/测试核对结果：
 | 冲突标记 | PASS |
 | 行尾空格 | PASS |
 
-Git `diff --check` 在每组提交前通过。最终提交后还需重新运行总 diff、commit 和 PR 检查。
+最终提交后已重新运行全量文档检查、`git diff --check`、`git log --check`、PR 状态核验和工作区洁净检查，结果均为 PASS。
 
 ## 11. 未修改范围
 
