@@ -1,50 +1,42 @@
 # 当前进度与下一步
 
-> 状态日期：2026-09-04
+> Gateway 工作面更新：2026-09-17。其他组件沿用各自带日期基线，本轮没有执行全项目状态复核。
 >
-> 能力分层以[当前状态矩阵](./current-status.md)为准，生产证据以[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)为准。
+> 能力分层以[当前状态矩阵](./current-status.md)为准；最新 Gateway 证据见[2026-09-17 长任务回传](../validation/records/2026-09-17-gateway-long-task-acceptance.md)，此前总体交付见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
 
 ## 当前工作流
 
-企业消息与 AI 文本闭环基础已完成生产交付。六阶段规划仍处于阶段 1，因为原阶段定义还包含文件基础链路；当前实际工作已经从消息 Runtime 交付转向文件服务、可靠性、Skills 和业务系统集成准备。
+阶段 1 的消息 Runtime 已有生产交付，文件基础链路仍未完成。此次先恢复微信生产入口和长任务回传，不重写架构；本轮限定场景已通过，转入文档收口与残余事项跟踪，不重复部署或重发已通过的测试。
 
-## 已完成里程碑
+## 本轮完成
 
-- Gateway V2 production runtime 与 P1 observability。
-- Gateway component documentation closeout：COMPLETED；PR #8/#9 MERGED，2026-09-04 main CI success。
-- WeChat forced-QR R2 repository promotion：COMPLETED；PR #1/#4/#5/#6 MERGED，Fixture/CI 漂移与合并冲突已解决，2026-09-04 main CI success。
-- WeChat component documentation closeout：COMPLETED。
-- 私聊与真正 `@` 的群聊文本链路，以及未 `@` 安全结束。
-- forced fresh QR 生产行为。
-- Checkpoint regression/rebase、历史前缀与实时后缀、self skip 和无重复回复。
-- CFserver 核心重启恢复与 fresh QR 重新放行。
-- AI 主机重启后的 Hermes reachability 恢复。
-- Gateway-only cutover、回滚 Release、离线镜像与生产证据留存。
-- `uncertain` Admin recovery、Context Runtime 等 Gateway 能力的仓库实现和自动化验证。
+- Gateway PR #11 修复代码已合并，固定合并基线已通过 GitHub 核验。
+- 现场新 Image ID、Dispatch 启动 600 秒等待配置及停止宽限期已核对。
+- 既有 uncertain 任务通过独立带审计的 mark_dead 终止，保留原错误与审计；既有排队只读任务完成回传。
+- Dispatch 与 Controller 管理的 Poll/Delivery 经受控步骤恢复。
+- 新的分钟级任务：服务端派发 113.799 秒，响应落库、一次投递及回执与微信实收匹配。
+- 原始工具日志、历史告警、制品来源及未验收专项的边界明确保留。
 
-## 当前工作面
+Gateway 文档 PR #12 已于 2026-09-17 合并 main，合并提交 `7963bc0db5a01e38099e021959feabf648db7ede`。其受审查 head 的两个工作流、5 个作业均通过。本仓库通过文档 PR #8 同步固定合并提交摘要，合并状态以 GitHub 为准；文档合并不表示再次部署。
 
-- 2026-09-04 enterprise documentation closeout baseline 已完成；repository branch authority 为 `main`，live tip 动态查询。
-- FileBrowser CFserver deployment/production acceptance、Hermes reliability、媒体/文件、Skills 和业务系统集成。
+## 历史已完成里程碑
 
-组件 repository/documentation closeout completed 不等于生产重新部署，也不等于整个企业自动化系统完成。
+以下保持原证据日期，不作为本轮重新执行的项目：Gateway V2/P1、9 月 4 日 Gateway/WeChat component documentation closeout、forced-QR R2 repository promotion、私聊与真正 @ 的群聊、未 @ 安全结束、Checkpoint regression/rebase/self skip、CFserver 核心重启及 fresh QR、AI host reachability、Gateway-only Session 保持，以及 Context/Admin recovery 等的仓库实现和自动化验证。
 
-## 建议优先级
+## 当前工作面与建议顺序
 
-以下为当前建议，不是不可变承诺；技术决定变化仍以[技术决策记录](../05_技术决策记录.md)为准。
+1. 单独核对 Hermes 原始工具日志/安装构建与现场镜像来源，保全新版离线证据和回滚材料；不得为补证重跑带副作用任务。
+2. 对历史会话连续性告警分别取证和处理，不通过删队列/改 Checkpoint 消除告警；按授权安排断线、并发、续租及重启专项。
+3. 继续原定 FileBrowser CFserver 部署/迁移/恢复验收，再推进 Hermes watchdog/监控、群聊双发送者隔离、引用正文、媒体与文件双向桥。
+4. 文件与权限边界稳定后建设企业 Skills Runtime，再接入旺店通/S6。
 
-1. 完成 FileBrowser CFserver 部署、迁移和恢复验收。
-2. 收口 Hermes watchdog、开机自启和生产监控。
-3. 生产验证同群多发送者的 `group_sender` 隔离。
-4. 完成引用正文上下文。
-5. 完成媒体和文件双向桥。
-6. 建设 Skills Runtime。
-7. 接入旺店通和 S6，并分批授权正式业务身份与群。
+以上为建议次序，不是已安排的自动任务或已获批准的生产变更；技术决定仍以[技术决策记录](../05_技术决策记录.md)为准。
 
 ## 持续限制
 
-- automatic boot stop gate 未完成，CFserver reboot 后 fresh QR 前必须显式检查并关闭 Gate。
-- agent-wechat 自身重启、重建或 Host reboot 都需要 fresh QR；Archive 不可自动复用。
-- AI 主机 reboot 与 Gateway-only deploy 通常不需要 fresh QR，但仍要完成各自健康验证。
-- FileBrowser、Skills、完整媒体、RAG、旺店通和 S6 均不属于当前生产交付。
-- 组件仓库合并与 CI 通过不替代 production image provenance、重新部署或生产验收。
+- automatic boot stop gate 未完成，CFserver reboot 后 fresh QR 前须显式关闭组合 Gate。
+- agent-wechat 自身重启/重建与 Host reboot 的 fresh QR 规则不变，Archive 不自动复用。
+- AI host-only reboot 与未触碰微信入口的 Gateway-only 切换不因此强制 fresh QR，但仍须验证健康；本次不新增无人值守恢复承诺。
+- FileBrowser、企业 Skills、完整媒体、RAG、旺店通、S6 不因一次本地文件工具测试而成为已交付。
+- 新 Image ID 不等于已核实 registry digest 或完整 source-to-image provenance。
+- 一次 113.799 秒成功不等于 600 秒上限、执行中断线/重启、全部会话、watchdog 或高可用验收。
