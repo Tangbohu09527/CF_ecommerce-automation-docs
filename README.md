@@ -28,7 +28,7 @@ CFserver 是部署宿主；`CF_agent-gateway` 与 PostgreSQL 是消息和控制�
 [2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)
 保留为历史基线，不再作为新 Gateway 镜像的当前发布记录。
 
-仓库 branch authority 仍为 `main`，live tip 必须动态查询。PR #11 代码已合并，Gateway 本次文档同步 PR #12 在记录时仍为 OPEN；本仓库通过固定文档提交引用证据，不将未合并的文档分支写成组件 main。此次文档同步本身不部署、不发布 Tag、不改生产状态。
+仓库 branch authority 仍为 `main`，live tip 必须动态查询。PR #11 代码已合并；Gateway 文档 PR #12 已于 2026-09-17 合并，合并提交为 `7963bc0db5a01e38099e021959feabf648db7ede`。本仓库通过固定合并提交引用证据；企业文档同步由 PR #8 承载，最终合并状态以 GitHub 为准。此次文档同步本身不部署、不发布 Tag、不改生产状态。
 
 ## 当前生产文本链路
 

@@ -16,11 +16,11 @@
 
 | 层次 | 2026-09-17 已核对 | 边界 |
 | --- | --- | --- |
-| 仓库代码 | PR #11 已合并；核对时 main 为 `9a1caa237a9053678c80f68fdb15d351d5bfecf8` | 这是 dated snapshot，不是永远不变的 live tip |
+| 仓库代码 | PR #11 修复合并基线为 `9a1caa237a9053678c80f68fdb15d351d5bfecf8`；后续文档合并见下行 | 代码合并基线不是永远不变的 live main tip |
 | 现场制品 | 四应用 Docker Image ID `sha256:1cd7650543babe75d4fabe71e27e3cbc1d54585d34ffa853280606c2a3ddaa8b` | 未独立证明完整源码/制品映射，未核实 registry manifest digest、新 Release label/Tag 或离线归档 |
 | 配置与运行 | Dispatch 启动 read/execution=600/600 秒，停止宽限期 3660 秒；Controller/Token 契约和数据库 schema 检查通过 | 不代表所有会话健康或无人值守恢复通过 |
 | 实机限定验收 | 数据库记录的分钟级派发为 113.799 秒；响应、单次投递尝试、回执与微信实收匹配 | 原始工具日志未独立审阅；600 秒上限、执行中断线/重启、并发/FIFO/续租专项未完成 |
-| 文档同步 | Gateway PR #12 在本记录时 OPEN，证据文档固定提交为 `6a430eab6a6ef752c7e88583732f299162cdca59` | 引用该提交不表示文档已合并 main，本次文档工作不部署 |
+| 文档同步 | Gateway PR #12 已于 2026-09-17 合并 main，固定合并提交为 `7963bc0db5a01e38099e021959feabf648db7ede` | 企业文档通过 PR #8 同步；文档合并不表示再次部署，live tip 仍须动态查询 |
 
 9 月 3 日的 Production Release authority `b488cf452584e73bc9b752564bf90ea153aa8d18`、
 source snapshot `f36c798294368263433f6132366ac9a864d9482b` 和旧镜像

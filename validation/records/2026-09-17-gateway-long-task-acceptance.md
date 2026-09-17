@@ -11,15 +11,15 @@
 | 对象 | 带日期事实 |
 | --- | --- |
 | Gateway branch authority | `main` |
-| 2026-09-17 核对的 main / PR #11 merge | `9a1caa237a9053678c80f68fdb15d351d5bfecf8` |
+| PR #11 修复代码合并基线 | `9a1caa237a9053678c80f68fdb15d351d5bfecf8` |
 | 现场 Docker Image ID | `sha256:1cd7650543babe75d4fabe71e27e3cbc1d54585d34ffa853280606c2a3ddaa8b` |
-| Gateway 文档提交 | `6a430eab6a6ef752c7e88583732f299162cdca59`，文档分支 `docs/long-task-acceptance-20260917` |
-| Gateway 文档 PR | [PR #12](https://github.com/Tangbohu09527/CF_agent-gateway/pull/12)，本记录编写时 OPEN，未合并 |
+| Gateway 文档提交 | 受审查 head `6a430eab6a6ef752c7e88583732f299162cdca59`；合并提交 `7963bc0db5a01e38099e021959feabf648db7ede` |
+| Gateway 文档 PR | [PR #12](https://github.com/Tangbohu09527/CF_agent-gateway/pull/12)，2026-09-17T07:06:26Z 已合并 main |
 | 企业总文档起点 | main 的 dated snapshot `8f51cd095c6967f806701b703281b08e5144296f`；在独立文档分支补充本记录 |
 | Schema | Gateway 仓库 head `20260823_04`；现场 database/migration_schema 为 ok，文档整理未再次查询现场 revision |
 
-完整明细归属组件仓库：[固定提交的 Gateway 验收记录](https://github.com/Tangbohu09527/CF_agent-gateway/blob/6a430eab6a6ef752c7e88583732f299162cdca59/docs/validation/2026-09-17-hermes-long-task-acceptance.md)。
-引用固定文档提交使 PR 尚未合并时也能核对证据，不表示该文档提交已经是组件 main。代码 PR #11 已合并，与文档 PR #12 是否合并是两件事。
+完整明细归属组件仓库：[固定提交的 Gateway 验收记录](https://github.com/Tangbohu09527/CF_agent-gateway/blob/7963bc0db5a01e38099e021959feabf648db7ede/docs/validation/2026-09-17-hermes-long-task-acceptance.md)。
+本摘要最初在组件文档 PR 尚未合并时引用其固定 head；现已通过 GitHub 核对 PR #12 合并并改为固定合并提交引用。合并提交与受审查 head 的文件差异为空。代码 PR #11、文档 PR #12 以及现场升级是不同事件；本次文档合并不表示再次部署。
 
 Image ID 不是经核实的 registry manifest digest。代码合并和观察到的镜像分别核验，完整构建来源映射、新 Release label/Tag、新离线归档及恢复/回滚材料未独立证明。9 月 3 日 P1 旧镜像与旧归档不替代这些新证据。
 
@@ -29,7 +29,7 @@ Image ID 不是经核实的 registry manifest digest。代码合并和观察到�
 | --- | --- |
 | Repository implementation | PR #11 有限等待及不确定派发保护已合并 |
 | Automated tests | PR #11 原记录的 444 项相关回归属于其原环境，不是本次文档的新测试 |
-| GitHub Actions | 本次文档 PR 按各自提交另行查 CI，不借用旧绿灯 |
+| GitHub Actions | Gateway 文档 head `6a430eab6a6ef752c7e88583732f299162cdca59` 的 CI Run `35189363808` 与 Clean device Run `35189363742` 均成功（合计 5 个作业）；企业文档仓库本分支没有配置 Workflow，文档校验单独记录，不冒充 CI 通过 |
 | Deployment | 用户的现场输出核对四个应用 Image ID、Dispatch 600 秒启动配置、3660 秒停止宽限期与 Controller/Token 契约 |
 | Production validation | 以下唯一测试消息的数据库证据与微信实收匹配 |
 | Not reviewed / Not run | 工具原始日志、Desktop 构建、近上限/断线/重启/并发/FIFO/续租专项及完整归档恢复 |
@@ -83,6 +83,6 @@ Image ID 不是经核实的 registry manifest digest。代码合并和观察到�
 
 ## 操作边界
 
-只修改企业总文档 Markdown，组件完整证据由 Gateway 文档 PR 承载；本次不修改生产代码、Compose、配置、Workflow 或数据库，不 SSH/Docker 操作现场，不创建 Tag、不自动合并任何 PR。
+只修改企业总文档 Markdown，组件完整证据已由 Gateway 文档 PR #12 合入 main。用户在本轮明确授权按 Gateway → 企业总文档顺序审查、校验并合并两个文档 PR；本仓库 PR #8 的最终合并事实以 GitHub 为准。该授权不包括生产部署，不修改生产代码、Compose、配置、Workflow 或数据库，不 SSH/Docker 操作现场，不创建 Tag。
 
 本次限定场景通过不等于阶段 1 文件链路或整个企业自动化系统完成。下一步在[当前进度](../../status/current-progress.md)跟踪。
