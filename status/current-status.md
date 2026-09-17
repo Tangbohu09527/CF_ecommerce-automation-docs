@@ -1,46 +1,64 @@
 # 当前状态矩阵
 
-> 状态日期：2026-09-04
+> Gateway 证据更新：2026-09-17。其他组件的仓库/部署状态沿用 2026-09-04 记录，除下文明确列出的现场观察外，本次没有重新核验其最新状态。
 >
-> 本文是系统当前状态的唯一权威入口。每行分别说明仓库实现、部署和生产验证，任何一层通过都不能自动替代另一层。
+> 本文是系统当前状态摘要的权威入口。原始证据和动态记录编号放在带日期验收记录，不将一次检查写成持续监控。
 
 ## 状态口径
 
-- **Repository implemented：** 能力存在于指定代码线。
-- **Automated tests / GitHub Actions：** 只证明对应提交和测试环境。
-- **Deployed：** 对应代码或组件已进入 CFserver/AI 主机。
-- **Production validated：** 指定行为已在真实链路留证。
-- **Planned / Not implemented / Not verified：** 不得写成已可用。
+- Repository implemented：能力存在于指定代码线。
+- Automated tests / GitHub Actions：只证明对应提交和环境，旧绿灯不能作为新提交的 CI。
+- Deployed：有现场制品/配置证据；源码 SHA、Image ID、registry digest 和完整来源证明不能混用。
+- Production validated：指定行为有带日期的真实链路证据。
+- Planned / Not implemented / Not verified：不得写成已可用；未合并文档 PR 不替代 main。
+
+## Gateway 新证据与历史基线
+
+| 层次 | 2026-09-17 已核对 | 边界 |
+| --- | --- | --- |
+| 仓库代码 | PR #11 已合并；核对时 main 为 `9a1caa237a9053678c80f68fdb15d351d5bfecf8` | 这是 dated snapshot，不是永远不变的 live tip |
+| 现场制品 | 四应用 Docker Image ID `sha256:1cd7650543babe75d4fabe71e27e3cbc1d54585d34ffa853280606c2a3ddaa8b` | 未独立证明完整源码/制品映射，未核实 registry manifest digest、新 Release label/Tag 或离线归档 |
+| 配置与运行 | Dispatch 启动 read/execution=600/600 秒，停止宽限期 3660 秒；Controller/Token 契约和数据库 schema 检查通过 | 不代表所有会话健康或无人值守恢复通过 |
+| 实机限定验收 | 数据库记录的分钟级派发为 113.799 秒；响应、单次投递尝试、回执与微信实收匹配 | 原始工具日志未独立审阅；600 秒上限、执行中断线/重启、并发/FIFO/续租专项未完成 |
+| 文档同步 | Gateway PR #12 在本记录时 OPEN，证据文档固定提交为 `6a430eab6a6ef752c7e88583732f299162cdca59` | 引用该提交不表示文档已合并 main，本次文档工作不部署 |
+
+9 月 3 日的 Production Release authority `b488cf452584e73bc9b752564bf90ea153aa8d18`、
+source snapshot `f36c798294368263433f6132366ac9a864d9482b` 和旧镜像
+`sha256:b9341ca7df6f952b4d81028c497574c1e22478e4408f98791a28bd9514b215f1`
+保留为历史，不再描述成新现场镜像。9 月 4 日的 PR #8/#9 docs-only closeout 和旧 CI 成功仍是历史事实，不意味着后续没有发生应用升级。
+
+详细证据见[2026-09-17 长任务回传](../validation/records/2026-09-17-gateway-long-task-acceptance.md)。
 
 ## 能力矩阵
 
-| 组件或能力 | Repository implementation | Deployment | Production validation | Remaining boundary | Next action |
-| --- | --- | --- | --- | --- | --- |
-| `CF_agent-gateway` | branch authority=`main`；2026-09-04 verified snapshot=`4f13039b86c60bc94340edb5468f0102d62d2dff`；PR #8 closeout baseline=`c5518aed12b90235f118ed81bb3cef75d0463443`，PR #9 authority baseline=`4f13039…`，均 MERGED；main CI Run `33863057556` success | production Release Git authority=`b488cf452584e73bc9b752564bf90ea153aa8d18`；source snapshot=`f36c798294368263433f6132366ac9a864d9482b`；immutable image `sha256:b9341ca7df6f952b4d81028c497574c1e22478e4408f98791a28bd9514b215f1` 在线 | Gateway V2/P1、Poll/Dispatch/Delivery、Controller、队列清空与文本链路通过 | PR #8/#9 为 docs-only，repository main 前进不表示生产重新部署；PostgreSQL restore 和业务扩展未完成 | 动态查询 live main，持续以独立 Release 证据管理生产 |
-| Gateway P1 observability | P1 PR #7 已合并到 Gateway main；结构化日志与降噪测试通过 | Release `p1-observability-main-b488cf452584-20260903`；Gateway 日志 `64m x 10` | 启动期有限摘要、稳态无重复目标日志、0 ERROR/violation 已验证 | 长期容量与集中告警仍属运维责任 | 建立持续容量监控和告警 |
-| `CF_agent-wechat` | branch authority=`main`；PR #1/#4/#5/#6 全部 MERGED；2026-09-04 promotion baseline=`02583fe76220916019ca961bb37dfa015640384e`，post-promotion docs snapshot=`69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`；main CI Run `33863104399` success | observed production image ID=`sha256:7ee0309980b7d03b747b40c6c04cbaeafe2d8fc01fc9429810cbc7571ebbf720`；仓库合并未重新构建或部署该镜像 | forced fresh QR、登录、auth/chats/messages、文本收发与 2026-09-03 Host reboot 恢复通过 | live main 需动态查询；现场 Image ID 与选定 Release Commit/构建输入的 exact mapping 未证明；automatic boot stop gate 未完成 | 保持 source/image provenance 边界，继续验证 boot stop gate |
-| forced-QR R2 | repository promotion COMPLETED；Fixture/CI 漂移已修复，dirty conflict 已解决，component docs closeout COMPLETED | 当前生产契约为 `restart: "no"`、loopback 6174、`cf-internal`、`ENABLE_VNC=0`、Token 只读挂载 | 生产行为验收仍来自 2026-09-03；main baseline 和 post-promotion docs CI 已通过 | repository completion 不表示生产镜像重新部署；CFserver reboot 后仍需显式关闭组合 Gate 并 fresh QR | 保持生产 Runbook 和 provenance，不外推为 automatic boot gate 已完成 |
-| PostgreSQL | Gateway schema 与权威状态模型已实现 | CFserver healthy，revision `20260823_04` | Message/Admission/Dispatch/Response/Delivery 与队列一致性通过 | 实际 restore 演练未完成 | 在隔离恢复目标完成 restore 验收 |
-| Hermes | 外部 Runtime，不属于本仓库或 Gateway 实现 | Windows AI 主机可达 | 私聊/群聊文本实际调用成功；AI 主机重启后 reachability 恢复一次 | watchdog、自启正式文档、告警、容量和高可用未完整验收 | 收口守护、启动和监控证据 |
-| private text | Gateway/WeChat 文本链实现与测试存在 | 已部署 | 完整真实回复闭环通过 | 不代表媒体、Skills 或业务自动化 | 保持每次 Release 回归 |
-| mentioned group text | 结构化 mention、Admission 和 V2 Routing 已实现 | 已部署 | 真正 `@` 可回复；未 `@` 不调用 AI | 不证明同群多发送者隔离已生产验收 | 增加双发送者生产对照测试 |
-| thread isolation | V2 `group_sender` key 包含 sender identity，自动化测试覆盖；V1 compatibility path 仍是 whole-room | 生产 Runtime 使用 V2 代码线 | 私聊/群聊单路径隔离有证据 | 同群不同发送者生产对照未验证；`group_shared` 未批准 | 留证验证双发送者并继续禁用 `group_shared` |
-| Context Runtime | Timeline、授权读取、Snapshot、search 与 Hermes context tool 已实现并通过 Gateway CI | 随 Gateway Release 部署 | 文本链使用线程绑定；Context 全能力未逐项生产演练 | RAG、Memory、引用正文注入未完成 | 验证 Snapshot/read/search 的生产行为 |
-| Admin recovery | `uncertain` inspect、retry-approved、mark-dead、confirm-success 与 immutable audit 已实现并测试 | 随 Gateway Release 部署 | 已有一次证据核对与 Guard 的受控恢复 | 未证明每个动作都在生产演练；不得手工改 DB | 为每种动作建立脱敏演练记录 |
-| Checkpoint continuity/rebase | generation、anchor、CAS rebase、历史前缀/实时后缀逻辑已实现和测试 | 已部署 | forced-QR 后回退、前缀跳过、后缀单次处理、self skip、无重复回复通过 | 长期上游保留窗口与更多异常分支需持续观察 | 纳入每次 forced-QR 回归 |
-| Response / Delivery | durable Response、Outbox、Attempt、reconciliation 已实现 | Dispatch/Delivery Worker 已部署 | 文本持久化、投递、无重复和队列清空通过 | 完整媒体投递未完成 | 保持文本回归并接入 Artifact 链 |
-| media discovery | 图片来源识别、Raw Payload 和读取接口已有实现 | 来源链已部署 | JPEG 字节、签名、大小与摘要验证已完成 | 只证明可发现/读取，不证明 AI 看图 | 接入 Attachment 和受控媒体存储 |
-| full media pipeline | Gateway 仓库包含部分 Artifact/媒体数据结构与测试 | 系统级链路未完整接入 | Not production validated | 入站持久化、Hermes 多模态、出站物化和微信回传未完成 | 分阶段完成入站、推理、出站验收 |
-| CFserver reboot | 核心服务 restart policy 与 WeChat `restart:no` 已配置 | 已执行一次真实重启 | Docker/存储/Gateway 核心恢复；agent-wechat 保持停止；fresh QR 后恢复在线 | Poll/Delivery 当时曾自动 running/healthy，automatic boot stop gate 未验证 | 启动后先通过 Controller `stop` 关闭组合 Poll/Delivery Gate，再 fresh QR |
-| AI host reboot | Hermes 外部运行能力存在 | 已执行一次真实 AI 主机重启 | Hermes reachability 恢复，WeChat Session 保持，无需 fresh QR | 不等于完整 watchdog/告警/高可用交付 | 建立可重复自启和告警验收 |
-| Gateway-only deployment | 不可变镜像切换与 Controller 已实现 | 多次受控 Gateway 切换 | agent-wechat 未重建，authenticated Session preserved | 不可外推到 agent-wechat 自身重启 | 固化为独立发布场景 |
-| FileBrowser | `main`=`4750a97…`；`feat/v1-integration`=`48380c3…`，V1 Beta 核心实现与自动化验证完成，CI 对应代码线通过 | 尚未在 CFserver 正式部署 | Not production validated | 迁移、备份恢复、回滚、真实 WebDAV/OnlyOffice、Agent 集成未完成 | 完成 CFserver Candidate、部署与恢复验收 |
-| Skills | Not integrated | Not deployed | Not verified | 权限、执行、幂等、审计和业务 Skill 均未接入 | 先定义 Skills Runtime 契约 |
-| OCR | 第一阶段明确不建设独立 OCR | Not deployed | Not applicable to delivered scope | 未来是否需要取决于真实业务 | 不提前立项 |
-| 旺店通 / S6 | Not integrated | Not deployed | Not verified | 接口、权限、确认、幂等和回滚未完成 | Skills 与文件边界稳定后分业务接入 |
+| 组件或能力 | 实现/部署证据 | 生产验证 | 剩余边界与下一步 |
+| --- | --- | --- | --- |
+| Gateway V2 / P1 | 既有实现/测试及历史生产交付；本轮新镜像/配置如上 | 历史文本链路与本轮分钟级持久化回传通过 | 完整发布来源、离线归档及恢复专项待核验 |
+| Gateway P1 observability | 9 月 3 日 P1 Release 与 `64m x 10` 策略历史记录 | 当时启动有限摘要、稳态降噪验收通过 | 本次未重复完整日志容量/保留周期验收；长期集中告警待办 |
+| `CF_agent-wechat` | 沿用 9 月 4 日 main snapshot `69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`；PR #1/#4/#5/#6 合并和 CI Run `33863104399` 为历史记录 | 本轮现场登录、Gate 恢复和文本投递有证据；forced-QR reboot 仍按 9 月 3 日记录 | 本次未核对其 live main 或 source/image exact mapping；automatic boot stop gate 未完成 |
+| forced-QR R2 | 历史 promotion/文档完成；契约为 `restart: no`、受限网络与 Token File | 9 月 3 日 forced-QR 行为验收 | 本次未重建微信入口或重新执行 CFserver reboot；不能新增无人值守恢复结论 |
+| PostgreSQL | 仓库 head `20260823_04`；本轮 runtime database/migration_schema 为 ok | 消息/派发/响应/投递只读一致性证据 | 实际 restore 演练和新版备份材料未独立核验 |
+| Hermes | 外部 Windows runtime，不归 Gateway 实现 | 本轮任务结果经 Gateway 回到微信；AI 主机重启后通路恢复有观察 | 原始工具日志/桌面构建、watchdog、告警、容量、高可用待核验 |
+| private text | 已实现、部署；当前验收会话轮询通过 | 历史文本闭环及本轮长任务微信实收 | 不代表媒体、企业文件服务或 Skills 集成 |
+| mentioned group text | 结构化 mention、Admission 和 V2 Routing 已实现/部署 | 历史真正 @ 回复、未 @ 不调用 AI | 本轮未新增群聊对照验收 |
+| thread isolation | V2 `group_sender` 按 sender identity 隔离，自动化覆盖；V1 compatibility 保留 whole-room | 历史私聊/群聊单路径证据 | 同群双发送者及长任务跨会话/FIFO 专项未完成；`group_shared` 未批准 |
+| Context Runtime | Timeline、授权读取、Snapshot/search/context tool 已实现并随 Release 部署 | 文本线程绑定有证据 | 全能力生产演练、RAG/Memory/引用正文注入未完成 |
+| Admin recovery | uncertain inspect/retry-approved/mark-dead/confirm-success 与不可变审计已实现/测试 | 本轮补充独立 mark_dead 的生产审计证据 | 不能把单个动作外推为所有恢复动作已演练；禁止手改 DB |
+| Checkpoint continuity/rebase | generation/anchor/CAS 及前缀/后缀逻辑已实现/测试 | 历史 forced-QR 回退、单次处理有证据；本轮验收会话未受影响 | 独立历史会话仍有连续性保护告警，不重置 Checkpoint 变绿，单独处置 |
+| Response / Delivery | 持久响应、Outbox、Attempt、receipt、reconciliation 已实现/部署 | 本轮长任务数据库与微信实收证据通过 | 不证明完整媒体投递或所有断线恢复 |
+| media discovery | 历史来源识别、Raw Payload/读取接口 | 曾验证 JPEG 字节、签名、大小与摘要 | 不等于 AI 看图；受控存储/Attachment 链仍待办 |
+| full media pipeline | 部分 Artifact/媒体结构和测试存在 | 未完成系统级生产验收 | 入站持久化、Hermes 多模态、出站物化与微信闭环待办 |
+| CFserver reboot | 历史 Docker restart policy 与 WeChat restart:no | 9 月 3 日核心恢复和 fresh QR 记录 | 本轮未重新执行；automatic boot stop gate 未验证，fresh QR 前仍须正式关 Gate |
+| AI host reboot | 外部运行能力与历史 reachability 记录 | 本轮 AI 主机重启后通路恢复、未因该次重启重新扫码 | 不等于执行中重启、完整自启/watchdog/HA 验收 |
+| Gateway-only deployment | 不可变制品切换与 Controller 已实现 | 本轮恢复保持外部微信入口/数据库不重建，有分步骤核对 | 不外推到微信入口自身重启或全自动升级 |
+| FileBrowser | 沿用 9 月 4 日记录：main=`4750a97…`、feat/v1-integration=`48380c3…`，V1 Beta 实现/自动化验证完成 | 当时 CFserver 部署/生产验收待办；本次未重新核查进度 | 迁移、备份恢复、回滚、WebDAV/OnlyOffice 和 Agent 集成待独立接管 |
+| Skills | 既有状态未集成/未部署 | 本次不新增此类验收 | 外部 Hermes 本地文件测试不等于企业 Skills Runtime |
+| OCR | 第一阶段不建设独立 OCR | 不属于已交付范围 | 不提前立项 |
+| 旺店通 / S6 | 既有状态未集成/未部署 | 本次不新增此类验收 | 文件与 Skills 边界稳定后分业务接入 |
 
 ## 当前结论
 
-企业消息与 AI 文本闭环基础已经生产交付。六阶段规划中的阶段 1 仍含文件基础链路，因此当前应表述为“阶段 1 的消息 Runtime 里程碑完成，文件基础链路继续推进”，而不是把整个阶段或整个项目标记为完成。
+阶段 1 的消息 Runtime 里程碑已有交付，2026-09-17 增补分钟级任务回传场景通过；阶段 1 文件基础链路和整个自动化系统仍未完成。
 
-动态 Message、Checkpoint、Queue、容器和 Archive 数量不在本文维护；带日期的实际结果见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
+动态 Message/Dispatch/Checkpoint/Queue/容器编号和计数只放入带日期记录，不在此保存成永久现状。
+历史基线见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)，最新 Gateway 证据见[2026-09-17 记录](../validation/records/2026-09-17-gateway-long-task-acceptance.md)。
