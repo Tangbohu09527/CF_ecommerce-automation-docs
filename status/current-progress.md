@@ -1,42 +1,51 @@
 # 当前进度与下一步
 
-> Gateway 工作面更新：2026-09-17。其他组件沿用各自带日期基线，本轮没有执行全项目状态复核。
+> 文件业务工作面更新：2026-09-27。来源为用户明确确认的需求及回传的实机输出；不是本轮直接登录生产系统或全组件重新验收。
 >
-> 能力分层以[当前状态矩阵](./current-status.md)为准；最新 Gateway 证据见[2026-09-17 长任务回传](../validation/records/2026-09-17-gateway-long-task-acceptance.md)，此前总体交付见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
+> 最新文件需求和边界见[文件业务场景](../requirements/file-workflows.md)。[当前状态矩阵](./current-status.md)仍保留 2026-09-17/09-04 的带日期基线，未同步的旧行不能覆盖本页文件工作面；也不能把本页限定验收扩大为全项目发布通过。
 
 ## 当前工作流
 
-阶段 1 的消息 Runtime 已有生产交付，文件基础链路仍未完成。此次先恢复微信生产入口和长任务回传，不重写架构；本轮限定场景已通过，转入文档收口与残余事项跟踪，不重复部署或重发已通过的测试。
+阶段 1 消息 Runtime 已有生产交付，文件基础业务仍在联调。三个项目已有同机部署和现场健康结果；已完成受限文件读取及一次受控文本新建的局部闭环。当前不重新安装、不重签凭据、不为补证重复创建。
 
-## 本轮完成
+2026-09-27 用户明确：主线是微信查询/分发资料，资质共享群附件识别分类归档，以及 AI 主机下载工作副本、加工、回存。直接改原件或删除需求较少，不再按通用 CRUD 把这两项排在真实附件业务之前。
 
-- Gateway PR #11 修复代码已合并，固定合并基线已通过 GitHub 核验。
-- 现场新 Image ID、Dispatch 启动 600 秒等待配置及停止宽限期已核对。
-- 既有 uncertain 任务通过独立带审计的 mark_dead 终止，保留原错误与审计；既有排队只读任务完成回传。
-- Dispatch 与 Controller 管理的 Poll/Delivery 经受控步骤恢复。
-- 新的分钟级任务：服务端派发 113.799 秒，响应落库、一次投递及回执与微信实收匹配。
-- 原始工具日志、历史告警、制品来源及未验收专项的边界明确保留。
+## 文件工作面已完成及证据等级
 
-Gateway 文档 PR #12 已于 2026-09-17 合并 main，合并提交 `7963bc0db5a01e38099e021959feabf648db7ede`。其受审查 head 的两个工作流、5 个作业均通过。本仓库通过文档 PR #8 同步固定合并提交摘要，合并状态以 GitHub 为准；文档合并不表示再次部署。
+- 2026-09-25 至 09-27 的用户输出显示 FileBrowser 与微信/Gateway 同机运行，AI 主机 HTTPS 和受限凭据接入完成；这是限定现场部署记录，不是正式发布或所有客户端联调通过。
+- 2026-09-26 微信真实文件读取：完整内容、SHA-256 及客户端审计关联通过。
+- 新建客户端 `28a4481fc2f73363f60bb0f6821bfc50817e99c3` 已由用户安装、启用；Hermes API 已显示原读取工具及可选新建工具。该源码属于未合并功能线，不写成 main。
+- 2026-09-27 用户完成计划、终端批准、微信触发创建及创建后 read/checksum；53 字节正文与三处摘要一致。用户随后回传本地 plan/approval/attempt/outcome 与已有 CLI 审计的只读关联核验通过。
+- 本次 Hermes 更新、切回本地模式和重启后的配置/工具检查及随后功能有现场结果；不保证任意未来版本或所有重启场景兼容。
+- 原始 Hermes trace、FileBrowser Persistent Audit 及完整跨层关联仍未独立核验。客户端记录不是服务端审计，既有操作不能为补证再执行。
 
-## 历史已完成里程碑
+## 下一步优先级
 
-以下保持原证据日期，不作为本轮重新执行的项目：Gateway V2/P1、9 月 4 日 Gateway/WeChat component documentation closeout、forced-QR R2 repository promotion、私聊与真正 @ 的群聊、未 @ 安全结束、Checkpoint regression/rebase/self skip、CFserver 核心重启及 fresh QR、AI host reachability、Gateway-only Session 保持，以及 Context/Admin recovery 等的仓库实现和自动化验证。
+1. **真实附件往返。** 用非敏感 PDF 与商品图样本验证实际字节获取、受控入库、查找与微信原附件回传。原件发送与图片消息分开验收，不能把缩略图或文件名当原件。
+2. **指定资质共享群自动归档。** 明确群/发送人/目录准入，再实现分类、商品匹配、待确认、去重和来源记录。常规已授权新增不逐份要求终端批准；不全局取消普通群未 @ 的安全边界。
+3. **AI 主机工作副本。** 通过 FileBrowser API 下载、加工、检查结果、另存回库并关联原件；只分发原件时不强制绕行 AI 主机。
+4. **完整交付收口。** 按业务价值补正式替换/删除、跨层审计、断线/离线恢复、备份恢复、CI 红项和新环境统一一条命令安装。终端/微信来回审批不是最终日常使用体验。
 
-## 当前工作面与建议顺序
+AI 主机离线期间由 CFserver 先收妥原件、分类任务稍后续接，是目标而非当前能力保证。现有附件元数据不证明内容已保存。具体共享群、目录字典和自动归档规则尚未配置，本次文档更新不改变生产权限。
 
-1. 单独核对 Hermes 原始工具日志/安装构建与现场镜像来源，保全新版离线证据和回滚材料；不得为补证重跑带副作用任务。
-2. 对历史会话连续性告警分别取证和处理，不通过删队列/改 Checkpoint 消除告警；按授权安排断线、并发、续租及重启专项。
-3. 继续原定 FileBrowser CFserver 部署/迁移/恢复验收，再推进 Hermes watchdog/监控、群聊双发送者隔离、引用正文、媒体与文件双向桥。
-4. 文件与权限边界稳定后建设企业 Skills Runtime，再接入旺店通/S6。
+## 2026-09-17 Gateway 历史限定成果
 
-以上为建议次序，不是已安排的自动任务或已获批准的生产变更；技术决定仍以[技术决策记录](../05_技术决策记录.md)为准。
+- Gateway PR #11 修复已合并，固定合并基线 `9a1caa237a9053678c80f68fdb15d351d5bfecf8` 已核对。
+- 现场新应用 Image ID、Dispatch read/execution 600 秒和停止宽限期有证据；完整 source/image provenance 不因此自动成立。
+- uncertain 任务经带审计 mark_dead 保留原错误；既有排队只读任务完成，Dispatch 与组合 Poll/Delivery Gate 经受控恢复。
+- 分钟级任务服务端派发耗时 113.799 秒，持久响应、单次投递和微信实收匹配；原始工具日志及其他可靠性专项未由此完成。
 
-## 持续限制
+详见[长任务回传记录](../validation/records/2026-09-17-gateway-long-task-acceptance.md)。Gateway 文档 PR #12 合并提交为 `7963bc0db5a01e38099e021959feabf648db7ede`；本仓库文档同步不表示再次部署。
 
-- automatic boot stop gate 未完成，CFserver reboot 后 fresh QR 前须显式关闭组合 Gate。
-- agent-wechat 自身重启/重建与 Host reboot 的 fresh QR 规则不变，Archive 不自动复用。
-- AI host-only reboot 与未触碰微信入口的 Gateway-only 切换不因此强制 fresh QR，但仍须验证健康；本次不新增无人值守恢复承诺。
-- FileBrowser、企业 Skills、完整媒体、RAG、旺店通、S6 不因一次本地文件工具测试而成为已交付。
-- 新 Image ID 不等于已核实 registry digest 或完整 source-to-image provenance。
-- 一次 113.799 秒成功不等于 600 秒上限、执行中断线/重启、全部会话、watchdog 或高可用验收。
+## 其他历史里程碑与持续边界
+
+Gateway V2/P1、组件文档收口、forced-QR R2 promotion、私聊/真正 @ 群聊、未 @ 结束、Checkpoint 回退、自回复跳过、核心重启与 fresh QR、Context/Admin recovery 等分别保持原证据日期，不写成本轮重复测试。
+
+- 历史会话连续性告警仍单独跟踪；用户暂缓处置，除非重新影响当前链路，不插回文件业务主线。不删队列或重置 Checkpoint 清告警。
+- automatic boot stop gate 未证明，CFserver reboot/fresh QR 仍走正式组合 Controller；agent-wechat 的 restart:no 和 Archive 不复用规则不变。
+- AI host-only reboot、未触碰微信的 Gateway-only 变更不当然需要重扫，但仍须检查状态；没有新增无人值守恢复保证。
+- 真实 PDF/图片文件业务、群自动归档、工作副本及全类型媒体未因文本读写测试而交付。
+- 备份恢复/回滚、WebDAV/OnlyOffice 真实联调、发布来源、CI 门禁及 PR 合并仍需逐项收口；部分绿灯不代表全仓库全绿。
+- 企业 Skills Runtime、旺店通/S6、RAG 等未由本次接入。第一阶段不建设独立 OCR。
+
+技术决定仍以[技术决策记录](../05_技术决策记录.md)为准，文件业务需求细化不绕过 D012/D018 的唯一 File Service、D027 的入站媒体受控持久化或 D028 的 READY Artifact 投递。
