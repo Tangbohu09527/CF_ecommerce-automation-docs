@@ -6,7 +6,9 @@
 >
 > 文档状态：当前基线
 >
-> 状态日期：2026-09-04
+> 状态日期：2026-10-11；运行设计沿用既有契约，实机成功保留原证据日期。
+
+最新仓库候选、CI 与重启截止点见[2026-10-11 脱敏证据摘要](../validation/records/2026-10-11-overall-status-evidence.md)。媒体候选未合并不写成 main，仓库/隔离测试通过不代表现场已切换或附件实收通过。
 
 ## 1. 目标
 
@@ -58,7 +60,7 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 
 安全 rebase 将当前可见历史前缀作为新基线，不调用 Message Sink；随后实时后缀只处理一次。连续性无法证明时 fail closed，不手工降低 Checkpoint。
 
-## 6. 已完成生产验收
+## 6. 2026-09-03 已完成生产验收
 
 - forced-QR 后 Local ID 回退。
 - Checkpoint generation。
@@ -74,7 +76,7 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 
 ## 7. Host reboot
 
-真实 CFserver reboot 中：
+2026-09-03 真实 CFserver reboot 中：
 
 - Docker 与 Gateway 核心恢复；
 - agent-wechat 保持停止；
@@ -82,6 +84,8 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 - Poll/Delivery 曾被观察为 running/healthy。
 
 因此 automatic boot stop gate 未验证。Operator 必须先检查状态并通过 Runtime Controller `stop` 同时停止 Poll Worker 与 Delivery Worker，再运行 forced-QR 入口；验证完成后只能用 `start` 同时恢复二者。Dispatch Worker 由 Gateway Release/Compose 生命周期独立管理。
+
+2026-10-11 用户随后已再次重启 CFserver；此次重启后状态未核验，Windows 是否关机未确认。此前已完成旧回退和旧核心恢复，新候选及两端新 plan 通过但尚未切换，新 deployment 未 `apply/start/verify`。下一步先核验现场与现存计划，符合条件再接续；不把重启前正常写成重启后恢复，不沿用旧 PID，不回到已结束的回退断点。
 
 ## 8. AI host 与 Gateway-only 变更
 

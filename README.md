@@ -1,95 +1,62 @@
 # 电商业务全自动化系统
 
-> Gateway 现场证据更新：2026-09-17。其他组件仍按各自注明的历史日期记录，本次未重新审查所有组件。
->
-> 本仓库只维护企业自动化总体架构、跨仓库状态、部署恢复边界、验证记录和技术决定，不包含业务代码、生产配置、凭证或真实业务数据。
+> 同步日期：2026-10-11。仓库与现场证据分别记录；本次只更新 Markdown，不部署、不恢复服务、不执行业务验收。
 
-## 项目定位
+## 整体目标
 
-CFserver 是部署宿主；`CF_agent-gateway` 与 PostgreSQL 是消息和控制状态权威。Windows AI 主机上的 Hermes external runtime 是执行边界。员工从微信发起请求，Gateway 完成持久化、身份权限、线程、路由、响应和投递控制；正式企业文件访问未来统一经过 `CF_filebrowser-enterprise` 的 File Service、权限检查和审计。
+员工微信 → 微信入口 → Gateway 权限/上下文/任务 → 官方 Hermes 与工具 → 企业文件服务/后续业务系统 → 结果返回微信。CFserver 是 Debian 部署宿主，Gateway/PostgreSQL 保存消息与控制权威状态，Windows AI 主机承担 Hermes 和执行工具。
 
-## 当前总状态
+AI 与员工共用 `CF_filebrowser-enterprise` 这一唯一正式文件系统。主线继续沿用 [9 月 27 日文件业务需求](./requirements/file-workflows.md)：内容分类、指定目录归档、查找并回传微信、下载工作副本加工后通过 API 回存；正式原件默认保留。旺店通、S6 等仍属后续集成。
 
-企业消息与 AI 文本闭环基础已有生产交付；2026-09-17 又完成一次分钟级任务的 Gateway 持久化及微信回传验收。历史会话连续性问题与未验收的可靠性专项仍保留。
+## 当前能做什么，卡在哪里
 
-六阶段规划中的阶段 1 还包含文件基础链路，因此阶段 1 的全部退出条件尚未满足。局部文件读取测试不等于企业 File Service、Skills、媒体或 ERP 已接入，也不等于所有会话和重启/高可用已验收。
-
-| 组件或能力 | 带日期的结论 |
+| 问题 | 截至 2026-10-11 的结论 |
 | --- | --- |
-| `CF_agent-gateway` | 2026-09-17 核对 main 的修复合并基线 `9a1caa237a9053678c80f68fdb15d351d5bfecf8`（PR #11）；现场四个应用使用新 Image ID，Dispatch 启动 read/execution 为 600/600 秒；本次派发服务端耗时 113.799 秒，响应及微信实收匹配 |
-| `CF_agent-wechat` | 本轮 Gate 恢复检查通过、微信登录与投递有现场证据；仓库 snapshot 仍沿用 2026-09-04 的 `69f07702b6ee16d8e9700b3a53d5ebbb8ee875f8`，本次未重新核验其 live main 或镜像来源映射 |
-| PostgreSQL | 本轮 database/migration runtime 检查为 ok；Gateway 仓库 head 为 `20260823_04`；真实 restore 演练仍未完成 |
-| Hermes | 本次长任务结果经 Gateway 回到微信；原始工具日志、Desktop 构建版本、watchdog/执行中断线或重启等仍未独立验收 |
-| `CF_filebrowser-enterprise` | 沿用 2026-09-04 基线：V1 Beta 实现与自动化验证完成，CFserver 部署/生产验收待办；本次未核对其最新进度 |
-| Skills、旺店通、S6 | 沿用已记录边界：未接入正式生产任务链；本次不改变该结论 |
+| 已有能力证据 | 私聊/真正 @ 群聊文本有历史闭环；**2026-09-17** 分钟级任务持久化与微信回传通过。**09-25 至 09-27** 已有 FileBrowser 同机部署、受限接入、真实文件读取和受控文本新建的限定现场证据 |
+| 当前接续点 | 用户回传：旧 f9 两端回退、d9 `complete-rollback` 和旧核心恢复完成；随后 d9 新候选镜像、两端新 plan 通过，**尚未切换**。新 deployment 尚未 `apply/start/verify`，原聊天附件实收未验收 |
+| 最新未知 | 用户随后已执行 CFserver 重启；**重启后状态未核验**，Windows 是否关机未确认。重启前 Hermes/Gateway API/Dispatch 运行、Poll/Delivery 停止、Gate 关闭和数据库正常，不证明重启后已恢复 |
+| 下一步 | 先核验重启后现场与现存新计划，符合条件再接续切换；不从头回退、传包或构建。当前先交付微信真实文件/图片收发，不并行扩安装器或大重构 |
 
-详细分层见[当前状态矩阵](./status/current-status.md)。最新 Gateway 证据见
-[2026-09-17 长任务回传记录](./validation/records/2026-09-17-gateway-long-task-acceptance.md)；
-[2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)
-保留为历史基线，不再作为新 Gateway 镜像的当前发布记录。
+“已有能力证据”不表示此刻在线可用。六阶段规划保持不变：阶段 1 的消息 Runtime 有历史交付，文件基础链路尚未完成，不给虚构完成百分比。
 
-仓库 branch authority 仍为 `main`，live tip 必须动态查询。PR #11 代码已合并；Gateway 文档 PR #12 已于 2026-09-17 合并，合并提交为 `7963bc0db5a01e38099e021959feabf648db7ede`。本仓库通过固定合并提交引用证据；企业文档同步由 PR #8 承载，最终合并状态以 GitHub 为准。此次文档同步本身不部署、不发布 Tag、不改生产状态。
+完整 SHA、PR、CI、现场候选和截止点统一见 [2026-10-11 脱敏证据摘要](./validation/records/2026-10-11-overall-status-evidence.md)，分层结论见[四项目状态矩阵](./status/current-status.md)。三个组件的固定候选与各自 main 分开核对，未合并分支不写成 main；组件其他文档任务不作为本次已完成成果。
 
-## 当前生产文本链路
+## 文件业务验收边界
 
-```text
-员工微信
-  -> CF_agent-wechat
-  -> Gateway Poll Worker
-  -> PostgreSQL Message / Admission / Dispatch
-  -> Dispatch Worker
-  -> Hermes external runtime
-  -> Gateway Response / Delivery Outbox
-  -> Delivery Worker
-  -> CF_agent-wechat
-  -> 微信回复
-```
+以下六项分别留证：微信入站取得字节、内容理解、指定目录/分类归档、文件中心查询回传、原聊天实际附件实收、加工结果回存。文本新建、读取成功、HTTP 200、CI 绿不能相互替代，缩略图/元数据也不证明取得原件。细则见[验收清单](./validation/production-validation-checklist.md#b11-媒体文件和业务扩展)。
 
-私聊文本与真正结构化 `@` 机器人的群聊文本已有历史真实回复闭环；普通群消息未明确 `@` 时不会调用 AI。V2 `group_sender` 的多发送者隔离有实现/自动化证据，但同群多发送者的独立生产对照验收仍待完成。
+正式文件只能通过 FileBrowser API、权限与审计访问；入站媒体仍遵守 Gateway 持久化，出站仍要求 READY Artifact。预授权资料群常规新增自动归档是目标，群/身份/目录规则未确定前不全局放行，未知分类进入待确认。AI 主机离线时 CFserver 先收原件、随后分类仍待实现/验收。
 
-## 已记录的交付范围
+## 后续规划
 
-- Gateway V2 四应用进程、PostgreSQL 权威状态、Controller 及历史 P1 生产交付。
-- 私聊、群聊真实 `@`、未 `@` 安全结束、Response/Delivery 与 Bot self 防回环的历史验收。
-- Checkpoint generation/rebase、历史前缀跳过、实时后缀单次处理和 P1 日志降噪的历史验收；不等于所有连续性异常已修复。
-- Admin recovery 的仓库实现/测试；本次又补充一次带审计的 `mark_dead` 现场恢复。
-- 本次分钟级任务的有限等待、响应持久化、单次投递及微信实收证据。
-- forced QR、CFserver 核心重启恢复、AI host reachability、Gateway-only Session 保持的带日期历史记录。
+- 轻量 Gateway Web：考虑局域网 IP 访问、Gateway 权限管理、查询 Gateway **已经接收的部分**聊天/任务记录；尚待规划，不承诺微信完整历史，不复制 FileBrowser 文件权限体系。
+- 共享群分类归档与工作副本加工沿用既有需求，接续真实文件/图片收发推进。
+- Skills Runtime、旺店通/S6、RAG、统一安装器和可靠性专项按证据及原六阶段后续安排；GPT-5.6 API 仍是计划，第一阶段不建设独立 OCR。
 
-## 尚未交付或未独立验收
-
-- 独立历史会话连续性问题的关闭；原始工具日志与 Desktop 构建版本复核。
-- 本次新版接近 600 秒、执行中断线/重启、并发/FIFO/续租和整机自动恢复专项。
-- 新镜像完整来源证明、registry manifest digest、新离线归档及备份恢复/回滚验收。
-- 入站文件/图片理解、Hermes 多模态、出站 Artifact 闭环及引用正文自动注入。
-- FileBrowser 的部署、迁移、备份恢复、WebDAV/OnlyOffice 实际联调与 Agent 主链集成。
-- Provider routing、Skills Runtime、知识库/RAG、旺店通、S6 和正式业务权限矩阵。
-- PostgreSQL restore、automatic boot stop gate、Hermes 长期 watchdog/告警/容量/高可用。
-- 独立 OCR：第一阶段按既定决定不建设。
-
-## 权威文档
+## 权威入口
 
 | 主题 | 入口 |
 | --- | --- |
-| 当前状态 | [status/current-status.md](./status/current-status.md) |
-| 当前进度 | [status/current-progress.md](./status/current-progress.md) |
+| 文件业务需求 | [requirements/file-workflows.md](./requirements/file-workflows.md) |
+| 当前能力与证据分层 | [status/current-status.md](./status/current-status.md) |
+| 当前断点与下一步 | [status/current-progress.md](./status/current-progress.md) |
+| 最新脱敏证据 | [2026-10-11 总体状态摘要](./validation/records/2026-10-11-overall-status-evidence.md) |
 | 系统架构 | [architecture/system-architecture.md](./architecture/system-architecture.md) |
-| 部署导航 | [deployment/deployment-guide.md](./deployment/deployment-guide.md) |
-| 跨系统恢复 | [operations/recovery-runbook.md](./operations/recovery-runbook.md) |
-| 验收清单 | [validation/production-validation-checklist.md](./validation/production-validation-checklist.md) |
-| 技术决定 | [05_技术决策记录.md](./05_技术决策记录.md) |
-| 最新 Gateway 限定验收 | [2026-09-17 长任务回传](./validation/records/2026-09-17-gateway-long-task-acceptance.md) |
-| 历史总体生产基线 | [2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md) |
+| 部署与恢复 | [部署导航](./deployment/deployment-guide.md)、[恢复手册](./operations/recovery-runbook.md) |
+| 分项验收 | [validation/production-validation-checklist.md](./validation/production-validation-checklist.md) |
+| 六阶段与固定决定 | [项目总纲](./00_项目总纲.md)、[技术决策记录](./05_技术决策记录.md) |
+| 历史限定成功 | [2026-09-17 长任务回传](./validation/records/2026-09-17-gateway-long-task-acceptance.md) |
+| 历史总体基线 | [2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md) |
 
-`docs/`、旧状态记录、XMind 和 PNG 按各自日期作为兼容或历史材料，不作为实时状态。
-
-## 相关仓库
+## 仓库边界
 
 | 仓库 | 职责 |
 | --- | --- |
-| `CF_ecommerce-automation-docs` | 架构、跨仓库状态、运维和路线图 |
-| `CF_agent-gateway` | 消息、身份权限、线程、路由、Context、Dispatch、Response、Delivery 和审计 |
-| `CF_agent-wechat` | 外部微信通道 Runtime |
-| `CF_filebrowser-enterprise` | 唯一正式企业 File Service 与持久审计边界 |
+| `CF_ecommerce-automation-docs` | 总体架构、跨仓库状态、阶段、部署恢复边界及带日期证据 |
+| `CF_agent-gateway` | 身份权限、上下文、任务、文件引用、消息和投递控制及审计关联 |
+| `CF_agent-wechat` | external 微信通道 Runtime 与媒体适配 |
+| `CF_filebrowser-enterprise` | AI 和员工共用的唯一正式文件系统、API、权限与持久审计 |
 
-生产运行不得持续依赖 GitHub 在线。代码基线、观察到的 Image ID、完整构建来源和实机验收是不同证据层；不得互相替代。
+本次基于 `8179533ffade1027d01727cbf5a89a26b491c400`，文档分支为 `codex/docs-overall-status-20261011`，Draft PR base 为 `docs/file-business-workflows-20260927`，保留[原 Draft PR #9](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/9)。本次不合并、不打 Tag。
+
+生产运行不得持续依赖 GitHub 在线。源码、CI、Image ID、registry digest、完整构建来源和真实业务验收不能互相推导。`docs/`、旧状态、XMind 和 PNG 按日期作为历史材料。

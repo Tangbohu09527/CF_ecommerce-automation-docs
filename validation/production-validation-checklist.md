@@ -4,7 +4,9 @@
 >
 > 文档编号：VAL-001
 >
-> 状态日期：2026-09-04
+> 状态日期：2026-10-11；A 节保留 2026-09-03 历史结果，本次未执行生产命令或业务验收。
+
+最新截止点见[2026-10-11 脱敏证据摘要](./records/2026-10-11-overall-status-evidence.md)：旧回退及旧核心恢复已完成，新候选和两端新 plan 已通过，但新 deployment 尚未 `apply/start/verify`。用户随后已重启 CFserver，重启后状态未核验，Windows 是否关机未确认。应先核验重启后现场与现存新计划，符合条件再接续切换；不能把重启前健康、旧 PID 或历史勾选当作本次放行依据，也不从头重复回退、传包或构建。
 
 ## A. 2026-09-03 已完成的生产验收摘要
 
@@ -29,7 +31,7 @@
 - [x] P1 启动摘要和稳态日志降噪通过，未观察到目标重复日志或 ERROR/violation。
 - [x] Gateway rollback Release、offline image archive、archive checksum 和 Evidence Run ID 已记录。
 
-以下不属于上面已完成项：同群多发送者生产隔离、PostgreSQL restore、automatic boot stop gate、完整媒体、FileBrowser deployment、Skills、旺店通/S6、Hermes watchdog/HA。
+以下不属于上面 2026-09-03 已完成项：同群多发送者生产隔离、PostgreSQL restore、automatic boot stop gate、完整媒体、FileBrowser deployment、Skills、旺店通/S6、Hermes watchdog/HA。FileBrowser 后续已有 09-25 至 09-27 限定部署、读取和文本新建证据，按[当前状态](../status/current-status.md)分别记录，不沿用历史待部署结论覆盖后续进展。
 
 ## B. 未来 Release 可复用检查模板
 
@@ -131,10 +133,21 @@
 
 ### B11. 媒体、文件和业务扩展
 
-- [ ] Attachment 私有持久化、完整性和生命周期通过；未实现时 BLOCKED。
-- [ ] Hermes 多模态协议通过；未实现时 BLOCKED。
-- [ ] Artifact 原子物化、`READY` 和媒体 Delivery 通过；未实现时 BLOCKED。
-- [ ] FileBrowser Candidate、migration、backup/restore、rollback、WebDAV/OnlyOffice 和权限审计通过；未部署时 BLOCKED。
+沿用[9 月 27 日文件业务场景](../requirements/file-workflows.md)，以下六项必须独立给出期望、实际、状态和脱敏证据。当前交付先聚焦真实 PDF/图片收发，其余业务步骤按既有优先级接续，不并行扩安装器或大重构。下表是截至 2026-10-11 的证据边界，不能直接勾选为未来 Release 的 PASS。
+
+| 独立验收项 | 通过标准 | 已有局部证据与当前缺口 |
+| --- | --- | --- |
+| 微信入站取得字节 | 指定获准消息取得可读取的真实文件/图片字节，记录类型、大小、摘要与源样本对比；Gateway 受控持久化和附件引用可核对。图片区分原图、标准图、缩略图与转码结果 | 历史 JPEG 读取有证据；9b 微信候选的固定制品及合成缓存隔离测试通过，不能证明已登录微信的原生下载。真实 PDF/图片完整入站尚未验收 |
+| 内容理解 | Hermes/适用工具实际读取已取得的内容；用样本核对提取信息与分类依据，缺失或看不清的信息明确待确认，不猜造商品归属、报告字段或授权有效性 | 09-26 有既有文件读取，10-06 有已存 PDF/PNG 的官方 Hermes 本机理解，10-07 有文字取文件及文字回复的固定证据；均不能替代微信新入站同一原件的理解验收。格式与多模态支持分样本记录，完整场景未验收 |
+| 指定目录/分类归档 | 群、身份、目录规则已授权；内容分类经校验后通过 FileBrowser API 保存到指定目录，核验实际字节、去重、来源关联及审计；未知/冲突进入待确认，同名不同内容不静默覆盖 | 09-27 受控文本新建有证据；真实共享群附件收妥、分类和正式归档未验收。常规预授权新增自动执行仍是目标，不能为验收而全局放行 |
+| 文件中心查询回传 | 按请求人/会话权限检索唯一正式 FileBrowser 文件系统，核对选中文件、取得字节、Gateway READY Artifact 与投递关联；只分发原件不强制经过 AI 主机加工 | 09-26 读取、10-07 File API 取件与原聊天文字回复及客户端基础可复用；完整“检索选件→受控物化→附件投递”未验收。读到内容或返回路径/链接不能代替附件回传 |
+| 原聊天实际附件实收 | 原请求聊天实际收到且可打开正确文件/图片；核对样本身份、内容完整性和单次投递，文件发送与图片消息分别留证；不错投、不重复发送 | 09-17 文本长任务回传仅证明文本场景；HTTP 200、READY 或发送接口成功不等于收件端实收。10-11 新 deployment 尚未 `apply/start/verify`，附件实收未验收 |
+| 加工结果回存 | 经 API 下载工作副本到隔离任务目录，工具加工后检查产物，再经 FileBrowser API 新建文件/新版并回读核验，记录原件关联、权限和审计；默认保留原件 | 独立客户端有部分基础；完整 Agent 下载、加工、产物回存及原件关联未验收。文本新建不能代替此项，也不证明完整版本管理 |
+
+- [ ] 六项分别填写 PASS/FAIL/BLOCKED/NOT_RUN；文本新建、读取成功、HTTP 200、CI 绿不能互相替代，附件元数据不等于原件。
+- [ ] Attachment 私有持久化、完整性、生命周期与 AI 主机离线后的续接分别留证；未取得原件不称“已收妥”。
+- [ ] 出站 Artifact 原子物化、`READY`、Delivery 回执与收件端实收分别核对，不因投递不确定盲目重发。
+- [ ] FileBrowser 部署、migration、backup/restore、rollback、WebDAV/OnlyOffice 和权限审计逐项记录；既有局部部署/客户端审计不代替完整发布或服务端 Persistent Audit。
 - [ ] Skills 权限、确认、幂等和审计通过；未实现时 BLOCKED。
 - [ ] 旺店通/S6 端到端业务验收通过；未接入时 BLOCKED。
 
