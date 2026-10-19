@@ -4,6 +4,8 @@
 
 ## 当前记录
 
+- [2026-10-20 统一部署与官方Hermes纯配置候选](./2026-10-20-configuration-only-candidate.md)：后续真实文件成果、固定候选和隔离验证；生产未访问。
+
 - [2026-09-17 Gateway 长任务回传](./2026-09-17-gateway-long-task-acceptance.md)：新 Gateway 限定现场验收，保留未完成边界。
 - [2026-09-03 Enterprise Runtime Production Closeout](./2026-09-03-enterprise-runtime-production-closeout.md)：历史总体生产基线；旧 Gateway 镜像不是 9 月 17 日观察的新镜像。
 

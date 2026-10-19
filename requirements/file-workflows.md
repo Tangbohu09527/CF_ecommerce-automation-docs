@@ -2,7 +2,7 @@
 
 > 用户确认日期：2026-09-27。本文记录已确认的业务需求及后续实施边界，不把目标流程写成已实现。
 >
-> 状态补充：2026-10-11，见[现场与仓库证据摘要](../validation/records/2026-10-11-overall-status-evidence.md)。原 PR #9 的业务需求继续沿用；本次只同步证据和接续顺序。
+> 状态补充：2026-10-20，见[当前候选与后续业务证据](../validation/records/2026-10-20-configuration-only-candidate.md)。原PR9业务需求及六阶段继续沿用；10月11日快照保留为历史。
 >
 > 本轮用户明确要求保留此场景，作为后续接管与开发的需求基线。总体阶段仍按原六阶段，不重新设计消息架构。消息、文件引用与任务状态由 Gateway/PostgreSQL 管理，正式文件仍只由 FileBrowser 提供。
 
@@ -68,7 +68,7 @@
 - `CF_filebrowser-enterprise`：唯一正式文件 API、存储授权和持久审计。
 - Hermes 插件是可替换接入层，不锁死某个 Hermes 提交，不要求升级 Agent 就重部署 FileBrowser或重签文件凭据。升级仍要验证实际接口与工具兼容。
 
-## 6. 当前证据与未完成项
+## 6. 9月27日证据快照（历史）
 
 以下只根据用户回传的带日期现场输出及此前已核对的代码记录；不是维护者本轮直接登录生产系统。
 
@@ -88,7 +88,7 @@
 
 组件参考（固定代码线，不表示已合并）：[FileBridge 插件](https://github.com/Tangbohu09527/CF_filebrowser-enterprise/blob/28a4481fc2f73363f60bb0f6821bfc50817e99c3/integrations/hermes-filebridge/plugin/__init__.py)、[独立客户端](https://github.com/Tangbohu09527/CF_filebrowser-enterprise/blob/28a4481fc2f73363f60bb0f6821bfc50817e99c3/tools/filebrowser-agentctl/README.md)。只读/受控新建分项成功不能扩大成全类型媒体、并发写入或正式发布通过。
 
-## 7. 2026-10-11 接续点与验收顺序
+## 7. 2026-10-11 接续点（历史，已被后续证据接续）
 
 旧 f9 两端回退、d9 Controller `complete-rollback` 和旧核心恢复已完成；随后 d9 新候选镜像及两端新 plan 已通过，尚未切换。用户之后只重启了 CFserver，重启后状态未核验，Windows 是否关机未确认。新 deployment 未 `apply/start/verify`，附件实收未验收，不能沿用重启前健康或历史 PID。
 
@@ -102,3 +102,11 @@
 此优先级是用户确认后的工作方向；任何正式群准入、目录授权、存量数据迁移或覆盖操作仍需具体范围和相应批准。此前已通过的安装、文本读取与新建不重复执行。
 
 验收必须分别记录：微信入站取得字节、内容理解、指定目录/分类归档、文件中心查询回传、原聊天实际附件实收、加工结果回存。分项标准见[生产验证清单](../validation/production-validation-checklist.md#b11-媒体文件和业务扩展)；文本新建、读取成功、HTTP 200、CI 绿不能替代其他分项。
+
+## 8. 10月20日状态与最终部署验收
+
+PDF读取/原件返回、文字接续、PNG看图/图片返回、单商品实际归档、正常微信商品ZIP出站已有分项真实成功；ZIP出站整包和12成员一致。正常微信ZIP入站完整业务验收仍缺，文件名候选和归档路径调整另记。不得按第6/7节旧快照重复部署或把历史失败改成成功。
+
+最终新机必须同时满足：受支持的全新Debian通过一条正式入口和必要参数部署FileBrowser/Gateway/微信入口；AI电脑只安装官方Hermes并配置少量参数；无需项目EXE、手工插件、官方源码改动或项目常驻客户端；不依赖Codex工作树、临时回执/聊天；撤销运维SSH/sudo后业务仍可持续运行。隐藏安装额外客户端不符合要求。
+
+本轮只在独立候选验证上述路径，官方共享MCP缺少可信每任务上下文，完整纯配置业务未通过。小批资料库整理与首批文件Skill准备可并行，条件见[进度清单](../status/current-progress.md)，不等于全面交付。群聊多人、完整聊天档案查询、群发仍最后安排。

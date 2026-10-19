@@ -7,7 +7,7 @@
 1. [README.md](./README.md)：仓库边界与摘要。
 2. [文件业务场景与实施优先级](./requirements/file-workflows.md)：2026-09-27 用户确认的文件工作主线。查找/微信回传、共享群真实附件分类归档、AI 主机工作副本加工后 API 回存优先；不要继续把直接修改/删除当主要工作，也不要把终端逐单审批作为正常收件体验。
 3. [当前状态矩阵](./status/current-status.md)：实现、部署、生产验证和剩余边界。该矩阵未更新部分按其日期；文件工作面以新增场景文档与后续带日期证据为补充，不能用旧的部署待办覆盖现场进展。
-4. [2026-10-11 总体状态证据](./validation/records/2026-10-11-overall-status-evidence.md)：固定候选、main/PR/CI 与用户现场截止点；新计划通过尚未切换，CFserver 重启后未核验。先核验重启后与现存计划，不从头回退、传包或构建。[2026-09-17 Gateway 长任务回传](./validation/records/2026-09-17-gateway-long-task-acceptance.md)保留为带日期的限定成功；[2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)为历史总体基线，不能证明当前在线。
+4. [2026-10-20 跨仓候选证据](./validation/records/2026-10-20-configuration-only-candidate.md)：补齐10月19日正常微信ZIP出站及后续统一部署/纯配置候选。准确源码、CI、隔离替身与生产观察分开；本轮未访问生产，不重复已通过的PDF/PNG/ZIP出站。[2026-10-11 总体状态证据](./validation/records/2026-10-11-overall-status-evidence.md)、[2026-09-17 Gateway 长任务回传](./validation/records/2026-09-17-gateway-long-task-acceptance.md)和[2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md)保留历史，不能覆盖后续结果或证明当前在线。
 5. [00_项目总纲.md](./00_项目总纲.md)与[05_技术决策记录.md](./05_技术决策记录.md)：阶段和固定决定；技术决策优先。
 6. 按任务读取需求、系统设计、开发规范、部署运维及根级 `architecture/`、`deployment/`、`operations/`、`validation/`。
 7. `docs/`、`design/`、旧 status 记录、XMind 和 PNG 按日期作为兼容或历史材料。
