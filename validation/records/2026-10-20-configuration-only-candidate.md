@@ -101,7 +101,7 @@ WeChat只改4文件、115增/11删：`scripts/prepare-clean-host.sh`实现受限
 
 测试修正`0d057c8c7f717e240ab0ad7f5fab8a7df37bf803`只在显式private cgroup namespace内做控制器委派，并在应用构建前运行CPU/内存/pids限额的smoke；沿用[固定Moby DinD实现依据](https://github.com/moby/moby/blob/4eee42c0243b1494b5df6411c1c208f7408461d8/hack/dind)，改为有限重试。不共享host Docker socket或cgroup namespace、不去掉产品资源限制、不改鉴权或TLS。
 
-该版`39311006559`实际通过资源smoke，OCI错误消失，随后FileBrowser重启/退出126。固定入口的Git checkout继承全局077 umask，使被bind到容器的已审核入口脚本为root-only 0700。修正`030ee8d09e6a0362b624cd5e7b1032895e825138`只对该固定普通代码文件验证身份/链接/模式并设0755；不递归放宽源码、不改任何凭据、owner或服务10001身份。新增POSIX回归验证仅目标改变、私有文件不变、不明模式拒绝；本机5通过/1项POSIX跳过，Linux须实际执行。`da369b579716c1dc825d729829c9f172e417df46`再将FileBrowser固定构建的base digest及源码依赖输入摘要以白名单导出，未上传完整private日志。最终准确检查待执行结果补齐。
+该版`39311006559`实际通过资源smoke，OCI错误消失，随后FileBrowser重启/退出126。固定入口的Git checkout继承全局077 umask，使被bind到容器的已审核入口脚本为root-only 0700。修正`030ee8d09e6a0362b624cd5e7b1032895e825138`只对该固定普通代码文件验证身份/链接/模式并设0755；不递归放宽源码、不改任何凭据、owner或服务10001身份。新增POSIX回归验证仅目标改变、私有文件不变、不明模式拒绝；本机5通过/1项POSIX跳过，Linux须实际执行。`da369b579716c1dc825d729829c9f172e417df46`再将FileBrowser固定构建的base digest及源码依赖输入摘要以白名单导出，未上传完整private日志。当时的检查尚待执行；最终准确HEAD结果见下方“候选清单与准确检查索引”和“最终统一入口脱敏回执”。
 
 ## 组件准确CI与已知红项
 
@@ -125,7 +125,7 @@ WeChat只改4文件、115增/11删：`scripts/prepare-clean-host.sh`实现受限
 
 FileBrowser基线PR5与PR7的`backend` tree经只读Git核对均为`349b6d58606d761703e790f97a244b4c7ce37564`；该比较只证明本轮没有改后端，不能把lint红项改写为通过。
 - WeChat PR11固定HEAD：component boundary `39300943397`、Debian clean `39300943037`、forced QR `39300943020`、upstream media `39300942997`均通过；无真实微信登录验收。
-- Gateway PR21固定产品SHA原8项检查通过，PR22原6项通过。它们不是本轮新入口HEAD CI；本轮准确结果待统一检查后补齐。正常自动push/PR重复及已被新SHA取代的CI允许取消，取消不算通过。
+- Gateway PR21固定产品SHA原8项检查通过，PR22原6项通过。它们不是本轮新入口HEAD CI；本轮最终准确HEAD结果已列于下方“候选清单与准确检查索引”，不能沿用这里的旧产品检查。正常自动push/PR重复及已被新SHA取代的CI允许取消，取消不算通过。
 - 总文档无workflow；只做Markdown/链接/敏感内容/空白检查。
 
 PR23最终HEAD `57bb2c2830f292d5167f0bda449afafbe0a528fd` 的正常[CI39317205893](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39317205893)三项job、[host39317205780](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39317205780)七项job、[clean39317205809](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39317205809)的A/B均成功，root已再次通过GitHub核对准确HEAD与结论。host工作流的旧探针仍为依赖子集，不替代前文官方PM完整默认依赖证据；clean是既有部署工作流，不是PR24统一三组件入口或原生授权返回通过。无须手工重复该矩阵。
