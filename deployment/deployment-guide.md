@@ -4,24 +4,34 @@
 >
 > 文档编号：DEP-001
 >
-> 状态同步日期：2026-10-11。以下为通用部署边界；本次只同步文档，不执行部署或恢复。
+> 状态同步日期：2026-10-20。以下为通用部署边界；本轮仅隔离候选与CI，不连接生产。
 
 ## 1. 适用范围
 
 本文规定企业 Runtime 的跨仓库部署顺序和门禁，不复制组件仓库的完整 Runbook。每次部署必须使用精确 commit、image digest、database revision、Compose project、回滚 Release 和脱敏验证记录。
 
-### 2026-10-11 当前接续点
+### 当前候选与最终验收标准
 
-用户回传：旧 f9 两端回退、d9 `complete-rollback` 与旧核心恢复已完成；随后 d9 新候选镜像与两端新 plan 通过，尚未切换，新 deployment 未 `apply/start/verify`，微信附件实收未验收。用户之后只重启了 CFserver；重启后状态没有核验，Windows 是否关机未确认。
+10月11日的未切换/未实收断点是历史记录。PDF/PNG及10月19日正常微信商品ZIP出站已有后续固定证据；最新候选与最后生产观察分列于[10月20日摘要](../validation/records/2026-10-20-configuration-only-candidate.md)。本轮没有访问生产，不能把历史健康当作实时状态。
 
-下一步先核验重启后现场与现存新计划，确认其身份、阶段、回退基线和当前环境仍匹配后再接续切换。不得从历史故障手册的起点重新回退、传包、构建或为补证重放 apply；不得沿用重启前健康和历史 PID。候选、源码、PR/CI 与现场事实集中在[10 月 11 日证据摘要](../validation/records/2026-10-11-overall-status-evidence.md)。本页通用流程不表示本次已经恢复或取得执行授权。
+统一服务端入口归属Gateway，复用三个产品仓库已有安装能力；[候选部署指南](https://github.com/Tangbohu09527/CF_agent-gateway/blob/71c802da233cfd855d0b7436da543c823a937098/docs/deployment/unified-server.md)包含正式命令和[输入模板](https://github.com/Tangbohu09527/CF_agent-gateway/blob/71c802da233cfd855d0b7436da543c823a937098/deploy/server-inputs.example.json)。各组件不互相复制业务实现；本仓不保存运行代码。
+
+最终交付须同时满足：
+
+1. 受支持全新Debian上一条正式入口加必要参数，部署FileBrowser、Gateway及微信入口；基础就绪、待登录、待员工授权分别报告。
+2. AI电脑只装官方Hermes和少量配置；不另装项目EXE、手工插件、修改官方源码或跑项目常驻客户端。藏进脚本仍不达标。
+3. 安装/运行不依赖Codex工作树、临时资料目录、旧机器回执或聊天记录；长期业务不依赖GitHub在线。
+4. 临时SSH/sudo撤销后独立业务凭据仍可用；不得把管理令牌暴露给模型。
+5. 新机、重复执行、准确阶段恢复、数据保留及完整授权返回链分别验收。
+
+当前统一入口仍是候选；干净官方Hermes工具通道已实测，但共享API缺少可信每调用任务授权，尚未走到Artifact/Response/Delivery。不能要求新电脑暗装旧插件作为替代交付。[原生探针固定报告](https://github.com/Tangbohu09527/CF_agent-gateway/blob/2ada096c8a30ecbde771fb32f7536790709b0cd9/docs/validation/2026-10-20-native-http-mcp.md)列出最少配置及精确缺口。
 
 ## 2. 发布输入
 
 | 输入 | 要求 |
 | --- | --- |
 | 文档 | 本仓库精确 commit |
-| Gateway | 当前 main、获准候选/source SHA、合并状态、实际 Image ID、可独立核实的 registry digest 与目标 schema 分列；本次 d9 修复线尚未合并，不能写成 main |
+| Gateway | 当前 main、获准候选/source SHA、合并状态、实际 Image ID、可独立核实的 registry digest 与目标 schema 分列；产品PR21与部署PR24等候选均未合并，兼容组合见带日期索引 |
 | WeChat | 实际批准分支/SHA、immutable image；未完成 main promotion 时明确写 PR 栈 |
 | PostgreSQL | image、revision、备份与 restore 计划 |
 | Hermes | external runtime 的批准控制和健康检查；不从历史文档猜版本 |
@@ -32,7 +42,7 @@
 
 ## 3. 基础环境
 
-- CFserver Host 使用 `Asia/Shanghai`，容器和 PostgreSQL 使用 UTC。
+- 新部署Host与应用/容器日志默认 `Asia/Shanghai`；PostgreSQL数据库时间语义/TimeZone保持UTC，log_timezone为Asia/Shanghai。候选默认值不代替既有机器实时核验。
 - Docker、存储挂载、日志空间、`cf-internal` 和离线镜像已准备。
 - PostgreSQL、Gateway、agent-wechat 各自使用明确 ownership。
 - Windows AI 主机具备受控 Hermes 启停与健康检查。
@@ -140,7 +150,7 @@ Dispatch Worker 已在 Gateway Release/Compose 生命周期中独立启动并验
 8. File Service permission/audit。
 9. Gateway/Hermes integration。
 
-FileBrowser 保持唯一正式文件系统，Gateway/Hermes 通过 API、权限与审计接入；正式原件与工作副本分开。当前先完成微信真实文件/图片收发，分类归档和加工回存沿用[既有业务需求](../requirements/file-workflows.md)，不并行扩安装器。
+FileBrowser 保持唯一正式文件系统，Gateway/Hermes 通过 API、权限与审计接入；正式原件与工作副本分开。PDF/PNG与商品ZIP出站已有后续成功；其余分项沿用[既有业务需求](../requirements/file-workflows.md)。统一入口与纯配置候选独立验证，不重复生产部署。
 
 ## 8. 禁止事项
 
