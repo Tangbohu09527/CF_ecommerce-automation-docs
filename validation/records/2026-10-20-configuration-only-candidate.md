@@ -8,6 +8,18 @@
 
 通过现有已认证gh API按仓库全名读取默认分支、PR base/head/状态、固定源码、实际diff及Actions；没有用搜索摘要或不带ref的默认文件代替候选。四仓独立分支，原工作树/未提交材料保留；不merge、force push、发布正式版本。文档仓只修改Markdown。
 
+## 本轮结论
+
+| 交付 | 实际结果 |
+| --- | --- |
+| 统一服务器入口 | 候选已实现；精确HEAD b3f2740的隔离Debian容器完整检查通过，18,168,526字节/12成员、失败接续、撤销管理密码后业务Token仍可用、服务重建及第二次执行均实测 |
+| 官方Hermes纯配置 | 官方依赖环境、原生图文、真实FileBrowser查询/导出及约18MB完整性通过；可信每任务上下文仍缺，未进入Gateway当前任务返回、Artifact/Response和微信替身 |
+| 四仓与正式发布 | 独立候选及文档已普通提交/推送，均保留Draft；没有合并或正式发布。准确SHA/CI及边界见下文 |
+| 最终新机标准 | 尚未整体达到；新增统一入口仍缺booted-systemd三组件/持久宿主盘/整机重启，新Windows及跨机器MCP HTTPS也未证明 |
+| 生产 | 完全未访问、未改动；现有PDF/PNG/商品ZIP出站的历史成功保留，不能据此声明此刻在线 |
+
+两个隔离组合各自验证，未拼成已经通过的纯配置业务链。下面的统一入口18MB测试是文件服务真实上传/下载；原生Hermes组合另有真实产品export，但没有当前任务合法返回闭环。
+
 ## 已核对的四仓起点
 
 | 仓库 | 默认main快照 | 相关固定候选/依赖 |
@@ -118,6 +130,156 @@ FileBrowser基线PR5与PR7的`backend` tree经只读Git核对均为`349b6d58606d
 
 PR23最终HEAD `57bb2c2830f292d5167f0bda449afafbe0a528fd` 的正常[CI39317205893](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39317205893)三项job、[host39317205780](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39317205780)七项job、[clean39317205809](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39317205809)的A/B均成功，root已再次通过GitHub核对准确HEAD与结论。host工作流的旧探针仍为依赖子集，不替代前文官方PM完整默认依赖证据；clean是既有部署工作流，不是PR24统一三组件入口或原生授权返回通过。无须手工重复该矩阵。
 
+
+## 候选清单与准确检查索引
+
+| 仓库/分支 | 固定HEAD与base | 实际改动/检查边界 |
+| --- | --- | --- |
+| Gateway PR24 `codex/feat-unified-server-entry` | `b3f2740289c6b1fa3208c352bc87b99b6f50cce4`；base PR21 `91a235fca08362d8c1440e808df56946be3cc1e8` | 27文件、2381增/12删；统一入口、接线、默认时区及相关验证，不包含旧插件隐藏安装 |
+| Gateway PR23 `codex/feat-native-hermes-remote-tools` | `57bb2c2830f292d5167f0bda449afafbe0a528fd`；相同产品base | 6文件、967增；官方安装/依赖审计和真实原生探针只在隔离tests/workflow，不修改官方客户端 |
+| FileBrowser PR7 `codex/feat-unified-server-component` | `47876e3a3d62affe777de8623697f62791fa5fa4`；base PR5 `3d556786068994826b8105ff4a1d11572b84b1b1` | 14文件、327增/22删；所属仓准备恢复、镜像资产及默认时区；backend树未改 |
+| WeChat PR11 `codex/feat-unified-server-component` | `e56c7e4b606f1614e54210a391906f4be7440f5e`；base PR10 `e9f751819fb8e9bc1772d7f6d67089e5b49f10d7` | 4文件、115增/11删；现存prepare的受限root-managed模式、测试、CI和说明；没有协议运行时切换 |
+| 总文档 PR12 `codex/docs-config-only-delivery` | base PR10 `0fe71a67bdc8331df9830ad69247674169b03a9d`；本记录固定URL的commit即文档版本 | 共9份Markdown；总纲/导航/状态/部署/需求/证据，六阶段不变。文档提交不代表产品或部署SHA |
+
+Gateway b3f2740的[统一入口39323622360](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39323622360)、[host39323622144](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39323622144)、[既有clean-device39323622091](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39323622091)均成功。后两者沿用各自旧单组件/探针组合，不替代新增统一入口的booted-host或官方PM完整依赖检查。统一入口Linux针对性8项均执行通过，本机6通过/2项POSIX跳过。[常规CI39323621819](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39323621819)最终也成功，root于10月19日21:16:50UTC／10月20日05:16:50北京核对：Python/迁移/V2、质量/仓库检查、真实Compose容器E2E三项job均成功，head为准确b3f2740。没有用旧提交绿色替代新HEAD。
+
+FileBrowser最终部署资产[39316167228](https://github.com/Tangbohu09527/CF_filebrowser-enterprise/actions/runs/39316167228)成功，常规[39316167220](https://github.com/Tangbohu09527/CF_filebrowser-enterprise/actions/runs/39316167220)失败范围仅为前述111项backend lint；不能写全仓绿。WeChat最终[component39300943397](https://github.com/Tangbohu09527/CF_agent-wechat/actions/runs/39300943397)、[Debian39300943037](https://github.com/Tangbohu09527/CF_agent-wechat/actions/runs/39300943037)、[forced-QR39300943020](https://github.com/Tangbohu09527/CF_agent-wechat/actions/runs/39300943020)、[media39300942997](https://github.com/Tangbohu09527/CF_agent-wechat/actions/runs/39300942997)均成功。PR23最终原生/常规/host/clean成功链接与依赖分层见前文。
+
+早期曾手工取消重复检查并出现竞态，取消记录保留；后续改由同分支concurrency自动去重，不再手工抢取消。最终自动push/PR重复运行被取消的记录不作为成功或产品故障；没有手工重复无关全矩阵。文档仓没有workflow，只有已执行的9份Markdown UTF-8/结构/相对链接/敏感模式/空白检查；不伪造CI。
+
+审阅入口：[Gateway PR24](https://github.com/Tangbohu09527/CF_agent-gateway/pull/24)、[原生Hermes PR23](https://github.com/Tangbohu09527/CF_agent-gateway/pull/23)、[FileBrowser PR7](https://github.com/Tangbohu09527/CF_filebrowser-enterprise/pull/7)、[WeChat PR11](https://github.com/Tangbohu09527/CF_agent-wechat/pull/11)、[总文档 PR12](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/12)。均保持OPEN/Draft，不merge、force push或发布正式版本。
+
+## 最终统一入口脱敏回执
+
+精确源码 `b3f2740289c6b1fa3208c352bc87b99b6f50cce4` 的[39323622360](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39323622360)成功，root下载并独立读取result、Debian镜像及限定日志。工作流run_started_at为10月19日20:57:32UTC／10月20日04:57:32北京，实际隔离job于20:59:06UTC启动；成功后的updated_at为21:09:25UTC／05:09:25北京。以下白名单摘录直接来自该次JSON，不仅保留一个本机路径或摘要。原始Artifact有14天留存，长期事实以本固定文档、对应源码和CI为准。
+
+19个实际阶段完成；预设端口冲突先准确拒绝，再接续。普通10001:10001服务及受限业务Token真实传输18,168,526字节合成ZIP，12个成员逐一匹配。管理密码经stdin设置，sudo实际正验证后清ticket、锁定；同密码及无密码sudo均负验证，业务Token仍读取原字节。此项是一次性Linux管理密码/sudo撤销，**不是SSH连接/密钥撤销或生产机器人验收**。
+
+同镜像真实重建FileBrowser服务后文件仍在；第二次完整入口保持凭据、配置及文件摘要。存储仍是独立tmpfs测试盘，没有证明宿主盘重启持久性或恢复备份。PostgreSQL实际SHOW为SQL UTC、log_timezone Asia/Shanghai；其他组件的TZ默认配置按固定源码核对，不把未启动的微信日志说成已实测上海时间。
+
+下面的Image ID是此轮本地构建/运行结果，registry digest与多架构Image ID分别记录。FileBrowser为完整Dockerfile的staging构建，未发布生产镜像；slim未单独构建。微信基础安装真实执行，但没有runtime/登录/真实收发。四项systemd观察为替身，不能将旧单组件A/B扩大成新增统一三组件booted-host通过。EXIT脚本执行一次性容器及私钥fixture清理，但没有导出逐项删除后的独立负验证；runner不作为长期凭据存储。没有创建生产临时授权或需要远程撤销的凭据。
+
+```json
+{
+  "status": "passed",
+  "scope": "pristine-Debian13-container-independent-Docker-daemon",
+  "systemd": "four-read-only-observation-substitute",
+  "storage": "independent tmpfs test-disk; not persistent host disk/RAID",
+  "cgroup": "private namespace; cpu/memory/pids resource-limited smoke passed",
+  "bytes": 18168526,
+  "members": 12,
+  "sha256": "5f30325a20bf69ab8575f08ec50d5fea95a00b2ef200cf7749dbf8645b9986f1",
+  "filebrowser_runtime_user": "10001:10001",
+  "reviewed_entrypoint_mode": "0755",
+  "passed": [
+    "same-input failure resume",
+    "verified HTTPS upload/download",
+    "whole ZIP and 12 member hashes",
+    "ordinary scoped business credential",
+    "management password sudo positive, locked, same password and sudo negative",
+    "business credential still works",
+    "real same-image service recreation retains file",
+    "malformed path 400, wrong token denied, other existing user 403",
+    "Poll/Delivery closed",
+    "no WeChat runtime/login",
+    "SQL UTC and log Asia/Shanghai",
+    "second complete entry preserves credentials, config, and file bytes"
+  ],
+  "not_tested": [
+    "booted systemd",
+    "host reboot",
+    "real Hermes model",
+    "real WeChat",
+    "configuration-only trusted task return",
+    "published production image combination"
+  ],
+  "completed_stages": [
+    "system",
+    "filebrowser-dependencies",
+    "gateway-controller",
+    "wechat-checkout",
+    "wechat-configure",
+    "wechat-bootstrap-no-login",
+    "credentials",
+    "filebrowser-checkout",
+    "filebrowser-image",
+    "filebrowser-prepare",
+    "filebrowser-start",
+    "filebrowser-bootstrap-finish",
+    "gateway-build",
+    "gateway-configure",
+    "gateway-database",
+    "gateway-migrate",
+    "gateway-start",
+    "https-prepare",
+    "https-start"
+  ],
+  "image_receipts": {
+    "filebrowser": {
+      "image_id": "sha256:4433479d35ca5a4cab0c4e7f7784a614f35926bcaac514314e12d4f8baebedd4",
+      "reference": "cf-filebrowser-unified:47876e3a3d62affe777de8623697f62791fa5fa4",
+      "source_sha": "47876e3a3d62affe777de8623697f62791fa5fa4"
+    },
+    "gateway": {
+      "base_digest": "python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258",
+      "gateway_commit": "b3f2740289c6b1fa3208c352bc87b99b6f50cce4",
+      "image_id": "sha256:27d00f10f101d6dd3b0d6c97902e1af21286a281659338a20e0a5c34a075afb3"
+    },
+    "https": {
+      "digest_reference": "nginx@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236",
+      "image_id": "sha256:dc73b49f5124cf2ee538dfbdfbd121f0b4ccdcb20fea30f3a81bd477c02e2bb5",
+      "requested_reference": "nginx:1.28-alpine"
+    },
+    "postgres": {
+      "digest_reference": "postgres@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4",
+      "image_id": "sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222",
+      "requested_reference": "postgres:16-bookworm"
+    },
+    "python": {
+      "digest_reference": "python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258",
+      "image_id": "sha256:4f228bc1cbcfc794e4878312cfc241d368eff55a21c08d1e2bb263116c4ef524",
+      "requested_reference": "python:3.12-slim-bookworm"
+    }
+  },
+  "filebrowser_build": {
+    "bases": {
+      "FFMPEG_IMAGE": {
+        "digest": "gtstef/ffmpeg@sha256:2e4a1c2263d8f47812d1832d9b367acf69ce89fe4e69af17757bfb6d4abfb483",
+        "image_id": "sha256:e77d6b7d5c4e13c9ec2597afc1002e1a0c69438c12fa94672107d83a53445f37",
+        "requested": "gtstef/ffmpeg:8.1-decode"
+      },
+      "GO_IMAGE": {
+        "digest": "golang@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d",
+        "image_id": "sha256:0a761904b78c29eba4ec83bd83b7312db1e113dcd92da7fc669843ad9bca56a1",
+        "requested": "golang:alpine"
+      },
+      "NODE_IMAGE": {
+        "digest": "node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392",
+        "image_id": "sha256:d0a16be756b6ec6658aecb8b7bcf87fa6c7d0d7fcc6ca53ad14bb49a4c90bdd7",
+        "requested": "node:jod-slim"
+      },
+      "RUNTIME_IMAGE": {
+        "digest": "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+        "image_id": "sha256:320994c3b997e2ec6433f717f153e108023c5bec8fefa8d76b83451d16d05ea8",
+        "requested": "alpine:latest"
+      }
+    },
+    "image_id": "sha256:4433479d35ca5a4cab0c4e7f7784a614f35926bcaac514314e12d4f8baebedd4",
+    "inputs": {
+      "_docker/Dockerfile": "6d2ecca8a8e69fd0c085c94c0d98199b269a4a14c348feb89f064f736378f6b5",
+      "backend/go.mod": "906731ccff310099e4b892046148156b2bb2a4ce655aba4eb90ea4870072dbb9",
+      "backend/go.sum": "fbbfda03caa850b306f7aa094ae7e0648188f2cb8b2a9f9ccb7d724ba85f7b7f",
+      "deploy/shared-host/compose.build.yaml": "76732e9489872f16fae1bb4463cf6699114fc400c83867768d6de4357756b0d3",
+      "frontend/package-lock.json": "29b8ca5c29a9e35114bad4555c1e4c0f9b1dd59de8e58f6430f24abc2553885a",
+      "frontend/package.json": "ce5fa91cbc643eb174d642d6ebaaaebfdac22e3ceffbbdfbb7aed306e916e82e"
+    },
+    "platform": "linux/amd64",
+    "source_sha": "47876e3a3d62affe777de8623697f62791fa5fa4"
+  },
+  "debian_image": "debian@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
+}
+```
+
 ## 保留的10月18—19日真实业务（本轮没有重跑）
 
 固定[商品ZIP报告](https://github.com/Tangbohu09527/CF_agent-gateway/blob/91a235fca08362d8c1440e808df56946be3cc1e8/docs/validation/2026-10-18-enterprise-product-zip.md)必须读到末尾“Normal WeChat ZIP outbound acceptance — October 19, completed”。
@@ -146,3 +308,5 @@ PR23最终HEAD `57bb2c2830f292d5167f0bda449afafbe0a528fd` 的正常[CI3931720589
 资料库小批整理与商品查询交付、素材归档、完整性检查Skill准备可与部署收敛并行。已有工具、缺业务规则、缺真实验收分别见[就绪清单](../../status/current-progress.md)。不以单商品成功宣称全企业资料完成，不开发新Skills Runtime/RAG。
 
 无需为本轮补输密码、扫码或UAC。下一轮先审阅候选与原生上下文缺口；统一入口尚缺的booted-host/新机和纯配置完整授权返回链应先隔离补证。真实微信ZIP入站、文件名、正式路径各自保留独立后续，不重派历史任务。群聊多人、完整档案查询、群发、Gateway Web继续排后。
+
+本轮收口时没有待处理生产写操作或新增管理会话；正式服务、Poll/Delivery、在途及上游待收本轮均未查询，所以不声明当前为空或已登录。原d02d工作树保留在`31f46b2827db9353808ee11ff01ab7fdbf173c8e`且未修改；五个独立候选工作区保留源码及证据，原有其他工作树/未提交材料没有被reset、clean或删除。最终文档提交只固定这份交接，不能当作运行产品SHA。
