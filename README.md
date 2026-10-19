@@ -1,6 +1,6 @@
 # 电商业务全自动化系统
 
-> 同步日期：2026-10-11。仓库与现场证据分别记录；本次只更新 Markdown，不部署、不恢复服务、不执行业务验收。
+> 同步日期：2026-10-20。[本轮跨仓候选与脱敏证据](./validation/records/2026-10-20-configuration-only-candidate.md)是当前导航。历史验收按原观察时间保留；本轮只做候选开发、隔离验证和文档同步，不访问生产。
 
 ## 整体目标
 
@@ -10,16 +10,16 @@ AI 与员工共用 `CF_filebrowser-enterprise` 这一唯一正式文件系统。
 
 ## 当前能做什么，卡在哪里
 
-| 问题 | 截至 2026-10-11 的结论 |
+| 问题 | 截至 2026-10-20 的结论 |
 | --- | --- |
-| 已有能力证据 | 私聊/真正 @ 群聊文本有历史闭环；**2026-09-17** 分钟级任务持久化与微信回传通过。**09-25 至 09-27** 已有 FileBrowser 同机部署、受限接入、真实文件读取和受控文本新建的限定现场证据 |
-| 当前接续点 | 用户回传：旧 f9 两端回退、d9 `complete-rollback` 和旧核心恢复完成；随后 d9 新候选镜像、两端新 plan 通过，**尚未切换**。新 deployment 尚未 `apply/start/verify`，原聊天附件实收未验收 |
-| 最新未知 | 用户随后已执行 CFserver 重启；**重启后状态未核验**，Windows 是否关机未确认。重启前 Hermes/Gateway API/Dispatch 运行、Poll/Delivery 停止、Gate 关闭和数据库正常，不证明重启后已恢复 |
-| 下一步 | 先核验重启后现场与现存新计划，符合条件再接续切换；不从头回退、传包或构建。当前先交付微信真实文件/图片收发，不并行扩安装器或大重构 |
+| 已有能力证据 | PDF、同会话文字接续、PNG看图与图片实收通过；单商品实际分类归档与限定文件整理已有记录；10月19日正常微信商品ZIP出站整包及12成员与收件一致 |
+| 当前接续点 | 独立候选实现Gateway统一服务器入口、FileBrowser/WeChat最小部署适配，验证固定官方Hermes纯配置接入；实际结果、准确SHA和CI见本轮记录，不等于生产已切换 |
+| 最新未知 | 生产最后观察为10月19日；本轮没有访问当前服务、登录、队列或上游消息。微信ZIP正常入站完整验收仍缺；文件名候选未生产验收，正式归档路径调整暂缓 |
+| 下一步 | 补齐统一入口新机证据及官方Hermes可信每任务授权返回链；资料库小批整理和首批文件Skill准备可并行。不重新执行已通过的PDF/PNG或重派历史任务 |
 
-“已有能力证据”不表示此刻在线可用。六阶段规划保持不变：阶段 1 的消息 Runtime 有历史交付，文件基础链路尚未完成，不给虚构完成百分比。
+“已有能力证据”不表示此刻在线可用。六阶段规划保持不变：阶段1的消息Runtime有历史交付，完整文件业务与最终简部署标准仍有缺口，不给虚构完成百分比。
 
-完整 SHA、PR、CI、现场候选和截止点统一见 [2026-10-11 脱敏证据摘要](./validation/records/2026-10-11-overall-status-evidence.md)，分层结论见[四项目状态矩阵](./status/current-status.md)。三个组件的固定候选与各自 main 分开核对，未合并分支不写成 main；组件其他文档任务不作为本次已完成成果。
+完整 SHA、PR、CI、候选和截止点统一见 [2026-10-20 脱敏证据摘要](./validation/records/2026-10-20-configuration-only-candidate.md)，分层结论见[四项目状态矩阵](./status/current-status.md)。[10月11日记录](./validation/records/2026-10-11-overall-status-evidence.md)作为历史保留，不覆盖后续业务成功。固定候选与各自 main 分开核对，未合并分支不写成 main。
 
 ## 文件业务验收边界
 
@@ -29,9 +29,10 @@ AI 与员工共用 `CF_filebrowser-enterprise` 这一唯一正式文件系统。
 
 ## 后续规划
 
-- 轻量 Gateway Web：考虑局域网 IP 访问、Gateway 权限管理、查询 Gateway **已经接收的部分**聊天/任务记录；尚待规划，不承诺微信完整历史，不复制 FileBrowser 文件权限体系。
-- 共享群分类归档与工作副本加工沿用既有需求，接续真实文件/图片收发推进。
-- Skills Runtime、旺店通/S6、RAG、统一安装器和可靠性专项按证据及原六阶段后续安排；GPT-5.6 API 仍是计划，第一阶段不建设独立 OCR。
+- 资料库小批整理和首批文件Skill准备可与部署收敛并行；已有工具、业务规则及缺验收项见当前进度。
+- 统一服务器入口与官方Hermes纯配置接入已有独立候选，仍需分层补齐授权返回和新机验收，不把当前机器修通当最终交付。
+- 群聊/多人交互、完整聊天档案查询和群发继续放最后；Gateway Web本轮不开发，不复制FileBrowser权限体系。
+- 旺店通/S6、RAG和可靠性专项按原六阶段后续安排，第一阶段不建设独立OCR。
 
 ## 权威入口
 
@@ -40,7 +41,7 @@ AI 与员工共用 `CF_filebrowser-enterprise` 这一唯一正式文件系统。
 | 文件业务需求 | [requirements/file-workflows.md](./requirements/file-workflows.md) |
 | 当前能力与证据分层 | [status/current-status.md](./status/current-status.md) |
 | 当前断点与下一步 | [status/current-progress.md](./status/current-progress.md) |
-| 最新脱敏证据 | [2026-10-11 总体状态摘要](./validation/records/2026-10-11-overall-status-evidence.md) |
+| 最新脱敏证据 | [2026-10-20 统一部署与纯配置候选](./validation/records/2026-10-20-configuration-only-candidate.md) |
 | 系统架构 | [architecture/system-architecture.md](./architecture/system-architecture.md) |
 | 部署与恢复 | [部署导航](./deployment/deployment-guide.md)、[恢复手册](./operations/recovery-runbook.md) |
 | 分项验收 | [validation/production-validation-checklist.md](./validation/production-validation-checklist.md) |
@@ -57,6 +58,6 @@ AI 与员工共用 `CF_filebrowser-enterprise` 这一唯一正式文件系统。
 | `CF_agent-wechat` | external 微信通道 Runtime 与媒体适配 |
 | `CF_filebrowser-enterprise` | AI 和员工共用的唯一正式文件系统、API、权限与持久审计 |
 
-本次基于 `8179533ffade1027d01727cbf5a89a26b491c400`，文档分支为 `codex/docs-overall-status-20261011`，Draft PR base 为 `docs/file-business-workflows-20260927`，保留[原 Draft PR #9](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/9)。本次不合并、不打 Tag。
+本轮文档候选为[Draft PR12](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/12)，基于PR10固定头 `0fe71a67bdc8331df9830ad69247674169b03a9d`。保留原PR9/PR10；不合并、不打Tag。旧分支、候选和正式版本分别见带日期记录。
 
 生产运行不得持续依赖 GitHub 在线。源码、CI、Image ID、registry digest、完整构建来源和真实业务验收不能互相推导。`docs/`、旧状态、XMind 和 PNG 按日期作为历史材料。

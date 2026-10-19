@@ -14,7 +14,7 @@
 
 10月11日的未切换/未实收断点是历史记录。PDF/PNG及10月19日正常微信商品ZIP出站已有后续固定证据；最新候选与最后生产观察分列于[10月20日摘要](../validation/records/2026-10-20-configuration-only-candidate.md)。本轮没有访问生产，不能把历史健康当作实时状态。
 
-统一服务端入口归属Gateway，复用三个产品仓库已有安装能力；[候选部署指南](https://github.com/Tangbohu09527/CF_agent-gateway/blob/71c802da233cfd855d0b7436da543c823a937098/docs/deployment/unified-server.md)包含正式命令和[输入模板](https://github.com/Tangbohu09527/CF_agent-gateway/blob/71c802da233cfd855d0b7436da543c823a937098/deploy/server-inputs.example.json)。各组件不互相复制业务实现；本仓不保存运行代码。
+统一服务端入口归属Gateway，复用三个产品仓库已有安装能力；[候选部署指南](https://github.com/Tangbohu09527/CF_agent-gateway/blob/b3f2740289c6b1fa3208c352bc87b99b6f50cce4/docs/deployment/unified-server.md)包含正式命令和[输入模板](https://github.com/Tangbohu09527/CF_agent-gateway/blob/b3f2740289c6b1fa3208c352bc87b99b6f50cce4/deploy/server-inputs.example.json)。各组件不互相复制业务实现；本仓不保存运行代码。基础状态使用保留数据库/核心/业务配置检查的`diagnose-base`；外部Hermes连接与完整业务验收另列，不因AI电脑尚未接入就把基础安装写成失败。
 
 最终交付须同时满足：
 
@@ -24,7 +24,7 @@
 4. 临时SSH/sudo撤销后独立业务凭据仍可用；不得把管理令牌暴露给模型。
 5. 新机、重复执行、准确阶段恢复、数据保留及完整授权返回链分别验收。
 
-当前统一入口仍是候选；干净官方Hermes工具通道已实测，但共享API缺少可信每调用任务授权，尚未走到Artifact/Response/Delivery。不能要求新电脑暗装旧插件作为替代交付。[原生探针固定报告](https://github.com/Tangbohu09527/CF_agent-gateway/blob/2ada096c8a30ecbde771fb32f7536790709b0cd9/docs/validation/2026-10-20-native-http-mcp.md)列出最少配置及精确缺口。
+当前统一入口仍是候选；官方固定安装器的依赖阶段、Python3.14.7和完整默认[all]环境已实测原生远程图文及查询/导出，但共享API缺少可信每调用任务授权，尚未走到Artifact/Response/Delivery。不能要求新电脑暗装旧插件作为替代交付。[原生探针固定报告](https://github.com/Tangbohu09527/CF_agent-gateway/blob/57bb2c2830f292d5167f0bda449afafbe0a528fd/docs/validation/2026-10-20-native-http-mcp.md)列出最少配置、准确依赖及精确缺口；不是完整新电脑安装验收。
 
 ## 2. 发布输入
 
