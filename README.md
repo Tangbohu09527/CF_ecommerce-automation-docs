@@ -1,62 +1,67 @@
 # 电商业务全自动化系统
 
-> 同步日期：2026-10-11。仓库与现场证据分别记录；本次只更新 Markdown，不部署、不恢复服务、不执行业务验收。
+> 文档同步：2026-10-20。组件证据通过 GitHub 固定提交只读核对；最后现场观察为 **2026-10-19 北京时间 18:36**，本轮未访问生产、未重新验收。
 
 ## 整体目标
 
-员工微信 → 微信入口 → Gateway 权限/上下文/任务 → 官方 Hermes 与工具 → 企业文件服务/后续业务系统 → 结果返回微信。CFserver 是 Debian 部署宿主，Gateway/PostgreSQL 保存消息与控制权威状态，Windows AI 主机承担 Hermes 和执行工具。
+员工微信 → 微信入口 → Gateway 权限/上下文/任务 → 官方 Hermes 与工具 → 企业文件服务/后续业务系统 → 结果返回微信。CFserver 是 Debian 部署宿主，Gateway/PostgreSQL 保存消息与控制权威状态，Windows AI 主机承担 Hermes 和执行工具。AI 与员工共用 `CF_filebrowser-enterprise` 唯一正式文件系统。
 
-AI 与员工共用 `CF_filebrowser-enterprise` 这一唯一正式文件系统。主线继续沿用 [9 月 27 日文件业务需求](./requirements/file-workflows.md)：内容分类、指定目录归档、查找并回传微信、下载工作副本加工后通过 API 回存；正式原件默认保留。旺店通、S6 等仍属后续集成。
+主线保留 [9 月 27 日文件业务需求](./requirements/file-workflows.md)：资料查询和微信交付、内容分类与指定目录归档、工作副本加工后通过 API 回存，默认保留正式原件。六阶段定义不变，不编造总体完成百分比。
 
 ## 当前能做什么，卡在哪里
 
-| 问题 | 截至 2026-10-11 的结论 |
+| 问题 | 截至本轮可核对证据的结论 |
 | --- | --- |
-| 已有能力证据 | 私聊/真正 @ 群聊文本有历史闭环；**2026-09-17** 分钟级任务持久化与微信回传通过。**09-25 至 09-27** 已有 FileBrowser 同机部署、受限接入、真实文件读取和受控文本新建的限定现场证据 |
-| 当前接续点 | 用户回传：旧 f9 两端回退、d9 `complete-rollback` 和旧核心恢复完成；随后 d9 新候选镜像、两端新 plan 通过，**尚未切换**。新 deployment 尚未 `apply/start/verify`，原聊天附件实收未验收 |
-| 最新未知 | 用户随后已执行 CFserver 重启；**重启后状态未核验**，Windows 是否关机未确认。重启前 Hermes/Gateway API/Dispatch 运行、Poll/Delivery 停止、Gate 关闭和数据库正常，不证明重启后已恢复 |
-| 下一步 | 先核验重启后现场与现存新计划，符合条件再接续切换；不从头回退、传包或构建。当前先交付微信真实文件/图片收发，不并行扩安装器或大重构 |
+| PDF 与连续会话 | PDF 正文实际读取、附件返回与样本收件摘要一致；后续文字在同一会话接续 |
+| PNG | **PNG图片识别及微信图片收发已验收，满足当前业务要求。** 原始字节差异等历史事实保留，不再作为开发阻塞 |
+| 商品资料 | 正式商品图/ZIP 工具已安装并由正式 Hermes 接口确认加载；一个商品分类归档成功，4 张主图、8 张详情，保留原包 |
+| 文件操作 | 查询、复制、移动、改名、替换、可恢复删除及还原有实际受限客户端/API 证据；不等于每项均由真实模型选择并实测 |
+| 正常微信 ZIP 出站 | 从企业文件系统重新导出后完成微信实收，18,167,063 字节、12 成员，整包和成员摘要匹配；不是转发刚上传的原包 |
+| 仍有限制 | ZIP 入站未完整验收；此前超时失败保留；文件名仍有前缀和中文替换，候选未生产验收；一个商品不代表全库已整理 |
+| 最后现场观察 | 10 月 19 日北京时间 18:36 收发关闭、无在途、原 Bot 登录；随后临时授权撤销、临时密码删除。这是报告时间点，不能推断现在在线 |
+| 当前下一步 | 简部署与官方 Hermes 纯配置接入由另一个 Gateway 任务开发验证中；可安排小批量资料整理与首批文件类 Skill 试点；现有归档路径调整由用户明确暂缓 |
 
-“已有能力证据”不表示此刻在线可用。六阶段规划保持不变：阶段 1 的消息 Runtime 有历史交付，文件基础链路尚未完成，不给虚构完成百分比。
+10 月 11 日的回退、新计划未切换与重启后未知保留在[历史记录](./validation/records/2026-10-11-overall-status-evidence.md)，已不再是当前待执行步骤。固定版本、PR/CI、源码与实际镜像边界见[本轮跨仓证据摘要](./validation/records/2026-10-20-overall-status-evidence.md)及[当前状态矩阵](./status/current-status.md)。
 
-完整 SHA、PR、CI、现场候选和截止点统一见 [2026-10-11 脱敏证据摘要](./validation/records/2026-10-11-overall-status-evidence.md)，分层结论见[四项目状态矩阵](./status/current-status.md)。三个组件的固定候选与各自 main 分开核对，未合并分支不写成 main；组件其他文档任务不作为本次已完成成果。
+## 当前部署与最终标准
 
-## 文件业务验收边界
+当前正式机器仍使用项目插件和受限客户端。最终目标是：服务端一条正式、可复用入口配合必要参数；电脑只安装官方 Hermes，再配置少量参数即可运行，无额外项目 EXE、手工复制插件、Hermes 源码修改或项目专用常驻进程；不依赖 Codex 工作树、`.task-artifacts` 或旧现场回执；撤销临时运维权限后，业务依靠正式业务凭据继续运行。
 
-以下六项分别留证：微信入站取得字节、内容理解、指定目录/分类归档、文件中心查询回传、原聊天实际附件实收、加工结果回存。文本新建、读取成功、HTTP 200、CI 绿不能相互替代，缩略图/元数据也不证明取得原件。细则见[验收清单](./validation/production-validation-checklist.md#b11-媒体文件和业务扩展)。
+新机简部署尚未达到最终标准。MCP 是验证路线，隔离工具发现成功不能代替整条文件业务验证，也不表示生产已经迁移。新推送的 [Gateway PR23 固定报告](https://github.com/Tangbohu09527/CF_agent-gateway/blob/1f3a1c2978bcc0b4803e6246e309fc77a7865c51/docs/validation/2026-10-20-native-http-mcp.md) 已证明官方原版 Hermes 纯配置的远程发现、图文工具消息和隔离 FileBrowser 合成 ZIP 查询/导出；仍缺可信的每任务授权绑定，未进入 Artifact/Response/微信交付。具体门槛见[部署指南](./deployment/deployment-guide.md)。Codex 开发模型改为 6.1 Sol，不代表生产 Hermes 模型或版本改变。
 
-正式文件只能通过 FileBrowser API、权限与审计访问；入站媒体仍遵守 Gateway 持久化，出站仍要求 READY Artifact。预授权资料群常规新增自动归档是目标，群/身份/目录规则未确定前不全局放行，未知分类进入待确认。AI 主机离线时 CFserver 先收原件、随后分类仍待实现/验收。
+## 后续安排与边界
 
-## 后续规划
+首批文件类 Skill 可从商品资料查询/图包交付、素材归档、资料完整性检查开始；已有工具、业务规则缺口和现场验收分别记录，不必等待 ERP、全部部署、新 RAG 或自研 Skills Runtime。详见[当前进度](./status/current-progress.md)。可靠性、ERP、平台集成、工作副本加工回存及全企业资料库治理仍按原证据边界推进。
 
-- 轻量 Gateway Web：考虑局域网 IP 访问、Gateway 权限管理、查询 Gateway **已经接收的部分**聊天/任务记录；尚待规划，不承诺微信完整历史，不复制 FileBrowser 文件权限体系。
-- 共享群分类归档与工作副本加工沿用既有需求，接续真实文件/图片收发推进。
-- Skills Runtime、旺店通/S6、RAG、统一安装器和可靠性专项按证据及原六阶段后续安排；GPT-5.6 API 仍是计划，第一阶段不建设独立 OCR。
+Gateway Web 仍是后续规划。以下三项排在项目最后，属于需求，不是已交付事实：
+
+- 群聊会话及多人/连续消息交互。
+- AI 查询获准的完整聊天档案，按当前场景、问题和任务主动检索相关上文，不仅限于 Hermes 自身历史或成功任务；授权档案完整不等于手机微信所有历史均已采集。
+- Gateway 向获准人员/群聊群发消息及附件。
 
 ## 权威入口
 
 | 主题 | 入口 |
 | --- | --- |
-| 文件业务需求 | [requirements/file-workflows.md](./requirements/file-workflows.md) |
-| 当前能力与证据分层 | [status/current-status.md](./status/current-status.md) |
-| 当前断点与下一步 | [status/current-progress.md](./status/current-progress.md) |
-| 最新脱敏证据 | [2026-10-11 总体状态摘要](./validation/records/2026-10-11-overall-status-evidence.md) |
-| 系统架构 | [architecture/system-architecture.md](./architecture/system-architecture.md) |
-| 部署与恢复 | [部署导航](./deployment/deployment-guide.md)、[恢复手册](./operations/recovery-runbook.md) |
-| 分项验收 | [validation/production-validation-checklist.md](./validation/production-validation-checklist.md) |
-| 六阶段与固定决定 | [项目总纲](./00_项目总纲.md)、[技术决策记录](./05_技术决策记录.md) |
-| 历史限定成功 | [2026-09-17 长任务回传](./validation/records/2026-09-17-gateway-long-task-acceptance.md) |
-| 历史总体基线 | [2026-09-03 Production Closeout](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md) |
+| 当前能力与证据分层 | [当前状态矩阵](./status/current-status.md) |
+| 下一步与试点 | [当前进度](./status/current-progress.md) |
+| 固定跨仓证据 | [2026-10-20 摘要](./validation/records/2026-10-20-overall-status-evidence.md) |
+| 文件需求 | [文件业务场景](./requirements/file-workflows.md) |
+| 部署与恢复 | [部署指南](./deployment/deployment-guide.md)、[恢复手册](./operations/recovery-runbook.md) |
+| 分项验收 | [生产验证清单](./validation/production-validation-checklist.md) |
+| 原六阶段与决定 | [项目总纲](./00_项目总纲.md)、[技术决策记录](./05_技术决策记录.md) |
+| 架构 | [系统架构](./architecture/system-architecture.md) |
+| 历史成果 | [9 月 17 日长任务](./validation/records/2026-09-17-gateway-long-task-acceptance.md)、[9 月 3 日基线](./validation/records/2026-09-03-enterprise-runtime-production-closeout.md) |
 
-## 仓库边界
+## 仓库与合并边界
 
 | 仓库 | 职责 |
 | --- | --- |
-| `CF_ecommerce-automation-docs` | 总体架构、跨仓库状态、阶段、部署恢复边界及带日期证据 |
-| `CF_agent-gateway` | 身份权限、上下文、任务、文件引用、消息和投递控制及审计关联 |
-| `CF_agent-wechat` | external 微信通道 Runtime 与媒体适配 |
-| `CF_filebrowser-enterprise` | AI 和员工共用的唯一正式文件系统、API、权限与持久审计 |
+| `CF_ecommerce-automation-docs` | 总体需求、阶段、跨仓状态、部署恢复边界及带日期证据 |
+| `CF_agent-gateway` | 身份权限、上下文、任务、文件引用、消息投递和审计关联 |
+| `CF_agent-wechat` | 微信通道 Runtime 与媒体适配 |
+| `CF_filebrowser-enterprise` | 唯一正式文件系统、API、权限与持久审计 |
 
-本次基于 `8179533ffade1027d01727cbf5a89a26b491c400`，文档分支为 `codex/docs-overall-status-20261011`，Draft PR base 为 `docs/file-business-workflows-20260927`，保留[原 Draft PR #9](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/9)。本次不合并、不打 Tag。
+本轮从 PR10 准确 HEAD `0fe71a67bdc8331df9830ad69247674169b03a9d` 建立 `codex/docs-overall-status-20261020`，Draft PR base 为 `codex/docs-overall-status-20261011`，依赖[PR9](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/9)和[PR10](https://github.com/Tangbohu09527/CF_ecommerce-automation-docs/pull/10)。核对时 main 仍为 `dd81075d7516d74a9e307ebdc03ce8ec07e12c49`，尚未包含这三轮文档更新。**Draft 分支更新不等于 main 已同步；本轮不合并。**
 
-生产运行不得持续依赖 GitHub 在线。源码、CI、Image ID、registry digest、完整构建来源和真实业务验收不能互相推导。`docs/`、旧状态、XMind 和 PNG 按日期作为历史材料。
+无文档 CI；本轮只做文档检查，不运行产品测试。生产运行不持续依赖 GitHub 在线。源码、CI、现场 Image ID、registry digest、文档提交与真实业务验收分别记录。
