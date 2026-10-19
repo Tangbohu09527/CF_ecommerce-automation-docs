@@ -4,17 +4,15 @@
 >
 > 文档编号：OPS-001
 >
-> 状态同步日期：2026-10-11。通用恢复流程保留；本次文档任务不执行现场操作。
+> 状态同步日期：2026-10-20。通用恢复流程保留；本次文档任务不执行现场操作。
 
-## 当前接续点：先核验重启后现场
+## 当前证据与恢复导航
 
-按用户 2026-10-11 终端回传，旧 f9 两端回退、d9 `complete-rollback` 和旧核心恢复均已完成。随后 d9 新候选镜像与两端新 plan 通过，尚未切换；新 deployment 尚未 `apply/start/verify`，原聊天附件实收未验收。完整标识与来源见[脱敏证据摘要](../validation/records/2026-10-11-overall-status-evidence.md)。
+最新可核对结果见[本轮跨仓摘要](../validation/records/2026-10-20-overall-status-evidence.md)：PDF/PNG 和正常商品 ZIP 出站已有业务证据；最后生产观察是 **2026-10-19 北京时间 18:36**，收发关闭、无在途、原 Bot 登录，随后临时授权撤销、临时密码删除。这是报告时间点，本轮未访问生产，不保证当前在线状态。
 
-用户随后确认只执行了 CFserver 重启。重启前旧 Hermes/Gateway API/Dispatch 运行、Poll/Delivery 停止、Gate 关闭、数据库正常；**这些不是重启后恢复证据**。重启后状态未核验，Windows 是否关机未确认，不沿用历史 PID。
+[10 月 11 日回退与未切换](../validation/records/2026-10-11-overall-status-evidence.md)保留为历史，不再要求恢复旧 d9 plan、重做回退或重放 apply。下一次获准现场任务应核对当时实际源码、镜像、schema、Gate、队列、Hermes 与凭据；不使用旧 PID、旧现场回执或工作树材料作为正式部署前提。当前桥接安装和最终官方 Hermes 纯配置目标见[部署指南](../deployment/deployment-guide.md#最终部署标准与候选边界)，并行候选仍开发验证中。
 
-下一步由现场操作者先核验两端当前状态、Gate、数据库与现存新计划的身份/阶段/回退基线；符合条件再接续切换。已有新计划不得覆盖或删除，不从头回退、传包、构建或重放 apply。核验前不将旧手册中的“两端已应用但启动失败”视为当前断点，也不先做扫码/放流。Host reboot 后 fresh QR 前显式检查并关闭 Gate 的固定要求仍有效。
-
-下列条目是定位与恢复的通用边界，需根据当时现场选择，不代表本次各步骤已执行或当前服务状态已核实。
+下列是按故障选择的通用恢复边界，不代表本轮已经执行或取得生产操作授权。forced fresh QR、组合 Poll/Delivery Gate 与 Archive 不复用要求不变。
 
 ## 1. 固定流程
 
@@ -36,7 +34,7 @@
 | PostgreSQL | revision、权威状态、备份与 restore |
 | `CF_agent-wechat` | container、WeChat process、fresh QR、auth/chats/messages |
 | Hermes / AI host | external runtime、reachability、watchdog、capacity |
-| FileBrowser | 唯一正式 File Service 的 API、文件权限、持久审计和恢复；已有部署证据，当前重启后状态待核验 |
+| FileBrowser | 唯一正式 File Service 的 API、文件权限、持久审计和恢复；已有部署、受限操作和单商品业务证据；本轮未实时核验 |
 
 ## 3. 禁止事项
 
@@ -145,7 +143,7 @@
 **Owner:** Operator；各组件 owner 配合。
 
 - **检查：** Docker、storage、PostgreSQL、Gateway、Controller、agent-wechat 和 Worker 实际状态。
-- **当前补充：** 本次先核对现存 d9 新计划和重启后的两端事实；重启前已恢复不等于本次已恢复，Windows 状态另查，历史 PID 不作为操作参数。
+- **当前补充：** 核对当次获准 Release 与实际重启后的两端事实；旧报告观察不证明当前恢复，历史 PID 或旧 plan 不作为操作参数。
 - **分类：** 核心恢复、agent-wechat 预期停止、Gate 是否意外运行。
 - **操作：** 不假设 automatic boot stop；先通过 Controller `stop` 显式关闭组合 Poll/Delivery Gate，再 fresh QR。Dispatch Worker 按 Gateway Release/Compose 生命周期独立核对；最后通过 Controller `start` 同时启动 Poll/Delivery。
 - **验证：** revision、Dispatch Worker、auth/chats/messages、Hermes reachability、Queue；两个受控 Worker 均 healthy、heartbeat fresh，Token Contract valid、`ready=true`。
@@ -222,7 +220,7 @@
 
 **Owner:** FileBrowser。
 
-- **检查：** 已有同机部署、受限接入及文件读/文本新建的历史证据；先核对当前 FileBrowser health、批准 image、API、权限、存储和审计，10-11 重启后状态待核验。
+- **检查：** 已有同机部署、受限文件操作、单商品归档与正常 ZIP 出站证据；故障时核对当时 FileBrowser health、批准 image、API、权限、存储和审计。本轮未重新检查实时状态。
 - **分类：** 服务、网络/TLS、受限身份、目录授权、文件完整性或客户端集成失败；不将文件服务失败直接等同于文本 Runtime 故障。
 - **操作：** 只恢复已定位的 FileBrowser 边界，不让 Gateway/Hermes 直连正式存储绕过 File Service，不因文件不可读自动扩大权限。
 - **验证：** 独立核对 health、permission、audit、backup/restore；需要业务验证时分别留存实际字节、内容理解、正式归档和微信实收证据。
