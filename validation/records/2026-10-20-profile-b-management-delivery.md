@@ -20,7 +20,7 @@ Gateway 候选 [Draft PR25](https://github.com/Tangbohu09527/CF_agent-gateway/pu
 
 本地定向后端/迁移 102 项及最终管理契约 13 项通过；实际 Playwright 页面、官方磁盘/SQLite、官方 read_file、网络故障后的创建/同步恢复和未知同名拒绝均执行。交付脚本在固定提交再次实际启停并通过重启浏览器检查。
 
-Windows 全套开发期回归为 2665 通过、198 跳过、18 失败，17 项涉及既有 POSIX 存储/链接语义，另 1 项为既有租约日志时序断言；不称全套通过。Linux 准确提交的 [Profile B 联合 CI](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39412486537) 已成功，实际 browser/native 制品 passed=true 且 children_stopped=true；[正常 CI](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39412486536) 分开核对，最终结果见该固定 run，未完成项不算通过。Linux 初次暴露的虚拟环境解释器软链接解引用问题已修复并由本次真实组件 CI 复验，未以补装依赖子集绕过。
+Windows 全套开发期回归为 2665 通过、198 跳过、18 失败，17 项涉及既有 POSIX 存储/链接语义，另 1 项为既有租约日志时序断言；不称全套通过。Linux 准确提交的 [Profile B 联合 CI](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39412486537) 已成功，实际 browser/native 制品 passed=true 且 children_stopped=true；[正常 CI](https://github.com/Tangbohu09527/CF_agent-gateway/actions/runs/39412486536) 也已成功：完整套件 2874 通过/7 跳过，专项迁移 47 通过、带既有数据的 PostgreSQL 迁移 1 通过、V2 端到端 6 通过，PostgreSQL 确认单一 head `20261020_01`。PR25 当前 27 项检查均成功，含质量和隔离真实容器端到端；不推导为生产部署。Linux 初次暴露的虚拟环境解释器软链接解引用问题已修复并由本次真实组件 CI 复验，未以补装依赖子集绕过。
 
 官方本地 read_file 仅检查合成小文件及调用归属。PR23 中 FileBrowser 每调用可信 task 关联、共享 MCP `_meta`/Artifact/Response/Delivery/微信返回缺口保留；独立 Profile 不扩大文件权限。附件接入、真实微信、异机 HTTPS、旧会话即时刷新和破坏性迁移未验收或未接通。
 
