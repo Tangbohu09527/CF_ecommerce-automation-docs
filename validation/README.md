@@ -1,11 +1,12 @@
 # Validation 文档索引
 
-> 最近同步：2026-10-20。本轮只更新需求、状态导航及文档检查，未运行产品测试、可行性实验或现场验收。
+> 最近同步：2026-10-20。新增获准 A→B 的组件隔离交付索引；PR13 需求同步与本次实施分开记录。未运行生产现场验收。
 
 ## 当前入口
 
 | 文档 | 用途 |
 | --- | --- |
+| [独立 Profile B 与管理 Web 隔离交付](./records/2026-10-20-profile-b-management-delivery.md) | Gateway PR25 固定候选、真实组件/浏览器证据、启动入口、剩余边界及 WeChat 文件名准备 |
 | [2026-10-20本轮同步记录](./records/2026-10-20-requirements-sync.md) | PR9—12/main基线、语义吸收、固定只读代码与文档检查 |
 | [最新需求正文与差异表](../requirements/confirmed-platform-scope.md) | 用户确认、待验证目标、已有实现与后续Skills边界 |
 | [PR11总体证据](./records/2026-10-20-overall-status-evidence.md) | 原PDF/PNG/正常ZIP与总体固定证据，保留当时日期/失败 |

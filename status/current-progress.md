@@ -1,5 +1,7 @@
 # 当前进度与下一步
 
+> 后续交付补充（2026-10-20）：本轮获准 A→B 的候选和可复用本机入口见[交付索引](../validation/records/2026-10-20-profile-b-management-delivery.md)。Gateway Draft PR25、WeChat 准备 Draft PR12 均未合并；没有生产操作。以下 PR13 原任务“本轮”指需求同步，不是本次实施范围；未继续其他批次或业务 Skills。
+
 > 需求同步：2026-10-20。[本轮用户确认正文](../requirements/confirmed-platform-scope.md)和[需求差异表](../requirements/confirmed-platform-scope.md#9-需求差异表)优先于两份旧证据中的当时待办。状态与代码/隔离/现场分层见[状态矩阵](./current-status.md)。本轮仅文档同步，不启动下列功能或验证工作。
 
 ## 本轮文档交付范围
