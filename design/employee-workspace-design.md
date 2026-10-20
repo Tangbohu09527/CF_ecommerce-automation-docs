@@ -18,6 +18,27 @@
 
 > 状态日期：2026-08-04。正文保留 V1 设计与历史偏差；当前 V2 实现和生产证据边界以顶部权威入口为准。
 
+## 0. 2026-10-20 当前需求覆盖说明
+
+当前需求以[平台基础能力与最新确认](../requirements/confirmed-platform-scope.md)为权威正文；下方第 1—14 节保留原设计及历史实现笔记，不再据此要求“同群按发起者独立个人线程”或并行推进 Skill 链路。最新方案已选定 B，不再待选 A/B。
+
+| 来源 | 模板来源 | 具体真实 Hermes Profile | 会话目标 |
+| --- | --- | --- | --- |
+| 员工私聊 | 员工所属分组 | 该员工独立 Profile，同组员工不共享 | 同一私聊首次创建后持续续接 |
+| 微信群聊 | 该微信群所属分组 | 该群独立 Profile，同组多个群不共享 | 同一群首次创建后持续续接，发起员工仍须获准 |
+
+Profile 是 Hermes 界面中的真实配置档案，包含独立配置、`SOUL.md`、Skills 及相应会话/记忆状态；不是 Gateway 提示词、普通 Session ID 或独立 OS 沙箱。先授权员工使用 Bot，再确认群聊使用权限；员工可已授权但未分组，不暗配默认 Profile。其他群成员可提供相关上下文，不因此获准使用 Bot。模板分组和正式文件权限分开。
+
+Gateway Web 规划管理分组模板，按目标电脑受控编排对应 Profile 存在及创建/同步；创建时机（分组生效或首次使用）、官方接口和限制待验证。当前仅有 Profile 引用/版本保存、请求携带与会话续接基础；真实路由、自动创建、修改同步、既有会话采用新配置须分别验证。D026 旧只引用边界保留历史并由本轮调整方向，不将已有字段当作完成证明。
+
+现有 `GroupType` 直接指向 `AgentProfile`，不是模板派生关系；V2 `group_sender` 含 sender identity，Profile revision 参与 key，分别可能造成同群不同会话、变更版本新线程。这些已有代码/测试与新 B 方案的群持续会话存在差距。不能用 V1 whole-room 行为或 `group_shared` 代码支持代替新目标验收。
+
+同步只处理管理员明确管理的模板字段，不覆盖聊天历史、已产生记忆、运行状态或独立凭据。模板字段、调组后旧会话和记忆处理、Skills 来源/版本、已有会话是否需新轮次/重载待细化或验证；不默认清空、全量迁移或共享。首次克隆不等于长期同步，版本/结果/失败/生效时机需可见。
+
+分组按部门、岗位或业务划分，Web 明确将组的任务分配到目标电脑，独立员工/群 Profile 位于对应电脑。电脑数由人数/频率/资源决定，不预设固定数量、UI 必须另机或自动迁移算法。会话/任务/电脑绑定与变更生效需明确，不能无声切换、丢历史或重复在途任务。
+
+执行中的补充应进入对应正在执行过程，当前 FIFO/续接不等于已实现。当前群近几条相关消息、明确引用、日期范围读取是基础需求；高级跨会话检索、群发和业务 Skills 后置。Skills 在四仓基础完成后由用户另找 Hermes 制作并单独建仓库。本轮只同步文档，未创建 Profile 或调用模型。
+
 ## 1. 定位与术语
 
 本设计支持“一套或少量统一 Hermes 服务承载多个员工逻辑工作区”。系统不为每个员工部署一套独立 Hermes 进程。每个 Employee Workspace / 员工工作区可以包含多个 AI Thread / AI 会话线程，不同员工的个人对话历史、任务状态和个人上下文默认隔离。
@@ -415,6 +436,6 @@ AI Thread / AI 会话线程与 Physical Conversation / 物理会话的绑定。�
 - 从微信、Gateway、Task Queue、完整 Worker Bridge、Skills 到原会话回传的目标任务链路；当前仅完成不含这些目标组件的 V1 文本闭环。
 - 同群不同员工 V2 `group_sender` 的生产对照复验；V1 whole-room compatibility path 继续保持显式边界。
 
-当前 V2 隔离实现已经进入 Gateway main；下一步是补齐生产对照复验，并继续建设文件和 Skill 链路。历史 Staging 结论仍只按其日期使用。
+以上为旧设计的实施笔记。V2 隔离已有实现/测试保留原日期；当前下一步以第 0 节最新范围与[当前状态矩阵](../status/current-status.md)为准，不继续把并行 Skill 链路或按 sender 隔离当作新 B 方案。
 
 相关边界见[系统设计](../02_系统设计.md)、[企业 AI Gateway 架构](../architecture/gateway-architecture.md)、[Hermes 事件协议](./hermes-event-schema.md)、[Message Store 设计](./message-store-design.md)、[Task Queue 设计](./task-queue-design.md)和[Access Control 设计](./access-control-design.md)。

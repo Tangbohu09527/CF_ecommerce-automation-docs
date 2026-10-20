@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 > 文档状态：正式 ADR 索引
-> 最近复核：2026-09-03
+> 最近复核：2026-10-20
 
 本目录提供企业自动化项目的技术决定导航。按照仓库固定规则，[技术决策记录](../05_技术决策记录.md)仍是决定正文和状态的唯一权威来源；本目录不复制完整决定，以避免两套 ADR 分叉。
 
@@ -16,6 +16,11 @@
 | 生产 Runtime | D019-D025 | 禁用 VNC、`cf-internal`、Persist-first、三个 Worker、首次 bootstrap、Secret 和闭环口径 |
 | Profile、媒体与恢复 | D026-D031 | Hermes Profile 所有权、Attachment/Artifact、`uncertain`、`group_sender` 和分层恢复 |
 | 生产 Runtime 收口 | D032-D039 | forced QR、Controller、immutable Release、Admin recovery、日志策略、Git authority、FileBrowser 和阶段口径 |
+| 最终部署、PNG与旧时序 | D040-D043 | 历史决定保留；D040仅后移，D041保留，D042/D043由下列新决定调整 |
+| 平台边界与Skills时序 | D044-D045 | 平台基础先完成；Skills后续由用户找Hermes做、独立仓库 |
+| B方案与Profile管理 | D046-D048 | 组是模板、每员工/群独立Profile；创建同步待验证，持续会话与执行中补充 |
+| 文件与聊天档案 | D049-D050 | 按任务取得/按要求保存、离线补分类撤出；消息采集/受控日期查询 |
+| Web、分组分机与后置工作 | D051-D053 | 规模决定电脑数，手工分配；部署恢复后移，高级检索/群发后置不排除当前群基础 |
 
 完整原因、影响和取代关系见[技术决策记录](../05_技术决策记录.md)。
 

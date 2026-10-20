@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > **兼容入口：本文已于 2026-08-21 由 [System Architecture](./system-architecture.md) 取代。**
 >
-> 当前生产证据见[2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md)。
+> 最新需求见[平台基础能力与最新确认](../requirements/confirmed-platform-scope.md)；固定运行证据见[2026-10-20 证据摘要](../validation/records/2026-10-20-overall-status-evidence.md)，本轮未访问生产。
 
 本路径为兼容既有链接而保留，不再维护独立的总体架构正文或生产状态副本。请从以下权威入口读取当前内容：
 

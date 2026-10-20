@@ -18,6 +18,24 @@
 
 > 状态日期：2026-08-04。正文保留概念设计；当前 durable Admission、Dispatch、Response、Delivery 和 Checkpoint 状态以顶部权威入口为准。
 
+## 0. 2026-10-20 当前档案与查询要求
+
+最新权威正文为[平台基础能力与最新确认](../requirements/confirmed-platform-scope.md)。Bot 服务端在线期间应持续采集私聊/群聊；同一份 Gateway 消息档案供人工 Web 按会话/人员/时间查看，也供机器人按获准指令读取当前群必要上文、明确引用或日期范围。Poll 负责采集，查询某天/月的已归档记录无需重新轮询微信历史。下方概念设计及 Staging 结果按原日期保留，不能推导当前档案已经完整。
+
+现有 Message 持久化、时间字段、管理查询 API 和 Message 先存后准入保留；未 `@` 可留档而不执行。当前 Polling self 在 sink 前跳过，Gateway 出站另存 Response/Delivery，不能因此保证 Bot 其他来源自发消息全留档。Poll 停止/范围、上游可见窗口和连续性亦会造成缺口，“Bot 在线”不等于“全部消息已存”。防回环应阻止自发消息触发 AI，而非永远禁止归档；Web 未开发不是唯一问题。
+
+| 时间 | 含义与当前使用 |
+| --- | --- |
+| `occurred_at` / 来源 `timestamp` | 消息在来源发生时间；当前管理查询主要按 `occurred_at` 起止筛选 |
+| `received_at` | Gateway 接收消息的时间，不冒充来源时间 |
+| `created_at` | 记录首次持久化时间，不冒充前两者 |
+
+管理读取已有 identity/conversation、start/end、limit/offset 基础（单页上限 100），时间筛选按半开区间。以北京时间表达的某天/月应转换为明确的 `[start, end)`，分页完整读取实际已归档且获准的记录；完整读取不等于一次把全部内容塞入模型。来源时间缺失及 UI 的日期表达仍需明确，不猜造时间或已采集范围。
+
+现有 Context 工具的近期/日期读取主要投影成功 Dispatch/Response，不能等同 Message 管理 API 或全部群上文。当前群近几条（包括可用的未 `@` 上文）、明确引用、日期范围受控工具仍有接入缺口，应作为基础能力；高级跨会话完整档案智能检索继续后置，不要求新 RAG。机器人不得取得管理员 Token 或数据库权限。
+
+消息/附件元数据留档、任务临时取得原件、正式文件库归档是三个动作。普通附件无任务一般不处理、不回复、不自动永久下载归档；明确查看/处理才按任务取原件，明确“存起来”才经正式文件服务保存，纯文档群可明确配置自动收件。取消离线自动补分类专项不改变 D005 等消息/已取得文件/任务状态持久化、防重与审计原则。详见[文件需求](../requirements/file-workflows.md)。
+
 ## 1. 定位
 
 Message Store 是企业 AI 的长期 Physical Conversation / 物理会话消息历史中心，也是上下文检索、权限追踪和审计的基础。它位于消息标准化之后、Identity Mapping 和 Access Control 之前，权威记录保存在 Debian。

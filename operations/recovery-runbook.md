@@ -10,9 +10,17 @@
 
 最新可核对结果见[本轮跨仓摘要](../validation/records/2026-10-20-overall-status-evidence.md)：PDF/PNG 和正常商品 ZIP 出站已有业务证据；最后生产观察是 **2026-10-19 北京时间 18:36**，收发关闭、无在途、原 Bot 登录，随后临时授权撤销、临时密码删除。这是报告时间点，本轮未访问生产，不保证当前在线状态。
 
-[10 月 11 日回退与未切换](../validation/records/2026-10-11-overall-status-evidence.md)保留为历史，不再要求恢复旧 d9 plan、重做回退或重放 apply。下一次获准现场任务应核对当时实际源码、镜像、schema、Gate、队列、Hermes 与凭据；不使用旧 PID、旧现场回执或工作树材料作为正式部署前提。当前桥接安装和最终官方 Hermes 纯配置目标见[部署指南](../deployment/deployment-guide.md#最终部署标准与候选边界)，并行候选仍开发验证中。
+[10 月 11 日回退与未切换](../validation/records/2026-10-11-overall-status-evidence.md)保留为历史，不再要求恢复旧 d9 plan、重做回退或重放 apply。下一次获准现场任务应核对当时实际源码、镜像、schema、Gate、队列、Hermes 与凭据；不使用旧 PID、旧现场回执或工作树材料作为正式部署前提。当前桥接安装和最终官方 Hermes 纯配置目标见[部署指南](../deployment/deployment-guide.md#最终部署标准与候选边界)；PR12 保留的[最终候选及失败/成功证据](../validation/records/2026-10-20-configuration-only-candidate.md)一并保留，不因优先级调整废弃。
 
-下列是按故障选择的通用恢复边界，不代表本轮已经执行或取得生产操作授权。forced fresh QR、组合 Poll/Delivery Gate 与 Archive 不复用要求不变。
+### 最新恢复目标与旧运行契约
+
+用户于 2026-10-20 确认的目标是故障/断电后开机运行一个恢复入口：检查并恢复缺失服务，微信在线则保留现有登录，离线再提示扫码，核对其他服务以及采集、AI 执行、投递状态并给出明确结果。默认不清 runtime、不重装、不升级、不迁移、不每次强制 fresh QR。服务恢复不代表可以盲目重做结果不明的历史任务。
+
+恢复入口与最终简部署保留为最终要求，优先级后移；不把无人值守高可用、自动故障切换或 watchdog 全套工程捆绑为当前交付条件。当前 AI 主机数量及分配由规模决定，分组到目标电脑以可观察、手工配置为当前方向；更改映射不能无声迁移会话、丢历史或让任务执行两遍。细节见[最新权威需求](../requirements/confirmed-platform-scope.md)。
+
+下面各故障节保留现有脚本与已验收运行契约。**现有 forced-QR、`restart: no`、Archive 不复用与新目标存在冲突，尚未通过实现和验收解决。** 不能在文档中把旧强制扫码写成用户新目标，也不能提前宣称现存脚本已能自动保留登录。本轮不改任何运行脚本，不执行恢复或现场核验。以后执行旧入口须按当次批准范围，不由本轮文档授权。
+
+普通附件默认不处理并不取消聊天档案、已取得文件和任务状态的持久保存；D005 与防重复原则继续有效。“AI 主机关机后先收所有原件、次日自动补分类”专项已撤出当前范围，离线请求的提示/结束/保留待细化，不默认批量自动重做积压业务。
 
 ## 1. 固定流程
 
@@ -33,14 +41,14 @@
 | `CF_agent-gateway` | API、Poll/Dispatch/Delivery、Controller、Context、Admin recovery；Controller v1 只组合控制 Poll/Delivery，Dispatch 属于 Release/Compose 生命周期 |
 | PostgreSQL | revision、权威状态、备份与 restore |
 | `CF_agent-wechat` | container、WeChat process、fresh QR、auth/chats/messages |
-| Hermes / AI host | external runtime、reachability、watchdog、capacity |
+| Hermes / AI host | external runtime、reachability 和 capacity；watchdog/高可用不作为当前必交条件 |
 | FileBrowser | 唯一正式 File Service 的 API、文件权限、持久审计和恢复；已有部署、受限操作和单商品业务证据；本轮未实时核验 |
 
 ## 3. 禁止事项
 
 - 不删除数据库行、Checkpoint、Queue、Response、Outbox 或 recovery audit。
 - 不手工改 Checkpoint、伪造 Response 或直接重发结果。
-- 不自动复用旧 WeChat Session 或 Archive。
+- 现有旧入口不自动复用 Archive；未来恢复目标先核对现有登录，在线保持。两者尚未完成实现对齐，不擅自改变脚本行为。
 - 不覆盖 active Release，不使用漂移镜像。
 - 不跨项目执行 Compose `down` 或 `--remove-orphans`。
 - 不打印 Token、Authorization、Cookie、QR、database URL、账号、Chat ID 或消息正文。
@@ -118,6 +126,8 @@
 
 ## 10. agent-wechat stopped
 
+以下强制扫码步骤属于[现存旧契约](#最新恢复目标与旧运行契约)，尚不满足用户要求的在线保留登录恢复入口。
+
 **Owner:** `CF_agent-wechat` + Operator。
 
 - **检查：** 容器、`restart: "no"`、Gate、Runtime/Archive 目录元数据和批准 image。
@@ -139,6 +149,8 @@
 - **证据：** 保存时间、image、流程阶段和 API aggregate 结果。
 
 ## 12. CFserver reboot
+
+以下是现存旧契约，曾有历史重启验收；最新目标先检查并保留在线登录，缺失服务恢复与离线扫码提示仍需后续实现验证，不由历史验收推定完成。
 
 **Owner:** Operator；各组件 owner 配合。
 

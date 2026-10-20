@@ -18,6 +18,18 @@
 
 > 状态日期：2026-08-04。本文仍是通用 Task Queue 目标设计。当前生产已经使用 durable Hermes Dispatch records、FIFO、lease、recovery 和独立 Worker，但这不等于本文定义的通用 Task/Provider 产品已经落地。
 
+## 0. 2026-10-20 当前执行与分组分机边界
+
+当前权威需求见[平台基础能力与最新确认](../requirements/confirmed-platform-scope.md)。下方通用 Provider/调度产品为历史目标设计，不据此扩大本轮范围或取消用户已确认的分组到电脑映射。本轮只改文档，不跑产品测试、安装或模型调用。
+
+用户已选 B：每员工/每群各自独立真实 Hermes Profile，分组提供模板，再由 Web 明确分配组任务到目标电脑。电脑数依实际人数/频率/资源，不预设固定台数或 UI 必须另机；可观察、手工明确配置是当前方向。CPU/内存与使用频率展示后续补齐，不把自动阈值分流、复杂均衡、执行中迁移或完整 Provider 产品列为已确认必做。
+
+每私聊/群的会话首次建立后持续绑定，Profile 不是每任务创建。任务、会话、Profile 和电脑映射及分配变更生效须明确，不能默认丢历史、重做在途工作或无声切换。现有 `group_sender` 按发起者分线程、revision 参与 key 与群持续会话新要求存在差距。
+
+现有同线程 FIFO 防并发与 Hermes 会话续接保留，但不等于执行中补充已实现。当前任务补充应能进入对应正在执行的过程，不能一律等前条结束后当无关任务；须区分同会话独立新请求、动作结束/不可撤销后才到达的修改。官方运行中机制及 API 接入待验证，不预先发明复杂合批系统。
+
+不再安排“AI 主机关机先收所有原件、开机自动补分类”专项。保留消息、已取得文件与任务状态的持久化、幂等和结果不明保护；离线请求如何提示/结束/保留待处理待细化，不默认次日执行全部积压业务。统一恢复入口后置，恢复服务不等于盲重做历史任务；业务 Skills 在四仓基础完成后另行制作并单独建仓库。
+
 ## 1. 定位
 
 Task Queue 是未来通用 AI 任务的持久化排队、调度和生命周期控制层。当前生产文本 Runtime 使用 durable Admission + Hermes Dispatch records，而不是本文完整的通用 Task 对象。
@@ -182,7 +194,7 @@ AI Router 结合 `requirements`、授权范围、数据地域、模型批准清�
 
 Provider 名称和模型只在路由后写入 `selected_provider` / `selected_model`，不得作为硬编码写入任务能力需求。没有满足能力、安全和权限约束的 Provider 时，Task 保持 `queued` 或按策略进入最终 `failed` / 人工处理，不能自动降级到未批准服务。
 
-Gateway 使用 AI Provider Registry 和 Provider Runtime State 管理路由事实，不以 AI Node Registry 作为核心架构。Local Provider 内部的主机发现、GPU 分配、进程和负载均衡由 Provider 自身负责。
+以上 Provider Registry 和 Provider Runtime State 是旧通用调度设计，不是本轮已确认实现；当前分组手工分配目标电脑的方向见第 0 节，不以此处旧抽象排除电脑/Profile 映射管理。
 
 ## 6. 执行状态
 
@@ -213,7 +225,7 @@ Provider Runtime State 至少包含：
 
 未来 Hermes 员工工作台按 `workspace_id` 和 `ai_thread_id` 查询 Task，并至少展示 `queue_position`、`started_at`、`elapsed_seconds`、当前状态、选定 Provider 和模型。该工作台是受控视图，不是已实现功能；显示快照不得覆盖 Task Store、attempt 或租约中的权威事实。
 
-该状态描述 Provider / Task 执行关系，不表示 Gateway 管理某台 AI 物理主机。Local Provider 可以提供节点诊断信息，但它是可选运维元数据，不形成 Gateway 节点注册表。
+上述旧状态描述 Provider / Task 执行关系。最新 Web 方向还需展示可接任务的 AI 电脑、实际资源、使用频率与分组分配；现有心跳/任务指标不等于相关采集已完成，具体模型与接口待实现细化。
 
 ## 7. 重试、超时和取消
 

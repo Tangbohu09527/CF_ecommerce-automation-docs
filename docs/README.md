@@ -1,6 +1,6 @@
 # docs 兼容与历史索引
 
-> 状态日期：2026-09-03
+> 导航同步：2026-10-20；下方历史材料保留原日期。
 >
 > 根级 `architecture/`、`deployment/`、`operations/`、`validation/`、`status/` 和 `05_技术决策记录.md` 是正式权威体系。`docs/` 不再维护第二份当前生产事实。
 
@@ -8,13 +8,15 @@
 
 | 主题 | 文档 |
 | --- | --- |
+| 最新确认/B方案/差异表 | [requirements/confirmed-platform-scope.md](../requirements/confirmed-platform-scope.md) |
 | 当前状态 | [status/current-status.md](../status/current-status.md) |
 | 当前进度 | [status/current-progress.md](../status/current-progress.md) |
 | 系统架构 | [architecture/system-architecture.md](../architecture/system-architecture.md) |
 | 部署 | [deployment/deployment-guide.md](../deployment/deployment-guide.md) |
 | 恢复 | [operations/recovery-runbook.md](../operations/recovery-runbook.md) |
 | 验证 | [validation/production-validation-checklist.md](../validation/production-validation-checklist.md) |
-| 生产证据 | [2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md) |
+| 当前证据导航 | [本轮需求同步](../validation/records/2026-10-20-requirements-sync.md)、[PR11总体](../validation/records/2026-10-20-overall-status-evidence.md)、[PR12最终候选](../validation/records/2026-10-20-configuration-only-candidate.md) |
+| 历史生产基线 | [2026-09-03 Production Closeout](../validation/records/2026-09-03-enterprise-runtime-production-closeout.md) |
 
 ## 兼容入口
 

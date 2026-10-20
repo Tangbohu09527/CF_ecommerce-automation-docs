@@ -6,9 +6,9 @@
 >
 > 文档状态：当前基线
 >
-> 状态日期：2026-10-11；运行设计沿用既有契约，实机成功保留原证据日期。
+> 需求同步日期：2026-10-20；已有运行契约与最新恢复目标并列，实机证据保留原日期。
 
-最新仓库候选、CI 与重启截止点见[2026-10-11 脱敏证据摘要](../validation/records/2026-10-11-overall-status-evidence.md)。媒体候选未合并不写成 main，仓库/隔离测试通过不代表现场已切换或附件实收通过。
+最新固定状态见[2026-10-20 总体证据](../validation/records/2026-10-20-overall-status-evidence.md)，最后现场观察为 10 月 19 日北京时间 18:36，本轮未访问生产。旧候选与重启断点保留在[10 月 11 日历史记录](../validation/records/2026-10-11-overall-status-evidence.md)。代码、隔离测试、部署与业务验收分别判断。
 
 ## 1. 目标
 
@@ -29,7 +29,9 @@ flowchart LR
 
 agent-wechat 与 Gateway 属于两个独立项目和 Compose ownership。两者通过 `cf-internal` 与 Token contract 通信。
 
-## 3. forced fresh QR 契约
+## 3. 已有 forced fresh QR 契约与新目标
+
+最新[用户确认](../requirements/confirmed-platform-scope.md)要求后置的统一恢复入口检查并恢复缺失服务，微信在线保留登录、离线再提示扫码，分别显示采集/AI 执行/投递状态；不默认清 runtime、重装、升级、迁移或每次强制 fresh QR。下面是现有契约，与新目标冲突部分尚未调整实现，本轮不修改运行脚本，不执行恢复。
 
 - agent-wechat 使用 `restart: "no"`。
 - Host、container 或 Runtime restart 后必须 fresh QR。
@@ -47,6 +49,8 @@ forced-QR R2 repository promotion 与 component documentation closeout 已于 20
 - 非 self 消息先持久化，再执行 Admission 和 V2 Routing。
 - Poll Worker 只入队 durable Dispatch，不直接调用 Hermes。
 - 首次 `LATEST` 建基线；已有环境恢复禁止重新 bootstrap。
+
+用户要求 Bot 在线期间持续采集私聊/群聊，人工 Web 与机器人复用同一 Gateway 档案。上面的 self 跳过是现存缺口：自身出站另有 Response/Delivery 不代表 Bot 其他自发消息均归档，防回环应阻止 AI 触发而非永远阻止留档。Poll 停止、范围限制、上游窗口和连续性也会影响完整性；未 `@` 可以归档但不执行，普通附件不处理不等于不存消息元数据。Poll 是采集，历史日期查询读取已归档记录，不重新轮询。
 
 ## 5. Local ID 与 generation
 
@@ -85,7 +89,7 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 
 因此 automatic boot stop gate 未验证。Operator 必须先检查状态并通过 Runtime Controller `stop` 同时停止 Poll Worker 与 Delivery Worker，再运行 forced-QR 入口；验证完成后只能用 `start` 同时恢复二者。Dispatch Worker 由 Gateway Release/Compose 生命周期独立管理。
 
-2026-10-11 用户随后已再次重启 CFserver；此次重启后状态未核验，Windows 是否关机未确认。此前已完成旧回退和旧核心恢复，新候选及两端新 plan 通过但尚未切换，新 deployment 未 `apply/start/verify`。下一步先核验现场与现存计划，符合条件再接续；不把重启前正常写成重启后恢复，不沿用旧 PID，不回到已结束的回退断点。
+10 月 11 日重启未知状态和此前完成的回退/恢复保留原记录，不再当作当前操作断点。10 月 19 日实际观察及后续候选见[10 月 20 日固定证据](../validation/records/2026-10-20-overall-status-evidence.md)。本轮不核验在线、不执行旧计划；恢复仍不得盲重做结果不明的历史任务。
 
 ## 8. AI host 与 Gateway-only 变更
 
@@ -105,7 +109,7 @@ Local ID 是来源事实，不假设跨 Session 单调。forced QR 后发生回�
 - automatic boot stop gate。
 - 上游长期消息保留窗口验证。
 - 选定 Release Commit、构建输入与现场 Image ID 的 provenance。
-- 文件/图片完整入站与出站链。
+- 保留 PDF/PNG 样本和正常 ZIP 出站限定验收；ZIP 入站、合法原文件名协议部署/收件和一般保存后检索仍分项有缺口。
 - Archive 长期保留和容量策略。
 - 上游 API/schema 升级复验。
 
