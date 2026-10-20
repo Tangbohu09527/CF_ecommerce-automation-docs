@@ -10,6 +10,8 @@
 
 本文规定企业 Runtime 的跨仓库部署顺序和门禁，不复制组件仓库的完整 Runbook。每次部署必须使用精确 commit、image digest、database revision、Compose project、回滚 Release 和脱敏验证记录。
 
+本轮用户已将简部署和统一恢复入口后置：当前先完成四仓平台基础，纯配置 MCP 或新机安装不再作为唯一主线。最终效果保留，候选和成功/失败证据不回滚、不废弃；本轮不继续部署研发。最新优先级与分组分机方向见[权威需求](../requirements/confirmed-platform-scope.md)。
+
 ### 当前现场证据与接续边界
 
 PDF、PNG 及正常商品 ZIP 出站已有真实业务证据，不能再以 10 月 11 日“新计划未切换”作为当前部署断点。旧事实保留在[历史摘要](../validation/records/2026-10-11-overall-status-evidence.md)。最后现场观察为 **2026-10-19 北京时间 18:36**：收发关闭、无在途、原 Bot 登录，随后临时授权撤销、临时密码删除；本轮不访问生产，也不推断现在运行状态。
@@ -23,9 +25,20 @@ PDF、PNG 及正常商品 ZIP 出站已有真实业务证据，不能再以 10 �
 - 不依赖 Codex 工作树、`.task-artifacts` 或旧现场回执。
 - 临时运维权限撤销后，正式业务凭业务凭据继续运行；管理权限撤销本身不证明业务持续运行已经验收。
 
-新机简部署尚未满足最终标准。另一个 Gateway 任务负责统一服务端入口和官方 Hermes 纯配置接入，**开发验证中**；本轮不接管其本地文件、分支或 PR，不等它完成才交付文档。FileBrowser [PR7](https://github.com/Tangbohu09527/CF_filebrowser-enterprise/pull/7) 已推送固定组件候选，验证首次准备中断后的恢复/拒绝边界；不是完整 Debian 联调或生产部署证明。
+新机简部署尚未满足最终标准。PR12 保存的[统一部署与官方 Hermes 最终候选证据](../validation/records/2026-10-20-configuration-only-candidate.md)按语义吸收，准确候选为：
 
-MCP 是验证路线，不能写成已迁移或生产已采用。[Gateway PR23 固定报告](https://github.com/Tangbohu09527/CF_agent-gateway/blob/1f3a1c2978bcc0b4803e6246e309fc77a7865c51/docs/validation/2026-10-20-native-http-mcp.md) 已证明不改官方源码、无项目插件/EXE/PYTHONPATH 的纯配置发现、正式图文工具消息及真实 TLS FileBrowser fixture 的合成大 ZIP 查询/导出。两个业务会话复用一个 MCP transport session、每调用元数据为空，缺可信 Gateway task/session/employee 绑定，实验哨兵返回 `trusted_task_context_missing`。尚未进入 Artifact/Response/微信协议替身交付及身份错配/过期/跨会话/重放矩阵。专用 Ubuntu CI 成功不等于全新 Debian 部署/重启；其他 CI 截止仍运行中。完整授权/撤销、任务绑定和业务链须继续验证，再单独安排获准现场验收。官方 Hermes 原版接入、无项目专用本机进程、独立新机可重建及管理权限撤销后的业务连续性须分别验收。组件既有 clean-device/compatibility CI 不自动证明这些新标准已经全部满足。
+| 候选 | 固定 HEAD | 已有结果与边界 |
+| --- | --- | --- |
+| Gateway PR24 统一入口 | `b3f2740289c6b1fa3208c352bc87b99b6f50cce4` | 隔离 Debian 13 容器真实统一入口通过，18,168,526 字节/12 成员、失败接续、撤销一次性管理密码后业务凭据可用、同镜像重建与第二次执行保留文件。systemd 观察为替身，tmpfs 非持久宿主盘；新增三组件的 booted-systemd、新机/整机重启仍缺 |
+| Gateway PR23 官方 Hermes 原生接入 | `57bb2c2830f292d5167f0bda449afafbe0a528fd` | 官方依赖环境、原生图文与真实 TLS FileBrowser fixture 查询/导出通过；可信当前任务授权和 Artifact/Response/微信替身返回未完成 |
+| FileBrowser PR7 | `47876e3a3d62affe777de8623697f62791fa5fa4` | 准备中断恢复、部署资产通过；常规检查的后端 lint 仍有 111 项失败，不写全仓绿 |
+| WeChat PR11 | `e56c7e4b606f1614e54210a391906f4be7440f5e` | 组件边界、Debian clean、forced-QR 和 media 检查通过；不含实际微信登录/收发，也未切换协议文件名候选 |
+
+MCP 仍是候选路线，不能写成已迁移或生产已采用。PR23 最终探针使用固定官方 Hermes `427d605d4985c2d49a795493ef6c5d66413057d1`，官方锁定 Python 3.14.7 与默认完整 `[all]` 依赖，53 项适用约束全部满足；旧自选依赖子集和 Windows Python 3.12 诊断不作为正式依赖验收。官方依赖阶段成功不等于完整安装器或 Windows 新机验收，跨机器 MCP HTTPS 尚未证明。
+
+两个业务会话复用一个 MCP transport session，每次调用 `_meta={}`；可信 Gateway task/session/employee 绑定缺失，`trusted_task_context_missing` 实际拒绝且 `task_return_authorized=false`。Profile 字段或静态 header 不提供同 Profile 并发任务的可信身份。尚未进入 Artifact/Response/微信协议替身交付及身份错配、过期、跨会话、重放矩阵。不能让模型填写可信 task ID 或放宽授权补齐结果。两个隔离组合不能拼成已经通过的完整业务链；CI 通过也不代替正式部署/微信实收。准确运行与原失败保留在上述固定记录，本轮没有重跑。
+
+官方 Profile 管理与纯配置文件工具是不同目标：B 方案、Gateway 受控创建/同步 Profile 的方向已确认，但保存引用、实际路由、自动创建、同步更新、已有会话生效时机须分别验证。不能由 MCP 工具发现或官方支持某接口宣称 Gateway 已完成 Profile 管理。
 
 时区默认值候选与运行配置分别核对：Gateway PR22、WeChat PR10、FileBrowser PR6/7 未合并；报告中的实际时区调整不等于候选镜像已运行。按批准策略分别记录宿主、应用日志、数据库存储及连接时区，不沿用旧“全部容器 UTC”的一刀切结论。
 
@@ -52,6 +65,8 @@ MCP 是验证路线，不能写成已迁移或生产已采用。[Gateway PR23 �
 - 不记录内网 IP、主机账号、Secret 或 Windows 本地绝对路径。
 
 ## 4. 标准部署顺序
+
+本节和第 5、6 节保留**现有运行脚本的旧契约说明**，不是本轮新恢复目标。用户已确认未来恢复入口应先检查：微信在线则保留现有登录，离线再提示扫码，不默认清 runtime、重装或强制 fresh QR。现存 forced-QR、`restart: no` 与 Archive 不复用流程尚未调整，存在明确差异；须另行实现和验收后才能替换，本轮不改脚本、不执行流程。详见[恢复目标与旧契约](../operations/recovery-runbook.md#最新恢复目标与旧运行契约)。
 
 ### 4.1 Host、Docker、storage、network
 
@@ -81,7 +96,7 @@ Bootstrap 只检查 Docker/Compose/目录/权限/Token mount/网络，不登录�
 - Token read-only；
 - Archive 不自动复用。
 
-### 4.6 fresh QR
+### 4.6 旧 forced-QR 契约
 
 1. 检查 Controller status。
 2. 通过 Controller `stop` 显式关闭组合 Poll/Delivery Gate，不假设 Host boot 后已 stopped。
@@ -119,7 +134,9 @@ Dispatch Worker 已在 Gateway Release/Compose 生命周期中独立启动并验
 
 执行[生产验证清单](../validation/production-validation-checklist.md)，失败或未运行项不得被健康检查替代。
 
-## 5. 四类变更
+## 5. 四类变更的旧运行契约
+
+下表是现存契约，不能当作新用户要求“每次恢复必须扫码”；新入口的状态检查和登录保留规则尚未实现/验收。
 
 | 场景 | fresh QR | 核心动作 |
 | --- | --- | --- |
@@ -153,14 +170,14 @@ FileBrowser 已有同机部署、受限 API 与客户端操作、一个商品 4 
 8. File Service permission/audit。
 9. Gateway/Hermes integration。
 
-FileBrowser 保持唯一正式文件系统，Gateway/Hermes 通过 API、权限与审计接入；正式原件与工作副本分开。PDF/PNG 和正常 ZIP 出站的限定验收保留；ZIP 入站、更多资料整理、共享群收件和通用加工回存继续分项推进。小批量资料整理与文件类 Skill 可并行安排，路径调整明确暂缓；最终简部署由独立候选按本页标准验证。
+FileBrowser 保持唯一正式文件系统，Gateway/Hermes 通过 API、权限与审计接入；正式原件与工作副本分开。PDF/PNG 和正常 ZIP 出站的限定验收保留；文件名原样保留与 ZIP 入站仍有缺口，通道回传不证明按要求保存后独立检索完成。普通附件默认不处理，按任务取得、明确要求才正式保存，纯文档群可明确配置例外。Skills 在四仓基础完成后由用户找 Hermes 制作并单独建仓；原并行试点安排已调整。路径调整明确暂缓，简部署与恢复入口后置，已有候选按各自真实证据保留。
 
 ## 8. 禁止事项
 
 - 把一个项目的 Compose 当成另一个项目的所有者。
 - 打印 `.env`、Token、Authorization 或 database URL。
 - 把未合并候选或组件文档 PR 写成 main/已部署，或把旧故障手册起点当作最新现场断点。
-- 用旧 Session 或 Archive 跳过 fresh QR。
+- 执行适用的旧 forced-QR 入口时擅自绕过其契约；未来恢复入口的在线登录保留目标按本页所列差异另行实现和验收。
 - 用手工数据库写入恢复 `uncertain`。
 - 把 FileBrowser 限定部署扩大为完整文件业务验收，或把企业 Skills Runtime、独立 OCR、旺店通/S6 的规划写成已经上线。
 

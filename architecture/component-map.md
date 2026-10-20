@@ -1,23 +1,23 @@
 # 组件职责图谱
 
-> 状态日期：2026-10-11。以下职责与带日期能力不表示当前在线；用户已重启 CFserver，重启后现场尚未核验。完整 SHA、PR、精确 CI 和实机截止点见 [证据摘要](../validation/records/2026-10-11-overall-status-evidence.md)。
+> 需求同步日期：2026-10-20。最后现场观察为 10 月 19 日北京时间 18:36；本轮未实时核验。固定 SHA、PR、CI 和现场边界见[总体证据](../validation/records/2026-10-20-overall-status-evidence.md)与[PR12 后续候选证据](../validation/records/2026-10-20-configuration-only-candidate.md)。
 
 | 组件 | Repository implementation | Deployment / validation | Remaining boundary |
 | --- | --- | --- | --- |
-| Gateway API | 身份、策略、Profile、Admin 和 Runtime health 已实现；新候选未合并状态见证据摘要 | 历史文本控制链通过；10 月 11 日旧核心恢复完成，新候选未切换 | 重启后核验、完整管理面与所有恢复动作 |
-| Poll Worker | Polling、Checkpoint generation/rebase、Persist-first 已实现 | 历史 forced-QR 连续性有证据；10 月 11 日重启前停止 | 重启后核验、长期窗口和历史连续性残余问题 |
-| Dispatch Worker | durable Dispatch、Hermes、FIFO、`uncertain` 已实现 | 9 月 17 日分钟级文本回传通过；10 月 11 日重启前旧 Dispatch 运行 | 重启后核验、媒体和长期容量 |
-| Delivery Worker | durable Outbox、Attempt、Receipt、reconciliation 已实现 | 历史文本投递通过；10 月 11 日重启前停止 | 原聊天实际附件实收待验收 |
-| PostgreSQL | 历史 schema `20260823_04`；权威消息与任务状态 | 10 月 11 日重启前用户回传正常，重启后未知 | 新现场核验与 restore 演练 |
-| Runtime Controller | v1 组合 stop/start Poll Worker 与 Delivery Worker；不控制 Dispatch | 10 月 11 日 complete-rollback 完成、重启前 Gate 关闭 | 重启后重新检查 Gate；automatic boot stop gate 未验收 |
-| external agent-wechat | 媒体候选与 main、PR、CI 分开记录 | 历史 forced-QR 和文本有证据；新候选未完成切换与媒体实收验收 | 新现场登录/Gate、来源映射与媒体闭环 |
-| 官方 Hermes 与工具 | 外部服务；文件读取/工作副本能力按固定版本和调用边界记录 | 历史文本通过；10 月 6 日本机 PDF/真实辅助视觉通过；10 月 11 日 Windows 是否关机未知 | 完整 Agent 文件业务与 watchdog、告警、容量、HA |
-| Context Runtime | Timeline、Snapshot、search 和授权读取 | 历史实现/测试/部署代码证据 | 全能力生产演练、RAG/Memory |
+| Gateway API | 身份/策略/Profile 引用等数据库与读取 API、Admin 恢复及 health 有基础 | 历史文本控制链有证据；精确候选与部署分别记录 | 员工群聊权限、分组/模板管理写接口、B 方案 Profile 编排和 Web |
+| Poll Worker | Polling、Checkpoint generation/rebase、Persist-first | 历史 forced-QR 连续性有证据 | self 跳过、Poll 停止/范围、上游窗口与连续性造成档案缺口 |
+| Dispatch Worker | durable Dispatch、Hermes 会话续接、FIFO、`uncertain` | 9 月 17 日分钟级文本回传通过，后续文件通道另留证 | FIFO 不等于执行中补充；B 方案群持续会话和分组分机待接通 |
+| Delivery Worker | durable Outbox、Attempt、Receipt、reconciliation | PDF/PNG 样本及正常 ZIP 出站已有限定实收 | 原文件名实际协议部署/收件验收、其他文件场景分项补齐 |
+| PostgreSQL | 权威 Message/Admission/Dispatch/Response/Delivery 与持久化 | 历史 schema 和现场证据各按日期 | restore 演练；保留原持久化/防重原则，不因取消离线分类而废弃 |
+| Runtime Controller | v1 组合 stop/start Poll Worker 与 Delivery Worker；不控制 Dispatch | 历史受控恢复和 Gate 证据 | 统一恢复入口后置；旧 forced-QR 与在线保留登录目标冲突，未改实现 |
+| external agent-wechat | 微信读取、登录、媒体通道与候选各按 SHA 记录 | 历史文本、PDF/PNG 和正常 ZIP 出站各有证据 | ZIP 入站、合法原文件名、采集连续性；未重做现场核验 |
+| 官方 Hermes 与工具 | 外部 Agent/文件工具；已有 Profile 引用/会话请求基础 | 历史文本、PDF/PNG 理解及隔离官方纯配置实验 | 真实 Profile 路由/创建/同步/旧会话生效逐项待验证，可信任务关联仍缺 |
+| Context Runtime | 成功任务 Timeline、Snapshot、search 和授权读取 | 历史实现/测试/部署代码证据 | 当前群 Message 上文、引用、日期查询工具接入；高级跨会话检索后置 |
 | Admin recovery | inspect、retry-approved、mark-dead、confirm-success | 历史实现/测试与限定现场恢复证据 | 每种动作生产演练 |
-| Media Runtime | 入站/出站与内容读取有候选代码和隔离测试，分支状态见证据摘要 | 历史图片字节及本机读取不替代微信附件闭环 | 入站字节、理解、归档、查询回传、原聊天实收、加工回存分别验收 |
-| FileBrowser | 唯一正式 File Service；集成 `bb11be4…` 未合并 main，专项 CI 与 regular 失败分开记录 | 9 月 26—27 日部署/受限读写；10 月 6 日已存 PDF/PNG 下载与本机理解 | 完整微信文件业务、迁移/restore、WebDAV/OnlyOffice |
-| Skills / 旺店通 / S6 | 未接入 | 未部署、未验证 | 后续实施 |
-| 轻量 Gateway Web | 待规划 | 未开发/未验收 | 局域网 IP、Gateway 权限、已接收部分聊天/任务查询；不承诺微信完整历史，不复制文件权限 |
+| Media Runtime | 任务取件、READY Artifact 等已有实现/候选和隔离验证 | PDF/PNG 样本、正常 ZIP 出站通道已验收 | 取件、正式保存、独立检索交付分别判断；不自动下载永久归档所有附件 |
+| FileBrowser | 唯一正式 File Service；受限查询/读写及文件操作基础保留 | 单商品归档、原包保留、正常 ZIP 导出已有证据；CI 失败保留 | 通用文件业务、迁移/restore、WebDAV/OnlyOffice 及完整关联审计 |
+| Skills / 旺店通 / S6 | 具体业务理解/流程后续承接 | 未作为本轮交付 | 四仓基础完成后用户另找 Hermes 制作并另建 Skills 仓库；不并行试点 |
+| Gateway Web | 七项管理展示方向已确认；已有部分数据库/读取 API | 页面未开发；CPU/内存/频率采集尚缺 | 管理写接口、B 方案状态、资源/频率采集与页面分开，不称后台全完成 |
 
 ```mermaid
 flowchart LR
@@ -34,4 +34,4 @@ flowchart LR
     H -. "受限 API / 工作副本" .-> FB["FileBrowser<br/>唯一正式文件系统"]
 ```
 
-图示不表示本次重启后在线；文件业务完整链尚待验收。AI 与员工共用 FileBrowser，正式访问经其 API、权限与审计，Gateway 私有媒体只做受控中转。内容分类、指定目录归档、查找回传及加工回存沿用 [9 月 27 日业务需求](../requirements/file-workflows.md)。正式状态以[当前状态矩阵](../status/current-status.md)为准。
+图示不表示本轮实时在线。AI 与员工共用 FileBrowser，正式访问经其 API、权限与审计，Gateway 私有媒体只做受控中转。分组模板派生每员工/群独立 Profile，再按组明确分配目标电脑；机器数与变更规则不预设。完整关系见[最新权威确认](../requirements/confirmed-platform-scope.md)，文件触发见[文件业务需求](../requirements/file-workflows.md)，事实见[当前状态矩阵](../status/current-status.md)。
