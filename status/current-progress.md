@@ -1,5 +1,7 @@
 # 当前进度与下一步
 
+> 管理台交付补充（2026-10-21）：[真实对象优先的微信管理台](../validation/records/2026-10-21-wechat-management-console-delivery.md)已在 CFserver 独立候选运行，真实联系人/已发现群/归档消息及 LAN 页面已核验；从好友关联员工、授权和分组，不需手填内部 ID。当前微信进程离线，资料明确为缓存；候选权限不影响正式派发。保留以下历史起点与 PR13 B 方案。
+
 > 后续交付补充（2026-10-20）：本轮获准 A→B 的候选和可复用本机入口见[交付索引](../validation/records/2026-10-20-profile-b-management-delivery.md)。Gateway Draft PR25、WeChat 准备 Draft PR12 均未合并；没有生产操作。以下 PR13 原任务“本轮”指需求同步，不是本次实施范围；未继续其他批次或业务 Skills。
 
 > 需求同步：2026-10-20。[本轮用户确认正文](../requirements/confirmed-platform-scope.md)和[需求差异表](../requirements/confirmed-platform-scope.md#9-需求差异表)优先于两份旧证据中的当时待办。状态与代码/隔离/现场分层见[状态矩阵](./current-status.md)。本轮仅文档同步，不启动下列功能或验证工作。

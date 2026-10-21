@@ -1,5 +1,7 @@
 # 当前状态矩阵
 
+> 管理台交付补充（2026-10-21）：Gateway Draft PR26 在 PR25 上接续，CFserver 独立候选及真实只读资料、LAN 浏览器、候选重建持久化已通过；[交付索引](../validation/records/2026-10-21-wechat-management-console-delivery.md)记录覆盖和边界。当前读取微信离线缓存；群/成员与历史完整性仍有缺口，候选权限不代表正式生效。以下旧矩阵保留原日期，不覆盖本次组件结果。
+
 > 后续交付补充（2026-10-20）：[独立 Profile B 与管理 Web 隔离结果](../validation/records/2026-10-20-profile-b-management-delivery.md)。四真实 Profile 创建、路由、持续会话、受管模板同步及核心管理 Web 已隔离通过；旧会话即时刷新未接通，真实微信/异机部署未验收。以下矩阵保留 PR13 起点事实，不覆盖新增组件证据，也不表示已部署生产。
 
 > 需求同步：2026-10-20。当前目标以[用户最新确认](../requirements/confirmed-platform-scope.md)及 D044—D053 为准；实现与观察分层。最后生产观察为 **2026-10-19 北京时间 18:36**，本轮未访问生产。
